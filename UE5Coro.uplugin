@@ -1,0 +1,26 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "UE5Coro",
+	"Description": "C++20 coroutine implementation for Unreal Engine",
+	"Category": "Programming",
+	"CreatedBy": "Laura Andelare",
+	"CreatedByURL": "https://github.com/landelare/ue5coro",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"EnabledByDefault" : true,
+	"CanContainContent": false,
+	"CanContainVerse": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "UE5Coro",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
