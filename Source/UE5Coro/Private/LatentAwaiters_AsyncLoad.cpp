@@ -29,82 +29,50 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "Engine/StreamableManager.h"
 #include "UE5Coro/LatentAwaiters.h"
-#include "Engine/World.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
 
 namespace
 {
-bool WaitOnce(void*& State, bool)
+struct FLatentLoader
 {
-	if (State)
+	FStreamableManager Manager;
+	TSharedPtr<FStreamableHandle> Handle;
+
+	explicit FLatentLoader(const auto& Path)
 	{
-		State = nullptr;
+		Handle = Manager.RequestAsyncLoad(Path.ToSoftObjectPath());
+	}
+};
+
+bool ShouldResume(void*& Loader, bool bCleanup)
+{
+	auto* This = static_cast<FLatentLoader*>(Loader);
+
+	if (bCleanup) [[unlikely]]
+	{
+		delete This;
 		return false;
 	}
-	return true;
+
+	auto& Handle = This->Handle;
+
+	// This is the same logic that Kismet uses
+	return !Handle.IsValid() ||
+		Handle->HasLoadCompleted() ||
+		Handle->WasCanceled();
+}
 }
 
-bool WaitUntilFrame(void*& State, bool)
+FLatentAwaiter Latent::AsyncLoadObject(TSoftObjectPtr<UObject> Ptr)
 {
-	return GFrameNumber >= reinterpret_cast<intptr_t>(State);
+	return FLatentAwaiter(new FLatentLoader(Ptr), &ShouldResume);
 }
 
-template<auto GetTime>
-bool WaitUntil(void*& State, bool bCleanup)
+FLatentAwaiter Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr)
 {
-	// Don't attempt to access GWorld in this case, it could be nullptr
-	if (bCleanup) [[unlikely]]
-		return false;
-
-	float& TargetTime = reinterpret_cast<float&>(State);
-	return (GWorld->*GetTime)() >= TargetTime;
-}
-
-template<auto GetTime>
-FLatentAwaiter GenericSeconds(float Seconds)
-{
-	void* State = nullptr;
-	reinterpret_cast<float&>(State) = (GWorld->*GetTime)() + Seconds;
-	return FLatentAwaiter(State, &WaitUntil<GetTime>);
-}
-}
-
-FLatentCancellation Latent::Abort()
-{
-	return {};
-}
-
-FLatentAwaiter Latent::NextTick()
-{
-	return FLatentAwaiter(reinterpret_cast<void*>(1), &WaitOnce);
-}
-
-FLatentAwaiter Latent::Frames(int32 Frames)
-{
-	ensureMsgf(Frames >= 0, TEXT("Invalid number of frames %d"), Frames);
-	intptr_t TicksPtr = GFrameNumber + Frames;
-	return FLatentAwaiter(reinterpret_cast<void*>(TicksPtr), &WaitUntilFrame);
-}
-
-FLatentAwaiter Latent::Seconds(float Seconds)
-{
-	return GenericSeconds<&UWorld::GetTimeSeconds>(Seconds);
-}
-
-FLatentAwaiter Latent::UnpausedSeconds(float Seconds)
-{
-	return GenericSeconds<&UWorld::GetUnpausedTimeSeconds>(Seconds);
-}
-
-FLatentAwaiter Latent::RealSeconds(float Seconds)
-{
-	return GenericSeconds<&UWorld::GetRealTimeSeconds>(Seconds);
-}
-
-FLatentAwaiter Latent::AudioSeconds(float Seconds)
-{
-	return GenericSeconds<&UWorld::GetAudioTimeSeconds>(Seconds);
+	return FLatentAwaiter(new FLatentLoader(Ptr), &ShouldResume);
 }

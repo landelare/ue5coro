@@ -46,7 +46,7 @@ namespace UE5Coro::Latent
 {
 /** Stops the latent coroutine immediately WITHOUT firing the latent exec pin.<br>
  *  The coroutine WILL NOT be resumed. */
-UE5CORO_API Private::FLatentCancellation Abort();
+Private::FLatentCancellation Abort();
 
 /** Resumes the coroutine in the next tick.<br>
  *  Useful in a generic are-we-there-yet loop since latent actions poll anyway. */
@@ -70,6 +70,12 @@ UE5CORO_API Private::FLatentAwaiter RealSeconds(float);
 /** Resumes the coroutine the specified amount of seconds later.<br>
  *  This is affected by pause only, NOT time dilation. */
 UE5CORO_API Private::FLatentAwaiter AudioSeconds(float);
+
+/** Asynchronously starts loading the object, resumes once it's loaded. */
+UE5CORO_API Private::FLatentAwaiter AsyncLoadObject(TSoftObjectPtr<UObject>);
+
+/** Asynchronously starts loading the class, resumes once it's loaded. */
+UE5CORO_API Private::FLatentAwaiter AsyncLoadClass(TSoftClassPtr<UObject>);
 
 /** Resumes the coroutine once the chained static latent action has finished,
  *  with automatic parameter matching.<br>Example usage:<br>
@@ -121,6 +127,11 @@ public:
 	void await_suspend(std::coroutine_handle<FAsyncPromise>);
 	void await_suspend(std::coroutine_handle<FLatentPromise>);
 };
+}
+
+inline UE5Coro::Private::FLatentCancellation UE5Coro::Latent::Abort()
+{
+	return {};
 }
 
 #include "LatentChain.inl"
