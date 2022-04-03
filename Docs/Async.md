@@ -73,6 +73,28 @@ There are some other situations that could cause unexpected behavior:
 Generally speaking, the same rules and limitations apply as the underlying system
 that drives the current awaiter.
 
+### Overlapping awaiters
+
+It is possible to run multiple awaiters overlapped, which makes sense for some of
+them that perform useful actions and not just wait (but not limited to them):
+
+```cpp
+using namespace UE5Coro;
+
+FAsyncCoroutine AMyActor::GuaranteedSlowLoad(int, FLatentActionInfo)
+{
+    // Awaiter types are in the Private namespace and subject to change, use auto
+    auto Wait1 = Latent::Seconds(1); // The clock starts now!
+    auto Wait2 = Latent::Seconds(0.5);
+    auto Load1 = Latent::AsyncLoadObject(MySoftPtr1);
+    auto Load2 = Latent::AsyncLoadObject(MySoftPtr2);
+    co_await Load1;
+    co_await Load2;
+    co_await Wait1; // Waste the remainder of that 1 second
+    co_await Wait2; // This will resume immediately, not half a second later
+}
+```
+
 ### Chained latent actions
 
 Most existing latent actions in the engine return `void` so there's nothing that
