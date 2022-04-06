@@ -156,34 +156,83 @@ latent function has returned. If for some reason you need exactly this, refer to
 the implementation of `Latent::ChainEx` to see how to register yourself with
 `UUE5CoroSubsystem` and call the function taking rvalue references directly.
 
-## Async coroutines and garbage collection
+## Coroutines and UObject lifetimes
 
-The caveats are mostly the same as with regular `AsyncTask`s, but due to the
-easy-to-write, synchronous-looking nature of coroutines it can be harder to notice
-if you're dealing with `UObject`s incorrectly.
+While coroutines provide a synchronous-looking interface, they do not run
+synchronously, and this can lead to problems that might be harder to spot due to
+the friendly linear-looking syntax. Most coroutines will not need to worry about
+these issues, but for advanced scenarios it's something you'll need to keep in
+mind.
 
-Your function immediately returns when you `co_await`, which is important if,
-e.g., it's called from the game thread and you're dealing with `UObjects` through
-parameters or `this`. These values are technically living in a "vanilla C++"
-struct without any `UPROPERTY` declarations and therefore can be eligible for
-garbage collection while you're on another thread:
+Your function immediately returns when you `co_await`, which means that the
+garbage collector might run before you resume. Your function parameters and local
+variables technically live in a "vanilla C++" struct with no UPROPERTY
+declarations and therefore are eligible for garbage collection.
+
+The usual solutions for multithreading and `UObject` access/GC keepalive such as
+`AddToRoot`, `FGCObject`, `TStrongObjectPtr`, etc. still apply. If something would
+work for `std::vector` it will probably work for coroutines, too.
+
+Examples of dangerous code:
 
 ```cpp
+using namespace UE5Coro;
+
+FAsyncCoroutine AMyActor::Latent(UObject* Obj, FLatentActionInfo)
+{
+    // You're synchronously running before the first co_await, Obj is as your
+    // caller passed it in. TWeakObjectPtr is safe to keep outside a UPROPERTY.
+    TWeakObjectPtr<UObject> ObjPtr(Obj);
+
+    co_await Latent::Seconds(1); // Obj might get garbage collected during this!
+
+    if (Obj) // This is useless, Obj could be a dangling pointer
+        Foo(Obj);
+    if (auto* Obj2 = ObjPtr.Get()) // This is safe
+        Foo(Obj2);
+
+    // This is also safe! co_await will not resume if `this` is destroyed, so you
+    // would not reach this line, but your local variables would run their
+    // destructors and get freed as expected (see "Latent Mode" above).
+    if (SomeUPropertyOnAMyActor)
+        Foo(this);
+
+    // Latent protection extends to awaiting Async awaiters and thread hopping:
+    co_await Async::MoveToThread(ENamedThreads::AnyBackgroundThreadNormalTask);
+    Foo(this); // Not safe, the GC might run on the game thread
+    co_await Async::MoveToGameThread();
+    Foo(this); // But this is OK! The co_await above resumed so `this` is valid.
+}
+```
+
+Especially dangerous if you're running on another thread, `this` protection
+and `co_await` _not_ resuming the coroutine does not apply if you're not latent:
+
+```cpp
+using namespace UE5Coro;
+
 FAsyncCoroutine UMyExampleClass::DontDoThisAtHome(UObject* Dangerous)
 {
-    UObject* Obj = NewObject<UObject>();
+    checkf(IsInGameThread(), TEXT("This example needs to start on the GT"));
 
+    // You can be sure this remains valid until you co_await
+    UObject* Obj = NewObject<UObject>();
+    if (IsValid(Dangerous))
+        Dangerous->Safe();
+
+    // Latent protection applies when co_awaiting Latent awaiters even if you're
+    // not latent, this might not resume if ActorObj gets destroyed:
+    co_await Latent::Chain(&ASomeActor::SomethingLatent, ActorObj, 1.0f);
+
+    // But not here:
     co_await Async::MoveToThread(ENamedThreads::AnyBackgroundThreadNormalTask);
     // You're no longer synchronously running on the game thread,
-    // Obj *IS* eligible for garbage collection!
-
+    // Obj *IS* eligible for garbage collection and Dangerous might be dangling!
     co_await Async::MoveToGameThread();
-    // You're back on the game thread, all of these could be dangling pointers:
+
+    // You're back on the game thread, but all of these could be destroyed by now:
     Dangerous->OhNo();
     Obj->Ouch();
     SomeMemberVariable++; // Even `this` could be GC'd by now!
 }
 ```
-
-The usual solutions for multithreading and `UObject` access/GC keepalive such as
-`AddToRoot`, `FGCObject`, `TStrongObjectPtr`, etc. still apply.
