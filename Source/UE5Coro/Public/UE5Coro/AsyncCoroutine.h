@@ -172,8 +172,12 @@ void FLatentPromise::Init(FLatentActionInfo LatentInfo, auto&... Args)
 	Init(Args...);
 }
 
-void FLatentPromise::Init(auto&, auto&... Args)
+void FLatentPromise::Init(auto& First, auto&... Args)
 {
-	Init(Args...);
+	// Convert UObject& to UObject* for world context
+	if constexpr (std::is_convertible_v<decltype(First), const UObject&>)
+		Init(static_cast<const UObject*>(std::addressof(First)), Args...);
+	else
+		Init(Args...);
 }
 }
