@@ -131,12 +131,22 @@ private:
 
 	void CreateLatentAction(FLatentActionInfo&&);
 	void Init();
-	void Init(const UObject*, auto&...);
-	void Init(FLatentActionInfo, auto&...);
-	void Init(auto&, auto&...);
+	
+	template<typename... TArgs>
+	void Init(const UObject*, TArgs&...);
+	
+	template<typename... TArgs>
+	void Init(const UObject& WorldContext, TArgs&... Args);
+	
+	template<typename... TArgs>
+	void Init(FLatentActionInfo, TArgs&...);
+	
+	template<typename TFirstArg, typename... TArgs, typename = typename TEnableIf<!std::is_base_of_v<UObject, TFirstArg>>::Type>
+	void Init(TFirstArg&, TArgs&...);
 
 public:
-	explicit FLatentPromise(auto&&...);
+	template<typename... TArgs>
+	explicit FLatentPromise(TArgs&&...);
 
 	std::atomic<ELatentState>& GetMutableLatentState() { return LatentState; }
 	void SetCurrentAwaiter(FLatentAwaiter*);
@@ -146,7 +156,8 @@ public:
 	void return_void();
 };
 
-FLatentPromise::FLatentPromise(auto&&... Args)
+template<typename... TArgs>
+FLatentPromise::FLatentPromise(TArgs&&... Args)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent coroutines may only be started on the game thread"));
@@ -154,7 +165,8 @@ FLatentPromise::FLatentPromise(auto&&... Args)
 	Init(Args...); // Deliberately not forwarding to force lvalue references
 }
 
-void FLatentPromise::Init(const UObject* WorldContext, auto&... Args)
+template<typename... TArgs>
+void FLatentPromise::Init(const UObject* WorldContext, TArgs&... Args)
 {
 	// Keep trying to find a world from the UObjects passed in
 	if (!World && WorldContext)
@@ -163,7 +175,19 @@ void FLatentPromise::Init(const UObject* WorldContext, auto&... Args)
 	Init(Args...);
 }
 
-void FLatentPromise::Init(FLatentActionInfo LatentInfo, auto&... Args)
+template<typename... TArgs>
+void FLatentPromise::Init(const UObject& WorldContext, TArgs&... Args)
+{
+	// *this will be passed as an argument to the coroutine constructor when called from a member function.
+	// This allows a cleaner way of grabbing the world from member functions, since those generally don't have a world context argument.
+	if (!World)
+		World = WorldContext.GetWorld(); // null is fine
+
+	Init(Args...);
+}
+
+template<typename... TArgs>
+void FLatentPromise::Init(FLatentActionInfo LatentInfo, TArgs&... Args)
 {
 	// The static_assert on coroutine_traits prevents this
 	check(!PendingLatentCoroutine);
@@ -172,7 +196,8 @@ void FLatentPromise::Init(FLatentActionInfo LatentInfo, auto&... Args)
 	Init(Args...);
 }
 
-void FLatentPromise::Init(auto&, auto&... Args)
+template<typename TFirstArg, typename... TArgs, typename>
+void FLatentPromise::Init(TFirstArg&, TArgs&... Args)
 {
 	Init(Args...);
 }
