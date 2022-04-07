@@ -83,7 +83,7 @@ struct FInitialSuspend
 
 	bool await_ready() noexcept { return Action == Ready; }
 	void await_resume() noexcept { }
-	void await_suspend(std::coroutine_handle<> Handle) noexcept
+	void await_suspend(std::coroutine_handle<FLatentPromise> Handle) noexcept
 	{
 		if (Action == Destroy)
 			Handle.destroy();

@@ -40,10 +40,10 @@ namespace
 {
 struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 {
-	std::coroutine_handle<> Handle;
+	std::coroutine_handle<FAsyncPromise> Handle;
 	FLatentAwaiter* Awaiter;
 
-	FPendingAsyncCoroutine(std::coroutine_handle<> Handle,
+	FPendingAsyncCoroutine(std::coroutine_handle<FAsyncPromise> Handle,
 	                       FLatentAwaiter* Awaiter)
 		: Handle(Handle), Awaiter(Awaiter) { }
 
