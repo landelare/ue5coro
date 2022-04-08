@@ -82,7 +82,7 @@ void FLatentCancellation::await_suspend(
 		ensureMsgf(CurrentState == FLatentPromise::LatentRunning,
 		           TEXT("Unexpected state in latent coroutine %d"), CurrentState);
 	);
-	LatentState = FLatentPromise::Aborted;
+	LatentState = FLatentPromise::Canceled;
 }
 
 FLatentAwaiter::~FLatentAwaiter()

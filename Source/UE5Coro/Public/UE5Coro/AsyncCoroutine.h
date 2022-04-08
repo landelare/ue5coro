@@ -121,7 +121,7 @@ public:
 		LatentRunning,
 		AsyncRunning,
 		DeferredDestroy,
-		Aborted,
+		Canceled,
 		Done,
 	};
 

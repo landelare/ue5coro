@@ -75,7 +75,7 @@ public:
 
 		auto State = Promise.GetMutableLatentState().load();
 
-		if (State >= FLatentPromise::Aborted)
+		if (State >= FLatentPromise::Canceled)
 			Response.DoneIf(true);
 		if (State == FLatentPromise::Done)
 			Response.TriggerLink(LatentInfo.ExecutionFunction, LatentInfo.Linkage,

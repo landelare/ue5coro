@@ -45,8 +45,9 @@ class FLatentPromise;
 namespace UE5Coro::Latent
 {
 /** Stops the latent coroutine immediately WITHOUT firing the latent exec pin.<br>
- *  The coroutine WILL NOT be resumed. */
-Private::FLatentCancellation Abort();
+ *  The coroutine WILL NOT be resumed. This does not count as the coroutine being
+ *  aborted. */
+Private::FLatentCancellation Cancel();
 
 /** Resumes the coroutine in the next tick.<br>
  *  Useful in a generic are-we-there-yet loop since latent actions poll anyway. */
@@ -129,7 +130,7 @@ public:
 };
 }
 
-inline UE5Coro::Private::FLatentCancellation UE5Coro::Latent::Abort()
+inline UE5Coro::Private::FLatentCancellation UE5Coro::Latent::Cancel()
 {
 	return {};
 }

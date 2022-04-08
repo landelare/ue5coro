@@ -49,7 +49,7 @@ void FAsyncAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
 	auto& State = Promise.GetMutableLatentState();
 	checkCode(
 		auto CurrentState = State.load();
-		checkf(CurrentState < FLatentPromise::Aborted,
+		checkf(CurrentState < FLatentPromise::Canceled,
 		       TEXT("Unexpected latent coroutine state %d"), CurrentState);
 	);
 

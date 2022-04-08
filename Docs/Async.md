@@ -32,7 +32,7 @@ need to call `AddNewAction()`.
 
 The output exec pin will fire in BP when the coroutine `co_return`s (most often
 this happens naturally as control leaves the scope of the function), but you can
-stop this by issuing `co_await Latent::Abort();`.
+stop this by issuing `co_await Latent::Cancel();`.
 
 If the `UFUNCTION` is called again with the same callback target/UUID while a
 coroutine is already running, a second copy will **not** start similarly to most
@@ -50,7 +50,7 @@ form of the RAII guard objects in `LatentCallbacks.h`. Having them in scope when
 a latent coroutine is aborted or destroyed will execute the provided callable
 that may perform special cleanup tasks. This is an advanced scenario, normally you
 would use regular RAII or `ON_SCOPE_EXIT` instead of specializing for each one of
-these callbacks. Note that `Latent::Abort()` does not count as either of these.
+these callbacks. Note that `Latent::Cancel()` does not count as either of these.
 
 ## Awaiters
 
