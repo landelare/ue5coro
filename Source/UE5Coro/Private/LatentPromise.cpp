@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "LatentActions.h"
+#include "LatentExitReason.h"
 #include "UE5Coro/AsyncCoroutine.h"
 #include "UE5Coro/LatentAwaiters.h"
 
@@ -39,14 +40,14 @@ namespace
 {
 class [[nodiscard]] FPendingLatentCoroutine : public FPendingLatentAction
 {
-	std::coroutine_handle<FLatentPromise> Handle;
+	FLatentPromise& Promise;
 	FLatentActionInfo LatentInfo;
 	FLatentAwaiter* CurrentAwaiter = nullptr;
 
 public:
 	explicit FPendingLatentCoroutine(std::coroutine_handle<FLatentPromise> Handle,
 	                                 FLatentActionInfo LatentInfo)
-		: Handle(Handle), LatentInfo(LatentInfo) { }
+		: Promise(Handle.promise()), LatentInfo(LatentInfo) { }
 
 	UE_NONCOPYABLE(FPendingLatentCoroutine);
 
@@ -55,14 +56,13 @@ public:
 		checkf(IsInGameThread(),
 		       TEXT("Unexpected latent action off the game thread"));
 
-		auto& Promise = Handle.promise();
 		auto& State = Promise.GetMutableLatentState();
 
 		// Destroy the coroutine unless it's currently running an AsyncTask.
 		// In that case, the responsibility will transfer to the async awaiter.
 		if (auto Old = FLatentPromise::AsyncRunning;
 			!State.compare_exchange_strong(Old, FLatentPromise::DeferredDestroy))
-			Handle.destroy();
+			Promise.Destroy();
 	}
 
 	virtual void UpdateOperation(FLatentResponse& Response) override
@@ -70,10 +70,9 @@ public:
 		if (CurrentAwaiter && CurrentAwaiter->ShouldResume())
 		{
 			CurrentAwaiter = nullptr;
-			Handle.resume(); // This might set the awaiter for next time
+			Promise.Resume(); // This might set the awaiter for next time
 		}
 
-		auto& Promise = Handle.promise();
 		auto State = Promise.GetMutableLatentState().load();
 
 		if (State >= FLatentPromise::Aborted)
@@ -81,6 +80,16 @@ public:
 		if (State == FLatentPromise::Done)
 			Response.TriggerLink(LatentInfo.ExecutionFunction, LatentInfo.Linkage,
 			                     LatentInfo.CallbackTarget);
+	}
+
+	virtual void NotifyActionAborted() override
+	{
+		Promise.SetExitReason(ELatentExitReason::ActionAborted);
+	}
+
+	virtual void NotifyObjectDestroyed() override
+	{
+		Promise.SetExitReason(ELatentExitReason::ObjectDestroyed);
 	}
 
 	const FLatentActionInfo& GetLatentInfo() const { return LatentInfo; }
@@ -121,6 +130,38 @@ void FLatentPromise::Init()
 	}
 }
 
+FLatentPromise::~FLatentPromise()
+{
+	checkf(IsInGameThread(),
+	       TEXT("Unexpected latent coroutine destruction off the game thread"));
+	GLatentExitReason = ELatentExitReason::Normal;
+}
+
+void FLatentPromise::Resume()
+{
+	// This can run on any thread
+	auto Handle = std::coroutine_handle<FLatentPromise>::from_promise(*this);
+	Handle.resume();
+}
+
+void FLatentPromise::Destroy()
+{
+	checkf(IsInGameThread(),
+	       TEXT("Unexpected latent coroutine destruction off the game thread"));
+	auto Handle = std::coroutine_handle<FLatentPromise>::from_promise(*this);
+
+	GLatentExitReason = ExitReason;
+	Handle.destroy(); // Counts as delete this;
+	checkf(GLatentExitReason == ELatentExitReason::Normal,
+	       TEXT("Internal error"));
+}
+
+void FLatentPromise::SetExitReason(ELatentExitReason Reason)
+{
+	checkf(ExitReason == ELatentExitReason::Normal, TEXT("Internal error"));
+	ExitReason = Reason;
+}
+
 void FLatentPromise::SetCurrentAwaiter(FLatentAwaiter* Awaiter)
 {
 	auto* Pending = static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine);
@@ -129,6 +170,9 @@ void FLatentPromise::SetCurrentAwaiter(FLatentAwaiter* Awaiter)
 
 FInitialSuspend FLatentPromise::initial_suspend()
 {
+	checkf(IsInGameThread(),
+	       TEXT("Latent coroutines may only be started on the game thread"));
+
 	auto& LAM = World->GetLatentActionManager();
 	auto* Pending = static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine);
 	auto& LatentInfo = Pending->GetLatentInfo();

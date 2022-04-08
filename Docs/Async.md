@@ -43,6 +43,15 @@ on the game thread. If the latent action manager decides to delete the latent ta
 and it's on another thread, it may continue until the next `co_await` after which
 your stack will be unwound **on the game thread**.
 
+#### Latent callbacks
+
+`NotifyActionAborted` and `NotifyObjectDestroyed` are exposed to coroutines in the
+form of the RAII guard objects in `LatentCallbacks.h`. Having them in scope when
+a latent coroutine is aborted or destroyed will execute the provided callable
+that may perform special cleanup tasks. This is an advanced scenario, normally you
+would use regular RAII or `ON_SCOPE_EXIT` instead of specializing for each one of
+these callbacks. Note that `Latent::Abort()` does not count as either of these.
+
 ## Awaiters
 
 There are two main categories of awaiters that are similar to coroutine execution

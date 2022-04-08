@@ -39,6 +39,7 @@
 
 namespace UE5Coro::Private
 {
+enum class ELatentExitReason : uint8;
 class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentPromise;
@@ -128,6 +129,7 @@ private:
 	UWorld* World = nullptr;
 	void* PendingLatentCoroutine = nullptr;
 	std::atomic<ELatentState> LatentState = LatentRunning;
+	ELatentExitReason ExitReason = static_cast<ELatentExitReason>(0);
 
 	void CreateLatentAction(FLatentActionInfo&&);
 	void Init();
@@ -137,8 +139,13 @@ private:
 
 public:
 	explicit FLatentPromise(auto&&...);
+	~FLatentPromise();
+	void Resume();
+	void Destroy();
 
 	std::atomic<ELatentState>& GetMutableLatentState() { return LatentState; }
+	ELatentExitReason GetExitReason() const { return ExitReason; }
+	void SetExitReason(ELatentExitReason Reason);
 	void SetCurrentAwaiter(FLatentAwaiter*);
 
 	FInitialSuspend initial_suspend();

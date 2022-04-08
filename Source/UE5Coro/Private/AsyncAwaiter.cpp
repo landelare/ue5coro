@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5Coro/AsyncAwaiters.h"
+#include "UE5Coro/LatentCallbacks.h"
 
 using namespace UE5Coro::Private;
 
@@ -76,10 +77,10 @@ void FAsyncAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
 
 			// Did a deferred deletion request arrive before the task started?
 			if (State == FLatentPromise::DeferredDestroy) [[unlikely]]
-				AsyncTask(ENamedThreads::GameThread, [Handle]
+				AsyncTask(ENamedThreads::GameThread, [Promise]() mutable
 				{
 					// Finish the coroutine on the game thread: destructors, etc.
-					Handle.destroy();
+					Promise.Destroy();
 				});
 			else
 				// We're committed to a resumption now. Deletion requests will
@@ -87,7 +88,7 @@ void FAsyncAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
 				// return to the game thread. If this is the game thread already,
 				// ~FPendingLatentCoroutine cannot run and the coroutine will
 				// either co_await or return_void.
-				Handle.resume();
+				Promise.Resume();
 		});
 	else
 		checkf(false, TEXT("Unexpected latent coroutine state %d"), Old);
