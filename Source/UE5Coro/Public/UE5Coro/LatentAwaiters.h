@@ -50,7 +50,7 @@ namespace UE5Coro::Latent
 Private::FLatentCancellation Cancel();
 
 /** Resumes the coroutine in the next tick.<br>
- *  Useful in a generic are-we-there-yet loop since latent actions poll anyway. */
+ *  @see Latent::Until for an alternative to while-NextTick loops. */
 UE5CORO_API Private::FLatentAwaiter NextTick();
 
 /** Resumes the coroutine on the first tick after the given number of frames. */
@@ -98,6 +98,9 @@ Private::FLatentAwaiter Chain(auto (Class::*Function)(FnParams...),
  *  Example usage:<br>
  *  co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1.0f, _2); */
 Private::FLatentAwaiter ChainEx(auto&& Function, auto&&... Args);
+
+/** Polls the provided function, resumes the coroutine when it returns true. */
+UE5CORO_API Private::FLatentAwaiter Until(std::function<bool()> Function);
 }
 
 namespace UE5Coro::Private

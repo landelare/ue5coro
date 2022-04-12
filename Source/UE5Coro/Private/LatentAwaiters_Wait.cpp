@@ -53,7 +53,7 @@ bool WaitUntilFrame(void*& State, bool)
 }
 
 template<auto GetTime>
-bool WaitUntil(void*& State, bool bCleanup)
+bool WaitUntilTime(void*& State, bool bCleanup)
 {
 	// Don't attempt to access GWorld in this case, it could be nullptr
 	if (bCleanup) [[unlikely]]
@@ -63,12 +63,24 @@ bool WaitUntil(void*& State, bool bCleanup)
 	return (GWorld->*GetTime)() >= TargetTime;
 }
 
+bool WaitUntilPredicate(void*& State, bool bCleanup)
+{
+	auto* Function = static_cast<std::function<bool()>*>(State);
+	if (bCleanup) [[unlikely]]
+	{
+		delete Function;
+		return false;
+	}
+
+	return (*Function)();
+}
+
 template<auto GetTime>
 FLatentAwaiter GenericSeconds(float Seconds)
 {
 	void* State = nullptr;
 	reinterpret_cast<float&>(State) = (GWorld->*GetTime)() + Seconds;
-	return FLatentAwaiter(State, &WaitUntil<GetTime>);
+	return FLatentAwaiter(State, &WaitUntilTime<GetTime>);
 }
 }
 
@@ -102,4 +114,11 @@ FLatentAwaiter Latent::RealSeconds(float Seconds)
 FLatentAwaiter Latent::AudioSeconds(float Seconds)
 {
 	return GenericSeconds<&UWorld::GetAudioTimeSeconds>(Seconds);
+}
+
+FLatentAwaiter Latent::Until(std::function<bool()> Function)
+{
+	checkf(Function, TEXT("Provided function is empty"));
+	return FLatentAwaiter(new std::function(std::move(Function)),
+	                      &WaitUntilPredicate);
 }
