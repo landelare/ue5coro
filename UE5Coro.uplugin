@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "1.1",
+	"VersionName": "1.1.1",
 	"FriendlyName": "UE5Coro",
 	"Description": "C++20 coroutine implementation for Unreal Engine",
 	"Category": "Programming",
@@ -20,12 +20,12 @@
 		{
 			"Name": "UE5Coro",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "PostConfigInit"
 		},
 		{
 			"Name": "UE5CoroK2",
 			"Type": "UncookedOnly",
-			"LoadingPhase": "PostEngineInit"
+			"LoadingPhase": "PostConfigInit"
 		}
 	]
 }
