@@ -7,7 +7,12 @@ support with additional features such as easy authoring of BP latent actions.
 
 ## Installing
 
-You'll obviously need C\+\+20 support for your project.
+For project-based installations, `git clone` this repository to your project's
+Plugins folder.
+If you want to install to the engine, you'll need to clone this repository under
+`Engine/Plugins/Marketplace`.
+
+You'll obviously need C\+\+20 support enabled in your project.
 In your Build.cs file, add or change this line:
 ```c#
 CppStandard = CppStandardVersion.Cpp20;
