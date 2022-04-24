@@ -33,6 +33,7 @@
 
 #include "CoreMinimal.h"
 #include <coroutine>
+#include <functional>
 
 namespace UE5Coro::Private
 {
