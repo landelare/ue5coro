@@ -6,6 +6,13 @@ awaiters provided by this library, found in `namespace UE5Coro::Async` and
 `namespace UE5Coro::Latent`. Any async coroutine can use both async and latent
 awaiters, but latent awaiters are limited to the game thread.
 
+`FAsyncCoroutine` is a minimal (around `sizeof(void*)` depending on your
+platform's implementation of `std::coroutine_handle`) struct that can access
+the underlying coroutine, but it doesn't own it. These objects are safe to
+discard or keep around for longer than needed, but interacting with a `delete`d
+coroutine is undefined behavior as usual.
+Coroutines get `delete`d when or shortly after they finish.
+
 ## Execution modes
 
 There are two major execution modes of async coroutines–they can either run

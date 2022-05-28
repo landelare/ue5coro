@@ -43,20 +43,37 @@ enum class ELatentExitReason : uint8;
 class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentPromise;
+class FPromise;
 }
 
-// This type does nothing but it has to be a USTRUCT in the global namespace to
-// support latent UFUNCTIONs without wrappers.
+// This type has to be a USTRUCT in the global namespace to support latent
+// UFUNCTIONs without wrappers.
 
 /**
  * Asynchronous coroutine. Return this type from a function and it will be able to
  * co_await various awaiters without blocking the calling thread.<br>
- * Objects of this type are meaningless and should not be stored.
+ * These objects do not represent ownership of the coroutine and do not need to
+ * be stored.
  */
 USTRUCT(BlueprintInternalUseOnly, Meta=(HiddenByDefault))
-struct FAsyncCoroutine
+struct UE5CORO_API FAsyncCoroutine
 {
 	GENERATED_BODY()
+	using handle_type = std::coroutine_handle<UE5Coro::Private::FPromise>;
+
+private:
+	handle_type Handle;
+
+public:
+	/** This constructor is public to placate the reflection system and BP,
+	 *  do not use directly. */
+	explicit FAsyncCoroutine(handle_type Handle = nullptr) : Handle(Handle) { }
+
+	/** Returns a delegate broadcasting this coroutine's completion for any
+	 *  reason, including being unsuccessful or canceled.
+	 *  This will be Broadcast() on the same thread where the coroutine is
+	 *	destroyed. */
+	TMulticastDelegate<void()>& OnCompletion();
 };
 
 template<typename... Args>
@@ -91,14 +108,25 @@ struct FInitialSuspend
 	}
 };
 
-class [[nodiscard]] FPromise
+class [[nodiscard]] UE5CORO_API FPromise
 {
+#if DO_CHECK
+	static constexpr uint32 Expected = U'♪' << 16 | U'♫';
+	uint32 Alive = Expected;
+#endif
+
+	TMulticastDelegate<void()> Continuations;
+
 protected:
 	FPromise() = default;
 	UE_NONCOPYABLE(FPromise);
 
 public:
-	FAsyncCoroutine get_return_object() { return {}; }
+	~FPromise();
+
+	TMulticastDelegate<void()>& OnCompletion();
+
+	FAsyncCoroutine get_return_object();
 	void unhandled_exception() { check(!"Exceptions are not supported"); }
 
 	// co_yield is not allowed in async coroutines
