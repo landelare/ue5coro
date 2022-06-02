@@ -111,6 +111,15 @@ FAsyncCoroutine AMyActor::GuaranteedSlowLoad(int, FLatentActionInfo)
 }
 ```
 
+### Coroutines
+
+`FAsyncCoroutine`s themselves are awaitable, `co_await`ing them will resume the
+caller when the callee coroutine finishes for any reason, including
+`Latent::Cancel()`. Async coroutines try to resume on a similar thread as they
+were on when `co_await` was run (game thread to game thread, render thread to
+render thread, etc.), latent coroutines resume on the next tick after the
+callee ended.
+
 ### Chained latent actions
 
 Most existing latent actions in the engine return `void` so there's nothing that

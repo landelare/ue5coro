@@ -127,7 +127,7 @@ public:
 
 	bool ShouldResume() { return (*Resume)(State, false); }
 
-	bool await_ready() { return Resume ? ShouldResume() : true; }
+	bool await_ready() { return ShouldResume(); }
 	void await_resume() { }
 	void await_suspend(std::coroutine_handle<FAsyncPromise>);
 	void await_suspend(std::coroutine_handle<FLatentPromise>);

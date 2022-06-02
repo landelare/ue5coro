@@ -40,6 +40,7 @@
 namespace UE5Coro::Private
 {
 enum class ELatentExitReason : uint8;
+class FAsyncAwaiter;
 class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentPromise;
@@ -60,6 +61,7 @@ struct UE5CORO_API FAsyncCoroutine
 {
 	GENERATED_BODY()
 	using handle_type = std::coroutine_handle<UE5Coro::Private::FPromise>;
+	friend UE5Coro::Private::FAsyncPromise;
 
 private:
 	handle_type Handle;
@@ -129,16 +131,21 @@ public:
 	FAsyncCoroutine get_return_object();
 	void unhandled_exception() { check(!"Exceptions are not supported"); }
 
+	template<typename T>
+	T&& await_transform(T&& Awaiter) { return std::forward<T>(Awaiter); }
 	// co_yield is not allowed in async coroutines
 	std::suspend_never yield_value(auto&&) = delete;
 };
 
-class [[nodiscard]] FAsyncPromise : public FPromise
+class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
 {
 public:
 	std::suspend_never initial_suspend() { return {}; }
 	std::suspend_never final_suspend() noexcept { return {}; }
 	void return_void() { }
+
+	using FPromise::await_transform;
+	FAsyncAwaiter await_transform(FAsyncCoroutine);
 };
 
 class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
@@ -179,6 +186,9 @@ public:
 	FInitialSuspend initial_suspend();
 	std::suspend_always final_suspend() noexcept { return {}; }
 	void return_void();
+
+	using FPromise::await_transform;
+	FLatentAwaiter await_transform(FAsyncCoroutine);
 };
 
 FLatentPromise::FLatentPromise(auto&&... Args)

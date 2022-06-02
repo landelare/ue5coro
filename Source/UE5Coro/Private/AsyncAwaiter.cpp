@@ -34,13 +34,104 @@
 
 using namespace UE5Coro::Private;
 
+namespace
+{
+template<typename T>
+struct FResumeTask
+{
+	using handle_type = std::coroutine_handle<T>;
+
+	ENamedThreads::Type Thread;
+	handle_type Handle;
+
+	explicit FResumeTask(ENamedThreads::Type Thread, handle_type Handle)
+		: Thread(Thread), Handle(Handle) { }
+
+	ENamedThreads::Type GetDesiredThread() const
+	{
+		return Thread;
+	}
+
+	TStatId GetStatId() const
+	{
+		RETURN_QUICK_DECLARE_CYCLE_STAT(FResumeTask,
+		                                STATGROUP_ThreadPoolAsyncTasks);
+	}
+
+	static ESubsequentsMode::Type GetSubsequentsMode()
+	{
+		return ESubsequentsMode::FireAndForget;
+	}
+};
+
+/** The easy case of coroutine resumption:
+ *  nothing else can delete an async coroutine. */
+struct FAsyncResume : FResumeTask<FAsyncPromise>
+{
+	explicit FAsyncResume(auto&&... Args)
+		: FResumeTask(std::forward<decltype(Args)>(Args)...) { }
+
+	void DoTask(ENamedThreads::Type, FGraphEvent*)
+	{
+		Handle.resume();
+	}
+};
+
+/** The hard case of coroutine resumption: a latent coroutine is owned by
+ *  the latent action manager on the game thread. */
+struct FLatentResume : FResumeTask<FLatentPromise>
+{
+	explicit FLatentResume(auto&&... Args)
+		: FResumeTask(std::forward<decltype(Args)>(Args)...) { }
+
+	void DoTask(ENamedThreads::Type, FGraphEvent*)
+	{
+		auto& Promise = Handle.promise();
+		auto& State = Promise.GetMutableLatentState();
+
+		// If this task is running on the game thread, attempt the
+		// async->latent transition (even though this is on the task graph)
+		if (IsInGameThread())
+		{
+			auto Old = FLatentPromise::AsyncRunning;
+			// This might fail if State == DeferredDestroy which is OK
+			State.compare_exchange_strong(Old, FLatentPromise::LatentRunning);
+			checkf(State == FLatentPromise::LatentRunning ||
+			       State == FLatentPromise::DeferredDestroy,
+			       TEXT("Unexpected state when returning to game thread"));
+		}
+
+		// Did a deferred deletion request arrive before the task started?
+		if (State == FLatentPromise::DeferredDestroy) [[unlikely]]
+			AsyncTask(ENamedThreads::GameThread, [Promise]() mutable
+			{
+				// Finish the coroutine on the game thread: destructors, etc.
+				Promise.Destroy();
+			});
+		else
+			// We're committed to a resumption now. Deletion requests will
+			// end up in another async co_await since the coroutine must
+			// return to the game thread. If this is the game thread already,
+			// ~FPendingLatentCoroutine cannot run and the coroutine will
+			// either co_await or return_void.
+			Promise.Resume();
+	}
+};
+}
+
 void FAsyncAwaiter::await_suspend(std::coroutine_handle<FAsyncPromise> Handle)
 {
 	// Easy mode, nothing else can decide to delete the coroutine
-	AsyncTask(Thread, [Handle]
-	{
-		Handle.resume();
-	});
+	auto* Task = TGraphTask<FAsyncResume>::CreateTask()
+	                                      .ConstructAndHold(Thread, Handle);
+
+	if (ResumeAfter)
+		ResumeAfter.promise().OnCompletion().AddLambda([Task]
+		{
+			Task->Unlock();
+		});
+	else
+		Task->Unlock();
 }
 
 void FAsyncAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
@@ -58,38 +149,18 @@ void FAsyncAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
 		State.compare_exchange_strong(Old, FLatentPromise::AsyncRunning) ||
 		Old == FLatentPromise::AsyncRunning ||
 		Old == FLatentPromise::DeferredDestroy)
-		AsyncTask(Thread, [Handle]
-		{
-			auto& Promise = Handle.promise();
-			auto& State = Promise.GetMutableLatentState();
-
-			// If this AsyncTask is running on the game thread, attempt the
-			// async->latent transition (even though this is an AsyncTask)
-			if (IsInGameThread())
-			{
-				auto Old = FLatentPromise::AsyncRunning;
-				State.compare_exchange_strong(Old, FLatentPromise::LatentRunning);
-				// This might fail if State == DeferredDestroy which is OK
-				checkf(State == FLatentPromise::LatentRunning ||
-				       State == FLatentPromise::DeferredDestroy,
-				       TEXT("Unexpected state when returning to game thread"));
-			}
-
-			// Did a deferred deletion request arrive before the task started?
-			if (State == FLatentPromise::DeferredDestroy) [[unlikely]]
-				AsyncTask(ENamedThreads::GameThread, [Promise]() mutable
-				{
-					// Finish the coroutine on the game thread: destructors, etc.
-					Promise.Destroy();
-				});
-			else
-				// We're committed to a resumption now. Deletion requests will
-				// end up in another async co_await since the coroutine must
-				// return to the game thread. If this is the game thread already,
-				// ~FPendingLatentCoroutine cannot run and the coroutine will
-				// either co_await or return_void.
-				Promise.Resume();
-		});
+		; // Proceed
 	else
 		checkf(false, TEXT("Unexpected latent coroutine state %d"), Old);
+
+	auto* Task = TGraphTask<FLatentResume>::CreateTask()
+	                                       .ConstructAndHold(Thread, Handle);
+
+	if (ResumeAfter)
+		ResumeAfter.promise().OnCompletion().AddLambda([Task]
+		{
+			Task->Unlock();
+		});
+	else
+		Task->Unlock();
 }

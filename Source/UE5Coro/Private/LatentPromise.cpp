@@ -31,6 +31,7 @@
 
 #include "LatentActions.h"
 #include "LatentExitReason.h"
+#include "UE5Coro/AsyncAwaiters.h"
 #include "UE5Coro/AsyncCoroutine.h"
 #include "UE5Coro/LatentAwaiters.h"
 
@@ -38,6 +39,31 @@ using namespace UE5Coro::Private;
 
 namespace
 {
+// ~FLatentAwaiter and OnCompleted() both release this in an unknown order.
+struct FTwoLives
+{
+	std::atomic<int> RefCount = 2;
+
+	void Release()
+	{
+		checkf(RefCount > 0, TEXT("Internal error"));
+		if (--RefCount == 0)
+			delete this;
+	}
+};
+
+bool ShouldResume(void*& State, bool bCleanup)
+{
+	auto* This = static_cast<FTwoLives*>(State);
+	if (bCleanup) [[unlikely]]
+	{
+		This->Release();
+		return false;
+	}
+	// The only other thing Releasing this is OnCompletion()
+	return This->RefCount < 2;
+}
+
 class [[nodiscard]] FPendingLatentCoroutine : public FPendingLatentAction
 {
 	FLatentPromise& Promise;
@@ -58,7 +84,7 @@ public:
 
 		auto& State = Promise.GetMutableLatentState();
 
-		// Destroy the coroutine unless it's currently running an AsyncTask.
+		// Destroy the coroutine unless it's currently async running.
 		// In that case, the responsibility will transfer to the async awaiter.
 		if (auto Old = FLatentPromise::AsyncRunning;
 			!State.compare_exchange_strong(Old, FLatentPromise::DeferredDestroy))
@@ -201,4 +227,12 @@ void FLatentPromise::return_void()
 		           TEXT("Unexpected coroutine state %d"), State);
 	);
 	LatentState = Done;
+}
+
+FLatentAwaiter FLatentPromise::await_transform(FAsyncCoroutine Other)
+{
+	auto* Done = new FTwoLives;
+	// Not using the subsystem, there's no FLatentActionInfo
+	Other.OnCompletion().AddLambda([Done] { Done->Release(); });
+	return FLatentAwaiter(Done, &ShouldResume);
 }

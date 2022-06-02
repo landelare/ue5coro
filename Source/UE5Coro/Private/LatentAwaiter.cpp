@@ -62,7 +62,7 @@ struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 
 		Response.DoneIf(true);
 
-		// Ownership moves back to AsyncTasks
+		// Ownership moves back to the task graph tasks
 		auto Original = Handle;
 		Handle = nullptr;
 		Original.resume();

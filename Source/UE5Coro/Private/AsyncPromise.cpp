@@ -29,52 +29,12 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
+#include "UE5Coro/AsyncAwaiters.h"
 
-#include "CoreMinimal.h"
-#include <coroutine>
-#include "Async/TaskGraphInterfaces.h"
-#include "UE5Coro/AsyncCoroutine.h"
+using namespace UE5Coro::Private;
 
-namespace UE5Coro::Private
+FAsyncAwaiter FAsyncPromise::await_transform(FAsyncCoroutine Other)
 {
-class FAsyncAwaiter;
-class FAsyncPromise;
-class FLatentPromise;
-}
-
-namespace UE5Coro::Async
-{
-/** Suspends the coroutine and resumes it on the provided named thread. */
-UE5CORO_API Private::FAsyncAwaiter MoveToThread(ENamedThreads::Type);
-
-/** Convenience function to resume on the game thread.<br>
- *  Equivalent to calling Async::MoveToThread(ENamedThreads::GameThread). */
-UE5CORO_API Private::FAsyncAwaiter MoveToGameThread();
-}
-
-namespace UE5Coro::Private
-{
-class [[nodiscard]] UE5CORO_API FAsyncAwaiter final
-{
-	using handle_type = std::coroutine_handle<FPromise>;
-
-	ENamedThreads::Type Thread;
-	handle_type ResumeAfter;
-
-	FAsyncAwaiter(const FAsyncAwaiter&) = delete;
-	void operator=(auto&&) = delete;
-
-public:
-	explicit FAsyncAwaiter(ENamedThreads::Type Thread,
-	                       handle_type ResumeAfter = nullptr)
-		: Thread(Thread), ResumeAfter(ResumeAfter) { }
-	FAsyncAwaiter(FAsyncAwaiter&&) = default;
-
-	bool await_ready() { return false; }
-	void await_resume() { }
-
-	void await_suspend(std::coroutine_handle<FAsyncPromise> Handle);
-	void await_suspend(std::coroutine_handle<FLatentPromise> Handle);
-};
+	auto Thread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
+	return FAsyncAwaiter(Thread, Other.Handle);
 }
