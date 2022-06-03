@@ -75,14 +75,7 @@ void FLatentCancellation::await_suspend(
 {
 	ensureMsgf(IsInGameThread(),
 	           TEXT("Latent awaiters may only be used on the game thread"));
-	auto& Promise = Handle.promise();
-	auto& LatentState = Promise.GetMutableLatentState();
-	checkCode(
-		auto CurrentState = LatentState.load();
-		ensureMsgf(CurrentState == FLatentPromise::LatentRunning,
-		           TEXT("Unexpected state in latent coroutine %d"), CurrentState);
-	);
-	LatentState = FLatentPromise::Canceled;
+	Handle.promise().LatentCancel();
 }
 
 FLatentAwaiter::~FLatentAwaiter()
@@ -110,9 +103,8 @@ void FLatentAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
 	auto& Promise = Handle.promise();
-	auto& LatentState = Promise.GetMutableLatentState();
 	checkCode(
-		auto CurrentState = LatentState.load();
+		auto CurrentState = Promise.GetLatentState();
 		checkf(CurrentState == FLatentPromise::LatentRunning,
 		       TEXT("Unexpected state in latent coroutine %d"), CurrentState);
 	);

@@ -81,14 +81,7 @@ public:
 	{
 		checkf(IsInGameThread(),
 		       TEXT("Unexpected latent action off the game thread"));
-
-		auto& State = Promise.GetMutableLatentState();
-
-		// Destroy the coroutine unless it's currently async running.
-		// In that case, the responsibility will transfer to the async awaiter.
-		if (auto Old = FLatentPromise::AsyncRunning;
-			!State.compare_exchange_strong(Old, FLatentPromise::DeferredDestroy))
-			Promise.Destroy();
+		Promise.ThreadSafeDestroy();
 	}
 
 	virtual void UpdateOperation(FLatentResponse& Response) override
@@ -96,11 +89,12 @@ public:
 		if (CurrentAwaiter && CurrentAwaiter->ShouldResume())
 		{
 			CurrentAwaiter = nullptr;
-			Promise.Resume(); // This might set the awaiter for next time
+			// This might set the awaiter for next time
+			Promise.ThreadSafeResume();
 		}
 
-		auto State = Promise.GetMutableLatentState().load();
-
+		// Did the coroutine finish?
+		auto State = Promise.GetLatentState();
 		if (State >= FLatentPromise::Canceled)
 			Response.DoneIf(true);
 		if (State == FLatentPromise::Done)
@@ -163,15 +157,38 @@ FLatentPromise::~FLatentPromise()
 	GLatentExitReason = ELatentExitReason::Normal;
 }
 
-void FLatentPromise::Resume()
+void FLatentPromise::ThreadSafeResume()
 {
-	// This can run on any thread
-	auto Handle = std::coroutine_handle<FLatentPromise>::from_promise(*this);
-	Handle.resume();
+	// Return to latent running on the game thread, even if it's an async task.
+	if (IsInGameThread())
+		AttachToGameThread();
+
+	// Was there a deferred deletion request?
+	if (LatentState == DeferredDestroy) [[unlikely]]
+		// Finish on the game thread: exit reason, destructors, etc.
+		AsyncTask(ENamedThreads::GameThread,
+		          std::bind_front(&FLatentPromise::ThreadSafeDestroy, this));
+	else
+		// If this promise is async running, we're committed to a resumption at
+		// this point (DeferredDestroy arrived since the if above).
+		// Deletion requests will end up in the next call to ThreadSafeResume
+		// since the coroutine must return to the game thread in a future
+		// co_await.
+
+		// If this is the game thread, ~FPendingLatentCoroutine cannot run and
+		// the coroutine will either co_await or return_void.
+
+		// Therefore, this can safely run on any thread now.
+		std::coroutine_handle<FLatentPromise>::from_promise(*this).resume();
 }
 
-void FLatentPromise::Destroy()
+void FLatentPromise::ThreadSafeDestroy()
 {
+	// If the coroutine is async running, request destruction from the awaiter.
+	if (auto Old = AsyncRunning;
+		LatentState.compare_exchange_strong(Old, DeferredDestroy))
+		return;
+
 	checkf(IsInGameThread(),
 	       TEXT("Unexpected latent coroutine destruction off the game thread"));
 	auto Handle = std::coroutine_handle<FLatentPromise>::from_promise(*this);
@@ -180,6 +197,39 @@ void FLatentPromise::Destroy()
 	Handle.destroy(); // Counts as delete this;
 	checkf(GLatentExitReason == ELatentExitReason::Normal,
 	       TEXT("Internal error"));
+}
+
+void FLatentPromise::AttachToGameThread()
+{
+	// This might fail to exchange if State == DeferredDestroy which is OK
+	auto Old = AsyncRunning;
+	LatentState.compare_exchange_strong(Old, LatentRunning);
+	checkCode(
+		auto State = LatentState.load();
+		checkf(State == FLatentPromise::LatentRunning ||
+		       State == FLatentPromise::DeferredDestroy,
+		       TEXT("Unexpected state when returning to game thread"));
+	);
+}
+
+void FLatentPromise::DetachFromGameThread()
+{
+	if (auto Old = LatentRunning;
+		LatentState.compare_exchange_strong(Old, AsyncRunning) ||
+		Old == AsyncRunning || Old == DeferredDestroy)
+		; // Done
+	else
+		checkf(false, TEXT("Unexpected latent coroutine state %d"), Old);
+}
+
+void FLatentPromise::LatentCancel()
+{
+	checkCode(
+		auto CurrentState = LatentState.load();
+		ensureMsgf(CurrentState == FLatentPromise::LatentRunning,
+		           TEXT("Unexpected latent coroutine state %d"), CurrentState);
+	);
+	LatentState = Canceled;
 }
 
 void FLatentPromise::SetExitReason(ELatentExitReason Reason)
@@ -220,7 +270,8 @@ void FLatentPromise::return_void()
 	ensureMsgf(IsInGameThread(),
 	           TEXT("Latent coroutines must end on the game thread"));
 	// Only this should be possible if co_returning cleanly on the game thread,
-	// ~FPendingLatentCoroutine is blocked from running and Abort doesn't resume
+	// ~FPendingLatentCoroutine is blocked from running and Latent::Cancel()
+	// doesn't resume.
 	checkCode(
 		auto State = LatentState.load();
 		ensureMsgf(State == LatentRunning,

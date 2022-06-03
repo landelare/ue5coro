@@ -175,10 +175,14 @@ private:
 public:
 	explicit FLatentPromise(auto&&...);
 	~FLatentPromise();
-	void Resume();
-	void Destroy();
+	void ThreadSafeResume();
+	void ThreadSafeDestroy();
 
-	std::atomic<ELatentState>& GetMutableLatentState() { return LatentState; }
+	ELatentState GetLatentState() const { return LatentState.load(); }
+	void AttachToGameThread(); // AsyncRunning -> LatentRunning
+	void DetachFromGameThread(); // LatentRunning -> AsyncRunning
+	void LatentCancel(); // LatentRunning -> Canceled
+
 	ELatentExitReason GetExitReason() const { return ExitReason; }
 	void SetExitReason(ELatentExitReason Reason);
 	void SetCurrentAwaiter(FLatentAwaiter*);

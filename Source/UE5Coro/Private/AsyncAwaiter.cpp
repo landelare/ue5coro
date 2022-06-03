@@ -86,35 +86,7 @@ struct FLatentResume : FResumeTask<FLatentPromise>
 
 	void DoTask(ENamedThreads::Type, FGraphEvent*)
 	{
-		auto& Promise = Handle.promise();
-		auto& State = Promise.GetMutableLatentState();
-
-		// If this task is running on the game thread, attempt the
-		// async->latent transition (even though this is on the task graph)
-		if (IsInGameThread())
-		{
-			auto Old = FLatentPromise::AsyncRunning;
-			// This might fail if State == DeferredDestroy which is OK
-			State.compare_exchange_strong(Old, FLatentPromise::LatentRunning);
-			checkf(State == FLatentPromise::LatentRunning ||
-			       State == FLatentPromise::DeferredDestroy,
-			       TEXT("Unexpected state when returning to game thread"));
-		}
-
-		// Did a deferred deletion request arrive before the task started?
-		if (State == FLatentPromise::DeferredDestroy) [[unlikely]]
-			AsyncTask(ENamedThreads::GameThread, [Promise]() mutable
-			{
-				// Finish the coroutine on the game thread: destructors, etc.
-				Promise.Destroy();
-			});
-		else
-			// We're committed to a resumption now. Deletion requests will
-			// end up in another async co_await since the coroutine must
-			// return to the game thread. If this is the game thread already,
-			// ~FPendingLatentCoroutine cannot run and the coroutine will
-			// either co_await or return_void.
-			Promise.Resume();
+		Handle.promise().ThreadSafeResume();
 	}
 };
 }
@@ -137,21 +109,12 @@ void FAsyncAwaiter::await_suspend(std::coroutine_handle<FAsyncPromise> Handle)
 void FAsyncAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
 {
 	auto& Promise = Handle.promise();
-	auto& State = Promise.GetMutableLatentState();
 	checkCode(
-		auto CurrentState = State.load();
+		auto CurrentState = Promise.GetLatentState();
 		checkf(CurrentState < FLatentPromise::Canceled,
 		       TEXT("Unexpected latent coroutine state %d"), CurrentState);
 	);
-
-	// Is this a latent->async transition or async->async chain?
-	if (auto Old = FLatentPromise::LatentRunning;
-		State.compare_exchange_strong(Old, FLatentPromise::AsyncRunning) ||
-		Old == FLatentPromise::AsyncRunning ||
-		Old == FLatentPromise::DeferredDestroy)
-		; // Proceed
-	else
-		checkf(false, TEXT("Unexpected latent coroutine state %d"), Old);
+	Promise.DetachFromGameThread();
 
 	auto* Task = TGraphTask<FLatentResume>::CreateTask()
 	                                       .ConstructAndHold(Thread, Handle);
