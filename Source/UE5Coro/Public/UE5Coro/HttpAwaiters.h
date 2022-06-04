@@ -29,22 +29,56 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-using UnrealBuildTool;
+#pragma once
 
-public class UE5Coro : ModuleRules
+#include <coroutine>
+#include <optional>
+#include <variant>
+#include "Interfaces/IHttpRequest.h"
+
+namespace UE5Coro::Private
 {
-	public UE5Coro(ReadOnlyTargetRules Target)
-		: base(Target)
-	{
-		CppStandard = CppStandardVersion.Cpp20;
-		bUseUnity = false;
+class FHttpAwaiter;
+class FAsyncPromise;
+class FLatentPromise;
+}
 
-		PublicDependencyModuleNames.AddRange(new[]
-		{
-			"Core",
-			"CoreUObject",
-			"Engine",
-			"HTTP",
-		});
-	}
+namespace UE5Coro::Http
+{
+/** Processes the request, resumes the coroutine after it's done.<br>
+ *  The result of the co_await expression will be a TTuple of
+ *  FHttpResponsePtr and bool bConnectedSuccessfully. */
+UE5CORO_API Private::FHttpAwaiter ProcessAsync(FHttpRequestRef);
+}
+
+namespace UE5Coro::Private
+{
+class [[nodiscard]] UE5CORO_API FHttpAwaiter
+{
+	using FAsyncHandle = std::coroutine_handle<FAsyncPromise>;
+	using FLatentHandle = std::coroutine_handle<FLatentPromise>;
+
+	const ENamedThreads::Type Thread;
+	const FHttpRequestRef Request;
+	UE::FSpinLock Lock;
+	std::variant<FAsyncHandle, FLatentHandle> Handle;
+	bool bSuspended;
+	// end Lock
+	std::optional<TTuple<FHttpResponsePtr, bool>> Result;
+
+	template<typename T>
+	void SetHandleAndUnlock(std::coroutine_handle<T>);
+	void Resume();
+	void RequestComplete(FHttpRequestPtr, FHttpResponsePtr, bool);
+
+public:
+	explicit FHttpAwaiter(FHttpRequestRef&& Request);
+	UE_NONCOPYABLE(FHttpAwaiter);
+
+	bool await_ready();
+	void await_suspend(std::coroutine_handle<FLatentPromise>);
+	void await_suspend(std::coroutine_handle<FAsyncPromise>);
+
+	TTuple<FHttpResponsePtr, bool> await_resume();
+};
 }
