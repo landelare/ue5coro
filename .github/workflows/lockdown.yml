@@ -1,0 +1,16 @@
+name: "Pull Request Lockdown"
+
+on:
+  pull_request_target:
+    types: opened
+
+permissions:
+  pull-requests: write
+
+jobs:
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: landelare/repo-lockdown@v2.2.0
+        with:
+          pr-comment: "Pull requests are not accepted."
