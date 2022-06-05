@@ -48,6 +48,14 @@ TGenerator<int> CountUp(int Max)
 bool FGeneratorTest::RunTest(const FString& Parameters)
 {
 	{
+		auto Generator = []() -> TGenerator<int>
+		{
+			co_yield 1.0;
+		}();
+		TestEqual("Temporary type conversion", Generator.Current(), 1);
+	}
+
+	{
 		TGenerator<int> Generator = CountUp(2);
 		for (int i = 0; i <= 2; ++i)
 		{

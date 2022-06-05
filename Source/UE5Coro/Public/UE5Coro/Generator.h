@@ -185,7 +185,13 @@ public:
 		return TGenerator<T>(handle_type::from_promise(*this));
 	}
 
-	std::suspend_always yield_value(std::convertible_to<T> auto&& Value)
+	std::suspend_always yield_value(std::remove_reference_t<T>& Value)
+	{
+		Current = std::addressof(Value);
+		return {};
+	}
+
+	std::suspend_always yield_value(std::remove_reference_t<T>&& Value)
 	{
 		Current = std::addressof(Value);
 		return {};
