@@ -50,38 +50,21 @@ on the game thread. If the latent action manager decides to delete the latent ta
 and it's on another thread, it may continue until the next `co_await` after which
 your stack will be unwound **on the game thread**.
 
-#### Latent callbacks
-
-`NotifyActionAborted` and `NotifyObjectDestroyed` are exposed to coroutines in the
-form of the RAII guard objects in `LatentCallbacks.h`. Having them in scope when
-a latent coroutine is aborted or destroyed will execute the provided callable
-that may perform special cleanup tasks. This is an advanced scenario, normally you
-would use regular RAII or `ON_SCOPE_EXIT` instead of specializing for each one of
-these callbacks. Note that `Latent::Cancel()` does not count as either of these.
-
 ## Awaiters
 
-There are two main categories of awaiters that are similar to coroutine execution
-modes but orthogonal to them–both modes can use awaiters from both namespaces.
-The ones in `namespace UE5Coro::Async` work with `AsyncTask`s under the hood,
-the ones in `namespace UE5Coro::Latent` are implemented as latent actions (even if
-you are not running in latent mode) and tied to the world so it's possible, e.g.,
-if PIE ends that `co_await` will not resume your coroutine.
-Destructors are still called, similarly to if an exception was thrown so it's safe
-to use `FScopeLock`s, smart pointers... but doing this could cause memory leaks:
+[Click here](Awaiters.md) for an overview of the various awaiters that come
+with the plugin.
 
-```cpp
-T* Thing = new T();
-co_await UE5Coro::Latent::Something(); // This may not resume if, e.g., PIE ends
-delete Thing;
-```
+Although it's not directly forbidden to reuse awaiter objects, it's recommended
+not to as the effects are rarely what you need and could change in future
+versions. Treat them as expired once they've been `co_await`ed.
 
-Most awaiters in the `Latent` namespace can only be used once and any further
-`co_await`s instantly continue. Awaiters in the `Async` namespace are reusable and
-always move you to their designated thread but they are as cheap to make as an
-`int` so only do this if it makes your code clearer.
+The awaiter types that are in the `UE5Coro::Private` namespace are subject to
+change in any future version. Most of the time, you don't even need to know
+about them, e.g. `co_await Something();`, but if you want to store them in
+a variable (see below), use `auto`.
 
-There are some other situations that could cause unexpected behavior:
+There are some additional situations that could cause unexpected behavior:
 * `co_await`ing `namespace UE5Coro::Latent` awaiters off the game thread.
 * Moving to a named thread that's not enabled, e.g., RHI.
 * Expecting to resume a latent awaiter while paused or otherwise not ticking.
@@ -99,7 +82,6 @@ using namespace UE5Coro;
 
 FAsyncCoroutine AMyActor::GuaranteedSlowLoad(int, FLatentActionInfo)
 {
-    // Awaiter types are in the Private namespace and subject to change, use auto
     auto Wait1 = Latent::Seconds(1); // The clock starts now!
     auto Wait2 = Latent::Seconds(0.5);
     auto Load1 = Latent::AsyncLoadObject(MySoftPtr1);
@@ -119,67 +101,6 @@ caller when the callee coroutine finishes for any reason, including
 were on when `co_await` was run (game thread to game thread, render thread to
 render thread, etc.), latent coroutines resume on the next tick after the
 callee ended.
-
-### Chained latent actions
-
-Most existing latent actions in the engine return `void` so there's nothing that
-you could take or store to `co_await` them. There are two special wrappers
-provided in `namespace UE5Coro::Latent` to make this work:
-
-```cpp
-using namespace std::placeholders; // for ChainEx
-using namespace UE5Coro;
-...
-
-// Automatic parameter matching: simply skip WorldContextObject and LatentInfo
-co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1.0f);
-
-// For members, provide the object as the first parameter like interface Execute_:
-co_await Latent::Chain(&UMediaPlayer::OpenSourceLatent, MediaPlayer /*this*/,
-                       MediaSource, Options, bSuccess);
-
-// Manual parameter matching, _1 is WorldContextObject and _2 is LatentInfo:
-co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1.0f, _2);
-co_await Latent::ChainEx(&UMediaPlayer::OpenSourceLatent, MediaPlayer, _1, _2,
-                         MediaSource, Options, bSuccess);
-```
-
-As it is impossible to read `UFUNCTION(Meta)` information at C++ compile time to
-figure out which parameter truly is the world context object, `Chain` uses
-type-based heuristics that can handle most latent functions found in the engine:
-* The first `UObject*` or `UWorld*` that's not `this` is the world context.
-* The first `FLatentActionInfo` is the latent info.
-* All other parameters of these types are treated as regular parameters and are
-  expected to be passed in.
-
-If this doesn't apply to your function, use `Latent::ChainEx` and explicitly
-provide `_1` for the world context (if needed) and `_2` for the latent info
-(mandatory) where they belong. They work exactly like they do in
-[`std::bind`](https://en.cppreference.com/w/cpp/utility/functional/bind).
-
-#### Debugging/implementation notes
-
-In popular debuggers (Visual Studio 2022 and JetBrains Rider 2022.1 tested)
-`Chain` tends to result in very long call stacks if the chained function is
-getting debugged. These are marked `[Inline Frame]` or `[Inlined]` (if your code
-is optimized, `Development` or above) and all of them tend to point at the exact
-same assembly instruction; this entire segment of the call stack is for display
-only and can be safely disregarded.
-
-It cannot be guaranteed but it's been verified that the `Chain` wrappers do get
-optimized and turn into a regular function call or get completely inlined in
-`Shipping`.
-
-#### Rvalue references
-
-Although this doesn't apply to `UFUNCTION`s, passing rvalue references to
-`Latent::Chain` is **not** equivalent to passing them straight to the chained
-function: the reference that the function will receive will be to a
-move-constructed object, not the original. This matters in extremely unusual
-scenarios where the caller wants to still access the rvalue object after the
-latent function has returned. If for some reason you need exactly this, refer to
-the implementation of `Latent::ChainEx` to see how to register yourself with
-`UUE5CoroSubsystem` and call the function taking rvalue references directly.
 
 ## Coroutines and UObject lifetimes
 

@@ -22,13 +22,17 @@ ready to go!
 
 ## Features
 
-Two main flavors of coroutines are currently implemented.
-Use these links to navigate to their detailed documentation pages or read this
-page for a quick overview:
+Click these links for the detailed description of the main features provided
+by this plugin, or keep reading for a quick overview.
 
-* [Generators](Docs/Generator.md) (caller-controlled, returning a sequence of
-                                   objects, a.k.a. iterators in C#)
-* [Async coroutines](Docs/Async.md) (callee-controlled pausing of execution)
+* [Generators](Docs/Generator.md) are caller-controlled and `co_yield` a
+sequence of objects, also known as iterators in C#.
+* [Async coroutines](Docs/Async.md) control their own resumption by
+`co_await`ing various awaiter objects. They can be used to implement BP latent
+actions or as a generic fork in code execution like AsyncTask, but not
+necessarily involving multithreading.
+* [Overview of built-in awaiters](Docs/Awaiters.md) that you can use with async
+coroutines.
 
 ### Generators
 
