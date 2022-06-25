@@ -32,3 +32,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UE5Coro/AsyncAwaiters.h"
+#include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/Generator.h"
+#include "UE5Coro/HttpAwaiters.h"
+#include "UE5Coro/LatentAwaiters.h"
+#include "UE5Coro/LatentCallbacks.h"
+#include "UE5Coro/LatentTimeline.h"
