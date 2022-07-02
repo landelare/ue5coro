@@ -97,6 +97,17 @@ latent function has returned. If for some reason you need exactly this, refer
 to the implementation of `Latent::ChainEx` to see how to register yourself with
 `UUE5CoroSubsystem` and call the function taking rvalue references directly.
 
+## UE::Tasks
+
+`UE::Tasks::TTask<T>` is directly `co_await`able.
+Doing so will resume the coroutine within the tasks system once the task has
+completed.
+The result of the `co_await` expression will be `T&` (not `T`!) or `void`,
+matching `TTask<T>::GetResult()`.
+
+Latent coroutines will need to `co_await Async::MoveToGameThread()` at some
+later point to correctly complete.
+
 ## HTTP
 
 `UE5Coro::Http::ProcessAsync` wraps a FHttpRequestRef in an awaiter that

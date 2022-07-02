@@ -31,12 +31,36 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
-#include "UE5Coro/AsyncAwaiters.h"
 #include "UE5Coro/AsyncCoroutine.h"
-#include "UE5Coro/Generator.h"
-#include "UE5Coro/HttpAwaiters.h"
-#include "UE5Coro/LatentAwaiters.h"
-#include "UE5Coro/LatentCallbacks.h"
-#include "UE5Coro/LatentTimeline.h"
-#include "UE5Coro/TaskAwaiters.h"
+
+namespace UE5Coro::Private
+{
+template<typename T>
+class [[nodiscard]] TTaskAwaiter
+{
+	UE::Tasks::TTask<T> Task;
+
+public:
+	explicit TTaskAwaiter(UE::Tasks::TTask<T> Task) : Task(Task) { }
+	UE_NONCOPYABLE(TTaskAwaiter);
+
+	bool await_ready() { return Task.IsCompleted(); }
+	auto await_resume() requires !std::is_void_v<T> { return Task.GetResult(); }
+	void await_resume() requires std::is_void_v<T> { }
+
+	template<typename P>
+	void await_suspend(std::coroutine_handle<P> Handle)
+	{
+		if constexpr (std::is_same_v<P, FLatentPromise>)
+			Handle.promise().DetachFromGameThread();
+
+		UE::Tasks::Launch(UE_SOURCE_LOCATION, [Handle]
+		{
+			if constexpr (std::is_same_v<P, FLatentPromise>)
+				Handle.promise().ThreadSafeResume();
+			else
+				Handle.resume();
+		}, Task);
+	}
+};
+}

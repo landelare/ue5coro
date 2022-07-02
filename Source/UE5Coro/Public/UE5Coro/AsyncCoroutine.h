@@ -45,6 +45,7 @@ class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentPromise;
 class FPromise;
+template<typename> class TTaskAwaiter;
 }
 
 // This type has to be a USTRUCT in the global namespace to support latent
@@ -131,8 +132,10 @@ public:
 	FAsyncCoroutine get_return_object();
 	void unhandled_exception() { check(!"Exceptions are not supported"); }
 
-	template<typename T>
-	T&& await_transform(T&& Awaiter) { return std::forward<T>(Awaiter); }
+	// Support awaiting some types that aren't awaiters themselves
+	template<typename T> T&& await_transform(T&&); // Awaiter passthrough
+	template<typename T> TTaskAwaiter<T> await_transform(UE::Tasks::TTask<T>);
+
 	// co_yield is not allowed in async coroutines
 	std::suspend_never yield_value(auto&&) = delete;
 };
@@ -201,6 +204,18 @@ FLatentPromise::FLatentPromise(auto&&... Args)
 	       TEXT("Latent coroutines may only be started on the game thread"));
 
 	Init(Args...); // Deliberately not forwarding to force lvalue references
+}
+
+template<typename T>
+T&& FPromise::await_transform(T&& Awaiter)
+{
+	return std::forward<T>(Awaiter);
+}
+
+template<typename T>
+TTaskAwaiter<T> FPromise::await_transform(UE::Tasks::TTask<T> Task)
+{
+	return TTaskAwaiter<T>(Task);
 }
 
 void FLatentPromise::Init(const UObject* WorldContext, auto&... Args)
