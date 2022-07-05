@@ -40,13 +40,11 @@ namespace
 {
 struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 {
-	std::coroutine_handle<FAsyncPromise> Handle;
+	FAsyncHandle Handle;
 	FLatentAwaiter* Awaiter;
 
-	FPendingAsyncCoroutine(std::coroutine_handle<FAsyncPromise> Handle,
-	                       FLatentAwaiter* Awaiter)
+	FPendingAsyncCoroutine(FAsyncHandle Handle, FLatentAwaiter* Awaiter)
 		: Handle(Handle), Awaiter(Awaiter) { }
-
 	UE_NONCOPYABLE(FPendingAsyncCoroutine);
 
 	virtual ~FPendingAsyncCoroutine() override
@@ -70,8 +68,7 @@ struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 };
 }
 
-void FLatentCancellation::await_suspend(
-	std::coroutine_handle<FLatentPromise> Handle)
+void FLatentCancellation::await_suspend(FLatentHandle Handle)
 {
 	ensureMsgf(IsInGameThread(),
 	           TEXT("Latent awaiters may only be used on the game thread"));
@@ -85,7 +82,7 @@ FLatentAwaiter::~FLatentAwaiter()
 	Resume = nullptr;
 }
 
-void FLatentAwaiter::await_suspend(std::coroutine_handle<FAsyncPromise> Handle)
+void FLatentAwaiter::await_suspend(FAsyncHandle Handle)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
@@ -98,7 +95,7 @@ void FLatentAwaiter::await_suspend(std::coroutine_handle<FAsyncPromise> Handle)
 		LatentInfo.CallbackTarget, LatentInfo.UUID, Latent);
 }
 
-void FLatentAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
+void FLatentAwaiter::await_suspend(FLatentHandle Handle)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));

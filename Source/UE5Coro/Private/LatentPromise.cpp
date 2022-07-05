@@ -71,7 +71,7 @@ class [[nodiscard]] FPendingLatentCoroutine : public FPendingLatentAction
 	FLatentAwaiter* CurrentAwaiter = nullptr;
 
 public:
-	explicit FPendingLatentCoroutine(std::coroutine_handle<FLatentPromise> Handle,
+	explicit FPendingLatentCoroutine(FLatentHandle Handle,
 	                                 FLatentActionInfo LatentInfo)
 		: Promise(Handle.promise()), LatentInfo(LatentInfo) { }
 
@@ -133,8 +133,7 @@ void FLatentPromise::CreateLatentAction(FLatentActionInfo&& LatentInfo)
 	checkf(!PendingLatentCoroutine, TEXT("Internal error"));
 
 	PendingLatentCoroutine = new FPendingLatentCoroutine(
-		std::coroutine_handle<FLatentPromise>::from_promise(*this),
-		std::move(LatentInfo));
+		FLatentHandle::from_promise(*this), std::move(LatentInfo));
 }
 
 void FLatentPromise::Init()
@@ -179,7 +178,7 @@ void FLatentPromise::ThreadSafeResume()
 		// the coroutine will either co_await or return_void.
 
 		// Therefore, this can safely run on any thread now.
-		std::coroutine_handle<FLatentPromise>::from_promise(*this).resume();
+		FLatentHandle::from_promise(*this).resume();
 }
 
 void FLatentPromise::ThreadSafeDestroy()
@@ -191,7 +190,7 @@ void FLatentPromise::ThreadSafeDestroy()
 
 	checkf(IsInGameThread(),
 	       TEXT("Unexpected latent coroutine destruction off the game thread"));
-	auto Handle = std::coroutine_handle<FLatentPromise>::from_promise(*this);
+	auto Handle = FLatentHandle::from_promise(*this);
 
 	GLatentExitReason = ExitReason;
 	Handle.destroy(); // Counts as delete this;

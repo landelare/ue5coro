@@ -51,5 +51,5 @@ TMulticastDelegate<void()>& FPromise::OnCompletion()
 
 FAsyncCoroutine FPromise::get_return_object()
 {
-	return FAsyncCoroutine(FAsyncCoroutine::handle_type::from_promise(*this));
+	return FAsyncCoroutine(FHandle::from_promise(*this));
 }

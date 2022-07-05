@@ -36,15 +36,13 @@ using namespace UE5Coro::Private;
 
 namespace
 {
-template<typename T>
+template<typename T, typename H = std::coroutine_handle<T>>
 struct FResumeTask
 {
-	using handle_type = std::coroutine_handle<T>;
-
 	ENamedThreads::Type Thread;
-	handle_type Handle;
+	H Handle;
 
-	explicit FResumeTask(ENamedThreads::Type Thread, handle_type Handle)
+	explicit FResumeTask(ENamedThreads::Type Thread, H Handle)
 		: Thread(Thread), Handle(Handle) { }
 
 	ENamedThreads::Type GetDesiredThread() const
@@ -91,7 +89,7 @@ struct FLatentResume : FResumeTask<FLatentPromise>
 };
 }
 
-void FAsyncAwaiter::await_suspend(std::coroutine_handle<FAsyncPromise> Handle)
+void FAsyncAwaiter::await_suspend(FAsyncHandle Handle)
 {
 	// Easy mode, nothing else can decide to delete the coroutine
 	auto* Task = TGraphTask<FAsyncResume>::CreateTask()
@@ -106,7 +104,7 @@ void FAsyncAwaiter::await_suspend(std::coroutine_handle<FAsyncPromise> Handle)
 		Task->Unlock();
 }
 
-void FAsyncAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> Handle)
+void FAsyncAwaiter::await_suspend(FLatentHandle Handle)
 {
 	auto& Promise = Handle.promise();
 	checkCode(

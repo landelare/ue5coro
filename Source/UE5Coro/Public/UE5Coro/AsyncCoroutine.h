@@ -34,6 +34,7 @@
 #include "CoreMinimal.h"
 #include <atomic>
 #include <coroutine>
+#include <variant>
 #include "Engine/LatentActionManager.h"
 #include "AsyncCoroutine.generated.h"
 
@@ -46,6 +47,11 @@ class FLatentAwaiter;
 class FLatentPromise;
 class FPromise;
 template<typename> class TTaskAwaiter;
+
+using FHandle = std::coroutine_handle<FPromise>;
+using FAsyncHandle = std::coroutine_handle<FAsyncPromise>;
+using FLatentHandle = std::coroutine_handle<FLatentPromise>;
+using FHandleVariant = std::variant<FAsyncHandle, FLatentHandle>;
 }
 
 // This type has to be a USTRUCT in the global namespace to support latent
@@ -61,16 +67,16 @@ USTRUCT(BlueprintInternalUseOnly, Meta=(HiddenByDefault))
 struct UE5CORO_API FAsyncCoroutine
 {
 	GENERATED_BODY()
-	using handle_type = std::coroutine_handle<UE5Coro::Private::FPromise>;
 	friend UE5Coro::Private::FAsyncPromise;
 
 private:
-	handle_type Handle;
+	UE5Coro::Private::FHandle Handle;
 
 public:
 	/** This constructor is public to placate the reflection system and BP,
 	 *  do not use directly. */
-	explicit FAsyncCoroutine(handle_type Handle = nullptr) : Handle(Handle) { }
+	explicit FAsyncCoroutine(UE5Coro::Private::FHandle Handle = nullptr)
+		: Handle(Handle) { }
 
 	/** Returns a delegate broadcasting this coroutine's completion for any
 	 *  reason, including being unsuccessful or canceled.
@@ -104,7 +110,7 @@ struct FInitialSuspend
 
 	bool await_ready() noexcept { return Action == Ready; }
 	void await_resume() noexcept { }
-	void await_suspend(std::coroutine_handle<FLatentPromise> Handle) noexcept
+	void await_suspend(FLatentHandle Handle) noexcept
 	{
 		if (Action == Destroy)
 			Handle.destroy();

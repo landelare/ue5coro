@@ -32,8 +32,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include <coroutine>
 #include <functional>
+#include "UE5Coro/AsyncCoroutine.h"
 
 namespace UE5Coro::Private
 {
@@ -111,7 +111,7 @@ class [[nodiscard]] UE5CORO_API FLatentCancellation final
 public:
 	bool await_ready() { return false; }
 	void await_resume() { }
-	void await_suspend(std::coroutine_handle<FLatentPromise>);
+	void await_suspend(FLatentHandle);
 };
 
 class [[nodiscard]] UE5CORO_API FLatentAwaiter final
@@ -129,8 +129,8 @@ public:
 
 	bool await_ready() { return ShouldResume(); }
 	void await_resume() { }
-	void await_suspend(std::coroutine_handle<FAsyncPromise>);
-	void await_suspend(std::coroutine_handle<FLatentPromise>);
+	void await_suspend(FAsyncHandle);
+	void await_suspend(FLatentHandle);
 };
 }
 

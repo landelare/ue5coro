@@ -33,14 +33,12 @@
 
 #include <coroutine>
 #include <optional>
-#include <variant>
 #include "Interfaces/IHttpRequest.h"
+#include "UE5Coro/AsyncCoroutine.h"
 
 namespace UE5Coro::Private
 {
 class FHttpAwaiter;
-class FAsyncPromise;
-class FLatentPromise;
 }
 
 namespace UE5Coro::Http
@@ -55,13 +53,10 @@ namespace UE5Coro::Private
 {
 class [[nodiscard]] UE5CORO_API FHttpAwaiter
 {
-	using FAsyncHandle = std::coroutine_handle<FAsyncPromise>;
-	using FLatentHandle = std::coroutine_handle<FLatentPromise>;
-
 	const ENamedThreads::Type Thread;
 	const FHttpRequestRef Request;
 	UE::FSpinLock Lock;
-	std::variant<FAsyncHandle, FLatentHandle> Handle;
+	FHandleVariant Handle;
 	bool bSuspended;
 	// end Lock
 	std::optional<TTuple<FHttpResponsePtr, bool>> Result;
@@ -76,8 +71,8 @@ public:
 	UE_NONCOPYABLE(FHttpAwaiter);
 
 	bool await_ready();
-	void await_suspend(std::coroutine_handle<FLatentPromise>);
-	void await_suspend(std::coroutine_handle<FAsyncPromise>);
+	void await_suspend(FLatentHandle);
+	void await_suspend(FAsyncHandle);
 
 	TTuple<FHttpResponsePtr, bool> await_resume();
 };

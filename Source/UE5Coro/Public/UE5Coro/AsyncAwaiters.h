@@ -57,24 +57,22 @@ namespace UE5Coro::Private
 {
 class [[nodiscard]] UE5CORO_API FAsyncAwaiter final
 {
-	using handle_type = std::coroutine_handle<FPromise>;
-
 	ENamedThreads::Type Thread;
-	handle_type ResumeAfter;
+	FHandle ResumeAfter;
 
 	FAsyncAwaiter(const FAsyncAwaiter&) = delete;
 	void operator=(auto&&) = delete;
 
 public:
 	explicit FAsyncAwaiter(ENamedThreads::Type Thread,
-	                       handle_type ResumeAfter = nullptr)
+	                       FHandle ResumeAfter = nullptr)
 		: Thread(Thread), ResumeAfter(ResumeAfter) { }
 	FAsyncAwaiter(FAsyncAwaiter&&) = default;
 
 	bool await_ready() { return false; }
 	void await_resume() { }
 
-	void await_suspend(std::coroutine_handle<FAsyncPromise> Handle);
-	void await_suspend(std::coroutine_handle<FLatentPromise> Handle);
+	void await_suspend(FAsyncHandle Handle);
+	void await_suspend(FLatentHandle Handle);
 };
 }

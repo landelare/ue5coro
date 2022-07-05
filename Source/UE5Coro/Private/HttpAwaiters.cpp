@@ -74,7 +74,7 @@ bool FHttpAwaiter::await_ready()
 	}
 }
 
-void FHttpAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> InHandle)
+void FHttpAwaiter::await_suspend(FLatentHandle InHandle)
 {
 	// Even if the entire co_await starts and ends on the game thread we need
 	// to take temporary ownership in case the latent action manager decides to
@@ -83,7 +83,7 @@ void FHttpAwaiter::await_suspend(std::coroutine_handle<FLatentPromise> InHandle)
 	SetHandleAndUnlock(InHandle);
 }
 
-void FHttpAwaiter::await_suspend(std::coroutine_handle<FAsyncPromise> InHandle)
+void FHttpAwaiter::await_suspend(FAsyncHandle InHandle)
 {
 	SetHandleAndUnlock(InHandle);
 }
@@ -93,7 +93,7 @@ void FHttpAwaiter::SetHandleAndUnlock(std::coroutine_handle<T> InHandle)
 {
 	// This should be locked from await_ready
 	checkf(!Lock.TryLock(), TEXT("Internal error"));
-	Handle = std::move(InHandle);
+	Handle = InHandle;
 	Lock.Unlock();
 }
 
