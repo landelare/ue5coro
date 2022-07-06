@@ -97,6 +97,18 @@ struct std::coroutine_traits<FAsyncCoroutine, Args...>
 	                                        UE5Coro::Private::FAsyncPromise>;
 };
 
+namespace UE5Coro
+{
+template<typename T>
+concept TAwaitable = requires(T Awaiter)
+{
+	[&Awaiter]() -> FAsyncCoroutine
+	{
+		co_await Awaiter;
+	};
+};
+}
+
 namespace UE5Coro::Private
 {
 struct FInitialSuspend
