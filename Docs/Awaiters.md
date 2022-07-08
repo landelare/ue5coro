@@ -4,6 +4,22 @@ This page gives an overview of the various awaiters that come with the plugin.
 This is not meant to be an exhaustive documentation (read the comments in the
 header files for that).
 
+## Aggregates
+
+`UE5Coro::WhenAny` and `WhenAll` let you combine any type of `co_await`able
+objects into one that resumes the coroutine when one or all of them have
+completed.
+When multiple types of awaiters are mixed, it's unspecified whose system will
+resume - for example:
+```cpp
+auto Async = Async::MoveToThread(...);
+auto Latent = Latent::Seconds(...);
+auto Task = UE::Tasks::Launch(...);
+co_await UE5Coro::WhenAll(Async, Latent, Task);
+```
+The code above might resume in an AsyncTask, game thread Tick, or the UE::Tasks
+system.
+
 ## Async tasks
 
 `UE5Coro::Async` contains awaiters that let you conveniently move execution

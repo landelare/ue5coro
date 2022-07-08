@@ -52,6 +52,8 @@ using FHandle = std::coroutine_handle<FPromise>;
 using FAsyncHandle = std::coroutine_handle<FAsyncPromise>;
 using FLatentHandle = std::coroutine_handle<FLatentPromise>;
 using FHandleVariant = std::variant<FAsyncHandle, FLatentHandle>;
+using FOptionalHandleVariant = std::variant<std::monostate,
+                                            FAsyncHandle, FLatentHandle>;
 }
 
 // This type has to be a USTRUCT in the global namespace to support latent

@@ -29,15 +29,42 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include "CoreMinimal.h"
 #include "UE5Coro/AggregateAwaiters.h"
-#include "UE5Coro/AsyncAwaiters.h"
-#include "UE5Coro/AsyncCoroutine.h"
-#include "UE5Coro/Generator.h"
-#include "UE5Coro/HttpAwaiters.h"
-#include "UE5Coro/LatentAwaiters.h"
-#include "UE5Coro/LatentCallbacks.h"
-#include "UE5Coro/LatentTimeline.h"
-#include "UE5Coro/TaskAwaiters.h"
+
+namespace UE5Coro::Private
+{
+bool FAggregateAwaiter::await_ready()
+{
+	Data->Lock.Lock();
+	checkf(std::holds_alternative<std::monostate>(Data->Handle),
+	       TEXT("Attempting to reuse aggregate awaiter"));
+
+	// Unlock if ready and resume immediately,
+	// otherwise carry the lock to await_suspend
+	bool bReady = Data->Count <= 0;
+	if (bReady)
+		Data->Lock.Unlock();
+	return bReady;
+}
+
+void FAggregateAwaiter::await_suspend(FAsyncHandle Handle)
+{
+	checkf(!Data->Lock.TryLock(), TEXT("Internal error"));
+	checkf(std::holds_alternative<std::monostate>(Data->Handle),
+	       TEXT("Attempting to reuse aggregate awaiter"));
+
+	Data->Handle = Handle;
+	Data->Lock.Unlock();
+}
+
+void FAggregateAwaiter::await_suspend(FLatentHandle Handle)
+{
+	checkf(!Data->Lock.TryLock(), TEXT("Internal error"));
+	checkf(std::holds_alternative<std::monostate>(Data->Handle),
+	       TEXT("Attempting to reuse aggregate awaiter"));
+
+	Handle.promise().DetachFromGameThread();
+	Data->Handle = Handle;
+	Data->Lock.Unlock();
+}
+}
