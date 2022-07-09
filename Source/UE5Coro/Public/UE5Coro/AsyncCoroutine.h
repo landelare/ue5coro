@@ -38,6 +38,10 @@
 #include "Engine/LatentActionManager.h"
 #include "AsyncCoroutine.generated.h"
 
+#ifndef __cpp_lib_coroutine
+#error UE5Coro requires C++20.
+#endif
+
 namespace UE5Coro::Private
 {
 enum class ELatentExitReason : uint8;
