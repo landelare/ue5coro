@@ -54,8 +54,11 @@ Private::FLatentCancellation Cancel();
  *  @see Latent::Until for an alternative to while-NextTick loops. */
 UE5CORO_API Private::FLatentAwaiter NextTick();
 
-/** Resumes the coroutine on the first tick after the given number of frames. */
+[[deprecated("Use UE5Coro::Latent::Ticks instead")]]
 UE5CORO_API Private::FLatentAwaiter Frames(int32);
+
+/** Resumes the coroutine the given number of ticks later. */
+UE5CORO_API Private::FLatentAwaiter Ticks(int64);
 
 /** Resumes the coroutine the specified amount of seconds later.<br>
  *  This is affected by both pause and time dilation. */

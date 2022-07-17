@@ -37,19 +37,9 @@ using namespace UE5Coro::Private;
 
 namespace
 {
-bool WaitOnce(void*& State, bool)
-{
-	if (State)
-	{
-		State = nullptr;
-		return false;
-	}
-	return true;
-}
-
 bool WaitUntilFrame(void*& State, bool)
 {
-	return GFrameNumber >= reinterpret_cast<intptr_t>(State);
+	return GFrameCounter >= reinterpret_cast<uint64>(State);
 }
 
 template<auto GetTime>
@@ -88,14 +78,21 @@ FLatentAwaiter GenericSeconds(double Seconds)
 
 FLatentAwaiter Latent::NextTick()
 {
-	return FLatentAwaiter(reinterpret_cast<void*>(1), &WaitOnce);
+	return Ticks(1);
 }
 
 FLatentAwaiter Latent::Frames(int32 Frames)
 {
-	ensureMsgf(Frames >= 0, TEXT("Invalid number of frames %d"), Frames);
-	intptr_t TicksPtr = GFrameNumber + Frames;
-	return FLatentAwaiter(reinterpret_cast<void*>(TicksPtr), &WaitUntilFrame);
+	return Ticks(Frames);
+}
+
+FLatentAwaiter Latent::Ticks(int64 Ticks)
+{
+	ensureMsgf(Ticks >= 0, TEXT("Invalid number of ticks %lld"), Ticks);
+	static_assert(sizeof(void*) == sizeof(uint64),
+	              "32-bit platforms are not supported");
+	uint64 Target = GFrameCounter + Ticks;
+	return FLatentAwaiter(reinterpret_cast<void*>(Target), &WaitUntilFrame);
 }
 
 FLatentAwaiter Latent::Seconds(double Seconds)
