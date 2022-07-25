@@ -34,6 +34,7 @@
 #include <coroutine>
 #include <optional>
 #include "Interfaces/IHttpRequest.h"
+#include "Misc/SpinLock.h"
 #include "UE5Coro/AsyncCoroutine.h"
 
 namespace UE5Coro::Private
