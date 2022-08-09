@@ -7,18 +7,19 @@ support with additional features such as easy authoring of BP latent actions.
 
 ## Installing
 
-For project-based installations, `git clone` this repository to your project's
-Plugins folder.
-If you want to install to the engine, you'll need to clone this repository under
-`Engine/Plugins/Marketplace`.
+Download the release that you wish to use from the
+[Releases](https://github.com/landelare/ue5coro/releases) page, extract it to
+your project's Plugins folder and in case you downloaded a source code zip,
+rename the folder that it contains to just `UE5Coro` so that you end up with
+`YourProject\Plugins\UE5Coro\UE5Coro.uplugin`.
 
-You'll obviously need C\+\+20 support enabled in your project.
-In your Build.cs file, add or change this line:
+In modules where you wish to use coroutines, add or change this line in the
+corresponding Build.cs file to enable the required language features:
 ```c#
 CppStandard = CppStandardVersion.Cpp20;
 ```
-Add `"UE5Coro"` to your dependency module names, enable the plugin, and you're
-ready to go!
+Add `"UE5Coro"` to your dependency module names in the same Build.cs file,
+enable the plugin in the Unreal editor, and you're ready to go!
 
 ## Features
 
