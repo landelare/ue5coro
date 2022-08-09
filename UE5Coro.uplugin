@@ -26,6 +26,11 @@
 			"Name": "UE5CoroK2",
 			"Type": "UncookedOnly",
 			"LoadingPhase": "PostConfigInit"
+		},
+		{
+			"Name": "UE5CoroTests",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PostConfigInit"
 		}
 	]
 }
