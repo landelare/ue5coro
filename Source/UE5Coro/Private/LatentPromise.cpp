@@ -257,8 +257,7 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	                                                    LatentInfo.UUID))
 		return {FInitialSuspend::Destroy};
 
-	World->GetLatentActionManager().AddNewAction(LatentInfo.CallbackTarget,
-	                                             LatentInfo.UUID, Pending);
+	LAM.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, Pending);
 
 	// Let the coroutine start immediately on its calling thread
 	return {FInitialSuspend::Ready};
