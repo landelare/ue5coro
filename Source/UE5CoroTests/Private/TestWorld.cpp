@@ -76,18 +76,24 @@ void FTestWorld::EndTick()
 	++GFrameCounter;
 }
 
-void FTestWorld::Run(std::function<FAsyncCoroutine()> Fn)
+FAsyncCoroutine FTestWorld::Run(std::function<FAsyncCoroutine()> Fn)
 {
-	Fn();
+	return Fn();
 }
 
-void FTestWorld::Run(std::function<FAsyncCoroutine(FLatentActionInfo)> Fn,
-                     bool* Done)
+FAsyncCoroutine FTestWorld::Run(
+	std::function<FAsyncCoroutine(FLatentActionInfo)> Fn, bool* Done)
 {
 	if (!Done)
 		Done = &GDummy;
 
 	auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
 	auto LatentInfo = Sys->MakeLatentInfo(Done);
-	Fn(std::move(LatentInfo));
+	return Fn(std::move(LatentInfo));
+}
+
+void FTestHelper::ForceResume(FAsyncCoroutine& Coroutine)
+{
+	// Unfit for public consumption: doesn't call ThreadSafeResume
+	Coroutine.Handle.resume();
 }

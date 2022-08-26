@@ -49,7 +49,14 @@ public:
 
 	void Tick(float DeltaSeconds = 0.125);
 	void EndTick();
-	void Run(std::function<FAsyncCoroutine()>);
-	void Run(std::function<FAsyncCoroutine(FLatentActionInfo)>, bool* = nullptr);
+	FAsyncCoroutine Run(std::function<FAsyncCoroutine()>);
+	FAsyncCoroutine Run(std::function<FAsyncCoroutine(FLatentActionInfo)>,
+	                    bool* = nullptr);
+};
+
+class FTestHelper
+{
+public:
+	static void ForceResume(FAsyncCoroutine& Coroutine);
 };
 }

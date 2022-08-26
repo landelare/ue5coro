@@ -51,6 +51,7 @@ class FLatentAwaiter;
 class FLatentPromise;
 class FPromise;
 template<typename> class TTaskAwaiter;
+namespace Test { class FTestHelper; }
 
 using FHandle = std::coroutine_handle<FPromise>;
 using FAsyncHandle = std::coroutine_handle<FAsyncPromise>;
@@ -74,6 +75,7 @@ struct UE5CORO_API FAsyncCoroutine
 {
 	GENERATED_BODY()
 	friend UE5Coro::Private::FAsyncPromise;
+	friend UE5Coro::Private::Test::FTestHelper;
 
 private:
 	UE5Coro::Private::FHandle Handle;
