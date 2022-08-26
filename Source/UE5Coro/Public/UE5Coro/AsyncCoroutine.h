@@ -154,7 +154,7 @@ public:
 	TMulticastDelegate<void()>& OnCompletion();
 
 	FAsyncCoroutine get_return_object();
-	void unhandled_exception() { check(!"Exceptions are not supported"); }
+	void unhandled_exception();
 
 	// Support awaiting some types that aren't awaiters themselves
 	template<typename T> T&& await_transform(T&&); // Awaiter passthrough

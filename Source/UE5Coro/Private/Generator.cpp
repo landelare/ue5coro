@@ -29,36 +29,15 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/Generator.h"
 
 using namespace UE5Coro::Private;
 
-FPromise::~FPromise()
-{
-#if DO_CHECK
-	Alive = 0;
-#endif
-	Continuations.Broadcast();
-}
-
-void FPromise::unhandled_exception()
+void FGeneratorPromise::unhandled_exception()
 {
 #if PLATFORM_EXCEPTIONS_DISABLED
 	check(!"Exceptions are not supported");
 #else
 	throw;
 #endif
-}
-
-TMulticastDelegate<void()>& FPromise::OnCompletion()
-{
-	// Best effort but ultimately unreliable check for stale objects
-	checkf(Alive == Expected,
-	       TEXT("Attempted to access or await a destroyed coroutine"));
-	return Continuations;
-}
-
-FAsyncCoroutine FPromise::get_return_object()
-{
-	return FAsyncCoroutine(FHandle::from_promise(*this));
 }

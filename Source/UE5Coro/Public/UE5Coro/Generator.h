@@ -154,7 +154,7 @@ public:
 
 namespace UE5Coro::Private
 {
-class [[nodiscard]] FGeneratorPromise
+class [[nodiscard]] UE5CORO_API FGeneratorPromise
 {
 protected:
 	/** Points to the current co_yield expression if valid. */
@@ -167,7 +167,7 @@ public:
 	std::suspend_never initial_suspend() { return {}; }
 	std::suspend_always final_suspend() noexcept { return {}; }
 	void return_void() { Current = nullptr; }
-	void unhandled_exception() { check(!"Exceptions are not supported"); }
+	void unhandled_exception();
 
 	// co_await is not allowed in generators
 	std::suspend_never await_transform(auto&&) = delete;
