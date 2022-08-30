@@ -121,8 +121,11 @@ completed.
 The result of the `co_await` expression will be `T&` (not `T`!) or `void`,
 matching `TTask<T>::GetResult()`.
 
+`UE5Coro::Tasks` provides a convenience function to move to a `TTask` without
+having to use the lambda syntax.
+
 Latent coroutines will need to `co_await Async::MoveToGameThread()` at some
-later point to correctly complete.
+later point to return to the game thread and correctly complete.
 
 ## HTTP
 

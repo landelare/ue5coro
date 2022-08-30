@@ -241,7 +241,7 @@ T&& FPromise::await_transform(T&& Awaiter)
 template<typename T>
 TTaskAwaiter<T> FPromise::await_transform(UE::Tasks::TTask<T> Task)
 {
-	return TTaskAwaiter<T>(Task);
+	return TTaskAwaiter<T>(Task, TEXT("UE5Coro automatic co_await wrapper"));
 }
 
 void FLatentPromise::Init(const UObject* WorldContext, auto&... Args)
