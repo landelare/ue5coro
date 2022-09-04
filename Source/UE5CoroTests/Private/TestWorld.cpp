@@ -62,6 +62,7 @@ FTestWorld::~FTestWorld()
 	World->DestroyWorld(true);
 	GWorld = PrevWorld;
 	GFrameCounter = OldFrameCounter;
+	CollectGarbage(RF_NoFlags);
 }
 
 void FTestWorld::Tick(float DeltaSeconds)

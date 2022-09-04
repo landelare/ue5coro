@@ -47,6 +47,8 @@ public:
 	FTestWorld();
 	~FTestWorld();
 
+	UWorld* operator->() const { return World; }
+
 	void Tick(float DeltaSeconds = 0.125);
 	void EndTick();
 	FAsyncCoroutine Run(std::function<FAsyncCoroutine()>);

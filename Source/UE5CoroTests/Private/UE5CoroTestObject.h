@@ -41,6 +41,11 @@ class UUE5CoroTestObject : public UObject
 	GENERATED_BODY()
 
 public:
+	UFUNCTION()
+	void Empty()
+	{
+	}
+
 	virtual UWorld* GetWorld() const override
 	{
 		return GWorld;
@@ -50,4 +55,6 @@ public:
 	{
 		UKismetSystemLibrary::DelayUntilNextTick(this, LatentInfo);
 	}
+
+	FAsyncCoroutine ObjectDestroyedTest(int&, bool&, FLatentActionInfo);
 };
