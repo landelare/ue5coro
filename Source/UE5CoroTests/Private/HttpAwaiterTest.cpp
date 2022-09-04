@@ -29,19 +29,23 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "HttpModule.h"
 #include "TestWorld.h"
+#include "Interfaces/IHttpResponse.h"
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/AsyncAwaiters.h"
+#include "UE5Coro/HttpAwaiters.h"
+#include "UE5Coro/TaskAwaiters.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncAwaiterTest, "UE5Coro.Async.TrueAsync",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHttpAsyncTest, "UE5Coro.Http.Async",
                                  EAutomationTestFlags::ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncInLatentTest, "UE5Coro.Async.Latent",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHttpLatentTest, "UE5Coro.Http.Latent",
                                  EAutomationTestFlags::ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
@@ -55,65 +59,53 @@ void DoTest(FAutomationTestBase& Test)
 	FTestWorld World;
 	constexpr bool bLatent = sizeof...(T) == 1;
 
-	if constexpr (bLatent)
+	std::atomic<bool> bDone = false;
+	World.Run(CORO
 	{
-		FEventRef TestToCoro(EEventMode::AutoReset);
-		FEventRef CoroToTest(EEventMode::AutoReset);
-		bool bStarted = false;
-		bool bDone = false;
-		World.Run(CORO
-		{
-			bStarted = true;
-			co_await Async::MoveToThread(ENamedThreads::AnyThread);
-			TestToCoro->Wait();
-			bDone = true;
+		auto Request = FHttpModule::Get().CreateRequest();
+		// We're not testing HTTP, just the awaiter
+		Request->SetURL(TEXT(".invalid"));
+		Request->SetTimeout(0.01);
+		auto [Response, bSuccess] = co_await Http::ProcessAsync(Request);
+		Test.TestEqual(TEXT("Success"), bSuccess, false);
+		Test.TestEqual(TEXT("Response"), static_cast<bool>(Response), true);
+		bDone = true;
+	});
+	FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
+
+	bDone = false;
+	World.Run(CORO
+	{
+		co_await Tasks::MoveToTask();
+		FPlatformMisc::MemoryBarrier();
+		Test.TestEqual(TEXT("Not in game thread 1"), IsInGameThread(), false);
+		auto Request = FHttpModule::Get().CreateRequest();
+		// We're not testing HTTP, just the awaiter
+		Request->SetURL(TEXT(".invalid"));
+		Request->SetTimeout(0.01);
+		auto [Response, bSuccess] = co_await Http::ProcessAsync(Request);
+		Test.TestEqual(TEXT("Not in game thread 2"), IsInGameThread(), false);
+		Test.TestEqual(TEXT("Success"), bSuccess, false);
+		Test.TestEqual(TEXT("Response"), static_cast<bool>(Response), true);
+		FPlatformMisc::MemoryBarrier();
+		if constexpr (bLatent)
 			co_await Async::MoveToGameThread();
-			CoroToTest->Trigger();
-		}, &bDone);
-		Test.TestEqual(TEXT("Started"), bStarted, true);
-		Test.TestEqual(TEXT("Not done yet 1"), bDone, false);
-		TestToCoro->Trigger();
-
-		// This test is running on the game thread so MoveToGameThread() needs
-		// a little help
-		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
-		Test.TestEqual(TEXT("Done"), bDone, true);
-	}
-
-	{
-		FEventRef TestToCoro(EEventMode::AutoReset);
-		FEventRef CoroToTest(EEventMode::AutoReset);
-		int State = 0;
-		World.Run(CORO
-		{
-			State = 1;
-			CoroToTest->Trigger();
-			co_await Async::MoveToThread(ENamedThreads::AnyThread);
-			TestToCoro->Wait();
-			State = 2;
-			CoroToTest->Trigger();
-			if constexpr (bLatent)
-				co_await Async::MoveToGameThread();
-		});
-		Test.TestEqual(TEXT("Initial state"), State, 1);
-		Test.TestEqual(TEXT("Wait 1"), CoroToTest->Wait(), true);
-		Test.TestEqual(TEXT("First event, original thread"), State, 1);
-		TestToCoro->Trigger();
-		Test.TestEqual(TEXT("Wait 2"), CoroToTest->Wait(), true);
-		Test.TestEqual(TEXT("Second event, new thread"), State, 2);
-	}
+		bDone = true;
+	});
+	// Test is being used by the coroutine on another thread here
+	FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
 
 #undef CORO
 }
 }
 
-bool FAsyncAwaiterTest::RunTest(const FString& Parameters)
+bool FHttpAsyncTest::RunTest(const FString& Parameters)
 {
 	DoTest<>(*this);
 	return true;
 }
 
-bool FAsyncInLatentTest::RunTest(const FString& Parameters)
+bool FHttpLatentTest::RunTest(const FString& Parameters)
 {
 	DoTest<FLatentActionInfo>(*this);
 	return true;

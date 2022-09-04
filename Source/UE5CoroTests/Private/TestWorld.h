@@ -57,6 +57,8 @@ public:
 class FTestHelper
 {
 public:
+	static void PumpGameThread(FTestWorld& World,
+	                           std::function<bool()> ExitCondition);
 	static void ForceResume(FAsyncCoroutine& Coroutine);
 };
 }

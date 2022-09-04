@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "TestWorld.h"
+#include "HAL/ThreadManager.h"
 #include "UE5Coro/UE5CoroSubsystem.h"
 
 using namespace UE5Coro::Private::Test;
@@ -68,6 +69,14 @@ void FTestWorld::Tick(float DeltaSeconds)
 	check(IsInGameThread());
 	World->Tick(LEVELTICK_All, DeltaSeconds);
 	EndTick();
+
+	FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
+
+	// Other things that need ticking - FTSTicker is used by FHttpModule
+	// Reference: FEngineLoop::Tick()
+	FTSTicker::GetCoreTicker().Tick(FApp::GetDeltaTime());
+	FThreadManager::Get().Tick();
+	GEngine->TickDeferredCommands();
 }
 
 void FTestWorld::EndTick()
@@ -90,6 +99,13 @@ FAsyncCoroutine FTestWorld::Run(
 	auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
 	auto LatentInfo = Sys->MakeLatentInfo(Done);
 	return Fn(std::move(LatentInfo));
+}
+
+void FTestHelper::PumpGameThread(FTestWorld& World,
+                                 std::function<bool()> ExitCondition)
+{
+	while (!ExitCondition())
+		World.Tick();
 }
 
 void FTestHelper::ForceResume(FAsyncCoroutine& Coroutine)
