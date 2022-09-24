@@ -41,6 +41,7 @@ class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentCancellation;
 class FLatentPromise;
+template<std::derived_from<UObject>> class TAsyncLoadAwaiter;
 }
 
 namespace UE5Coro::Latent
@@ -76,12 +77,6 @@ UE5CORO_API Private::FLatentAwaiter RealSeconds(double);
  *  This is affected by pause only, NOT time dilation. */
 UE5CORO_API Private::FLatentAwaiter AudioSeconds(double);
 
-/** Asynchronously starts loading the object, resumes once it's loaded. */
-UE5CORO_API Private::FLatentAwaiter AsyncLoadObject(TSoftObjectPtr<UObject>);
-
-/** Asynchronously starts loading the class, resumes once it's loaded. */
-UE5CORO_API Private::FLatentAwaiter AsyncLoadClass(TSoftClassPtr<UObject>);
-
 /** Resumes the coroutine once the chained static latent action has finished,
  *  with automatic parameter matching.<br>Example usage:<br>
  *  co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1.0f); */
@@ -103,6 +98,16 @@ Private::FLatentAwaiter Chain(auto (Class::*Function)(FnParams...),
  *  co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1.0f, _2); */
 Private::FLatentAwaiter ChainEx(auto&& Function, auto&&... Args);
 
+/** Asynchronously starts loading the object, resumes once it's loaded.<br>
+ *  The result of the co_await expression is the T*. */
+template<std::derived_from<UObject> T>
+Private::TAsyncLoadAwaiter<T> AsyncLoadObject(TSoftObjectPtr<T>);
+
+/** Asynchronously starts loading the class, resumes once it's loaded.<br>
+ *  The result of the co_await expression is the UClass*. */
+UE5CORO_API Private::TAsyncLoadAwaiter<UClass> AsyncLoadClass(
+	TSoftClassPtr<UObject>);
+
 /** Polls the provided function, resumes the coroutine when it returns true. */
 UE5CORO_API Private::FLatentAwaiter Until(std::function<bool()> Function);
 }
@@ -117,15 +122,17 @@ public:
 	void await_suspend(FLatentHandle);
 };
 
-class [[nodiscard]] UE5CORO_API FLatentAwaiter final
+class [[nodiscard]] UE5CORO_API FLatentAwaiter
 {
+protected:
 	void* State;
 	bool (*Resume)(void*& State, bool bCleanup);
+
+	FLatentAwaiter(FLatentAwaiter&&);
 
 public:
 	explicit FLatentAwaiter(void* State, bool (*Resume)(void*&, bool))
 		: State(State), Resume(Resume) { }
-	UE_NONCOPYABLE(FLatentAwaiter);
 	~FLatentAwaiter();
 
 	bool ShouldResume() { return (*Resume)(State, false); }
@@ -135,11 +142,37 @@ public:
 	void await_suspend(FAsyncHandle);
 	void await_suspend(FLatentHandle);
 };
+
+namespace AsyncLoad
+{
+UE5CORO_API FLatentAwaiter InternalAsyncLoadObject(TSoftObjectPtr<UObject>);
+UE5CORO_API UObject* InternalResume(void*);
+}
+
+template<std::derived_from<UObject> T>
+class [[nodiscard]] TAsyncLoadAwaiter : public FLatentAwaiter
+{
+public:
+	explicit TAsyncLoadAwaiter(FLatentAwaiter&& Other)
+		: FLatentAwaiter(std::move(Other)) { }
+
+	T* await_resume() { return Cast<T>(AsyncLoad::InternalResume(State)); }
+};
+
+static_assert(sizeof(FLatentAwaiter) == sizeof(TAsyncLoadAwaiter<UObject>));
 }
 
 inline UE5Coro::Private::FLatentCancellation UE5Coro::Latent::Cancel()
 {
 	return {};
+}
+
+template<std::derived_from<UObject> T>
+UE5Coro::Private::TAsyncLoadAwaiter<T> UE5Coro::Latent::AsyncLoadObject(
+	TSoftObjectPtr<T> Ptr)
+{
+	return Private::TAsyncLoadAwaiter<T>(
+		Private::AsyncLoad::InternalAsyncLoadObject(Ptr));
 }
 
 #include "LatentChain.inl"

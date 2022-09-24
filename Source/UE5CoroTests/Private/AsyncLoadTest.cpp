@@ -29,62 +29,70 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "Engine/StreamableManager.h"
+#include "TestWorld.h"
+#include "Misc/AutomationTest.h"
 #include "UE5Coro/LatentAwaiters.h"
 
 using namespace UE5Coro;
-using namespace UE5Coro::Private;
+using namespace UE5Coro::Private::Test;
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncLoadTestLatent, "UE5Coro.AsyncLoad.Latent",
+                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags::HighPriority |
+                                 EAutomationTestFlags::ProductFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncLoadTestAsync, "UE5Coro.AsyncLoad.Async",
+                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags::HighPriority |
+                                 EAutomationTestFlags::ProductFilter)
 
 namespace
 {
-struct FLatentLoader
+template<typename... T>
+void DoTest(FAutomationTestBase& Test)
 {
-	FStreamableManager Manager;
-	TSharedPtr<FStreamableHandle> Handle;
+#define CORO [&](T...) -> FAsyncCoroutine
+	FTestWorld World;
 
-	explicit FLatentLoader(const auto& Path)
 	{
-		Handle = Manager.RequestAsyncLoad(Path.ToSoftObjectPath());
+		TStrongObjectPtr<UWorld> Object(World.operator->());
+		UWorld* Result;
+		FEventRef CoroToTest;
+		World.Run(CORO
+		{
+			TSoftObjectPtr<UWorld> Soft = Object.Get();
+			Result = co_await Latent::AsyncLoadObject(Soft);
+			CoroToTest->Trigger();
+		});
+		CoroToTest->Wait();
+		Test.TestEqual(TEXT("Loaded"), Result, Object.Get());
 	}
 
-	~FLatentLoader()
 	{
-		if (Handle)
-			Handle->ReleaseHandle();
-	}
-};
-
-bool ShouldResume(void*& Loader, bool bCleanup)
-{
-	auto* This = static_cast<FLatentLoader*>(Loader);
-
-	if (bCleanup) [[unlikely]]
-	{
-		delete This;
-		return false;
+		UClass* Result;
+		FEventRef CoroToTest;
+		World.Run(CORO
+		{
+			TSoftClassPtr<UObject> Soft = UObject::StaticClass();
+			Result = co_await Latent::AsyncLoadClass(Soft);
+			CoroToTest->Trigger();
+		});
+		CoroToTest->Wait();
+		Test.TestEqual(TEXT("Loaded"), Result, UObject::StaticClass());
 	}
 
-	// This is the same logic that FLoadAssetActionBase::UpdateOperation() uses
-	auto& Handle = This->Handle;
-	return !Handle || Handle->HasLoadCompleted() || Handle->WasCanceled();
+#undef CORO
 }
 }
 
-FLatentAwaiter AsyncLoad::InternalAsyncLoadObject(TSoftObjectPtr<UObject> Ptr)
+bool FAsyncLoadTestLatent::RunTest(const FString& Parameters)
 {
-	return FLatentAwaiter(new FLatentLoader(Ptr), &ShouldResume);
+	DoTest<FLatentActionInfo>(*this);
+	return true;
 }
 
-UObject* AsyncLoad::InternalResume(void* State)
+bool FAsyncLoadTestAsync::RunTest(const FString& Parameters)
 {
-	checkf(ShouldResume(State, false), TEXT("Internal error"));
-
-	auto* This = static_cast<FLatentLoader*>(State);
-	return This->Handle ? This->Handle->GetLoadedAsset() : nullptr;
-}
-
-TAsyncLoadAwaiter<UClass> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr)
-{
-	return Private::TAsyncLoadAwaiter<UClass>(
-		FLatentAwaiter(new FLatentLoader(Ptr), &ShouldResume));
+	DoTest<>(*this);
+	return true;
 }

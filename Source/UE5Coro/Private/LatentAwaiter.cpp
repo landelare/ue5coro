@@ -75,9 +75,17 @@ void FLatentCancellation::await_suspend(FLatentHandle Handle)
 	Handle.promise().LatentCancel();
 }
 
+FLatentAwaiter::FLatentAwaiter(FLatentAwaiter&& Other)
+	: State(Other.State), Resume(Other.Resume)
+{
+	Other.State = nullptr;
+	Other.Resume = nullptr;
+}
+
 FLatentAwaiter::~FLatentAwaiter()
 {
-	(*Resume)(State, true);
+	if (Resume) [[likely]]
+		(*Resume)(State, true);
 	State = nullptr;
 	Resume = nullptr;
 }
