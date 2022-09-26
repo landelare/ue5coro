@@ -91,7 +91,7 @@ public:
 
 	bool await_ready() { return Task.IsCompleted(); }
 	void await_resume() requires std::is_void_v<T> { }
-	auto await_resume() requires !std::is_void_v<T> { return Task.GetResult(); }
+	auto await_resume() requires (!std::is_void_v<T>) { return Task.GetResult(); }
 
 	template<typename P>
 	void await_suspend(std::coroutine_handle<P> Handle)

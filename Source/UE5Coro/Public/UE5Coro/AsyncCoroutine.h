@@ -108,9 +108,9 @@ struct std::coroutine_traits<FAsyncCoroutine, Args...>
 namespace UE5Coro
 {
 template<typename T>
-concept TAwaitable = requires(T Awaiter)
+concept TAwaitable = requires
 {
-	[&Awaiter]() -> FAsyncCoroutine
+	[](T& Awaiter) -> FAsyncCoroutine
 	{
 		co_await Awaiter;
 	};
