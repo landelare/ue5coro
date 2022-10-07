@@ -29,6 +29,7 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <optional>
 #include "TestWorld.h"
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/AggregateAwaiters.h"
@@ -87,6 +88,7 @@ void DoTest(FAutomationTestBase& Test)
 
 	{
 		int State = 0;
+		std::optional<int> First;
 		World.Run(CORO
 		{
 			++State;
@@ -103,15 +105,50 @@ void DoTest(FAutomationTestBase& Test)
 				++State;
 			});
 			++State;
-			co_await WhenAny(A, B);
+			First = co_await WhenAny(A, B);
 			++State;
 		});
 		World.EndTick();
 		Test.TestEqual("Initial state", State, 4); // All 3 coroutines suspended
+		Test.TestFalse("Not resumed yet", First.has_value());
 		World.Tick();
 		Test.TestEqual("First tick", State, 6); // A and outer resumed
+		Test.TestEqual("Resumer index", First.value(), 0);
 		World.Tick();
 		Test.TestEqual("Second tick", State, 7); // B resumed
+	}
+
+	{
+		std::optional<int> First;
+		World.Run(CORO
+		{
+			auto A = World.Run(CORO { co_await Latent::Ticks(3); });
+			auto B = World.Run(CORO { co_await Latent::Ticks(4); });
+			auto C = World.Run(CORO { co_await Latent::Ticks(1); });
+			auto D = World.Run(CORO { co_await Latent::Ticks(2); });
+			First = co_await WhenAny(A, B, C, D);
+		});
+		World.EndTick();
+		Test.TestFalse("Not resumed yet", First.has_value());
+		World.Tick();
+		Test.TestEqual("Resumer index", First.value(), 2);
+	}
+
+	{
+		std::optional<int> First;
+		World.Run(CORO
+		{
+			auto A = Latent::Ticks(1);
+			auto B = Latent::Ticks(2);
+			co_await Latent::Ticks(3);
+			First = co_await WhenAny(A, B);
+		});
+		World.EndTick();
+		Test.TestFalse("Not resumed yet", First.has_value());
+		World.Tick();
+		World.Tick();
+		World.Tick();
+		Test.TestEqual("Resumer index", First.value(), 0);
 	}
 
 #undef CORO

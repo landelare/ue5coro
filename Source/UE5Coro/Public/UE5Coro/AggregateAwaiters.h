@@ -37,18 +37,21 @@
 
 namespace UE5Coro::Private
 {
-class FAggregateAwaiter;
+class FAnyAwaiter;
+class FAllAwaiter;
 }
 
 namespace UE5Coro
 {
 /** co_awaits all parameters, resumes its own awaiting coroutine when any
- *  of them finishes. */
-Private::FAggregateAwaiter WhenAny(TAwaitable auto&&...);
+ *  of them finishes.
+ *  The result of the co_await expression is the index of the parameter that
+ *  finished first.*/
+Private::FAnyAwaiter WhenAny(TAwaitable auto&&...);
 
 /** co_awaits all parameters, resumes its own awaiting coroutine when all
  *  of them finish. */
-Private::FAggregateAwaiter WhenAll(TAwaitable auto&&...);
+Private::FAllAwaiter WhenAll(TAwaitable auto&&...);
 }
 
 namespace UE5Coro::Private
@@ -59,47 +62,68 @@ class [[nodiscard]] UE5CORO_API FAggregateAwaiter
 	{
 		UE::FSpinLock Lock;
 		int Count;
+		int Index = -1;
 		FOptionalHandleVariant Handle;
 
 		explicit FData(int Count) : Count(Count) { }
 	};
 	std::shared_ptr<FData> Data;
 
-	static FAsyncCoroutine Consume(auto, auto&&);
+	static FAsyncCoroutine Consume(std::shared_ptr<FData>, int, auto&&);
+
+protected:
+	int GetResumerIndex() const;
 
 public:
 	FAggregateAwaiter(int Count, auto&&... Awaiters)
 		: Data(std::make_shared<FData>(Count))
 	{
-		(Consume(Data, std::forward<decltype(Awaiters)>(Awaiters)), ...);
+		int Idx = 0;
+		(Consume(Data, Idx++, std::forward<decltype(Awaiters)>(Awaiters)), ...);
 	}
 	UE_NONCOPYABLE(FAggregateAwaiter);
 
 	bool await_ready();
 	void await_suspend(FAsyncHandle);
 	void await_suspend(FLatentHandle);
+};
+
+class [[nodiscard]] FAnyAwaiter : public FAggregateAwaiter
+{
+public:
+	FAnyAwaiter(auto&&... Args)
+		: FAggregateAwaiter(std::forward<decltype(Args)>(Args)...) { }
+	int await_resume() { return GetResumerIndex(); }
+};
+
+class [[nodiscard]] FAllAwaiter : public FAggregateAwaiter
+{
+public:
+	FAllAwaiter(auto&&... Args)
+		: FAggregateAwaiter(std::forward<decltype(Args)>(Args)...) { }
 	void await_resume() { }
 };
 }
 
-UE5Coro::Private::FAggregateAwaiter UE5Coro::WhenAny(TAwaitable auto&&... Args)
+UE5Coro::Private::FAnyAwaiter UE5Coro::WhenAny(TAwaitable auto&&... Args)
 {
 	return {sizeof...(Args) ? 1 : 0, std::forward<decltype(Args)>(Args)...};
 }
 
-UE5Coro::Private::FAggregateAwaiter UE5Coro::WhenAll(TAwaitable auto&&... Args)
+UE5Coro::Private::FAllAwaiter UE5Coro::WhenAll(TAwaitable auto&&... Args)
 {
 	return {sizeof...(Args), std::forward<decltype(Args)>(Args)...};
 }
 
-FAsyncCoroutine UE5Coro::Private::FAggregateAwaiter::Consume(auto Data,
-                                                             auto&& Awaiter)
+FAsyncCoroutine UE5Coro::Private::FAggregateAwaiter::Consume(
+	std::shared_ptr<FData> Data, int Index, auto&& Awaiter)
 {
 	co_await Awaiter;
 
 	UE::TScopeLock _(Data->Lock);
 	if (--Data->Count != 0)
 		co_return;
+	Data->Index = Index; // Mark that this index was the one reaching 0
 	auto Handle = Data->Handle;
 	_.Unlock();
 
@@ -110,4 +134,3 @@ FAsyncCoroutine UE5Coro::Private::FAggregateAwaiter::Consume(auto Data,
 	else
 		; // we haven't been co_awaited yet, await_ready deals with this
 }
-

@@ -33,6 +33,13 @@
 
 namespace UE5Coro::Private
 {
+int FAggregateAwaiter::GetResumerIndex() const
+{
+	checkf(Data->Count <= 0, TEXT("Internal error"));
+	checkf(Data->Index != -1, TEXT("Internal error"));
+	return Data->Index;
+}
+
 bool FAggregateAwaiter::await_ready()
 {
 	Data->Lock.Lock();
