@@ -97,7 +97,7 @@ template<typename... Args>
 struct std::coroutine_traits<FAsyncCoroutine, Args...>
 {
 	static constexpr int LatentInfoCount =
-		(... + std::is_convertible_v<Args, FLatentActionInfo>);
+		(0 + ... + std::is_convertible_v<Args, FLatentActionInfo>);
 	static_assert(LatentInfoCount <= 1,
 		"Multiple FLatentActionInfo parameters found in coroutine");
 	using promise_type = std::conditional_t<LatentInfoCount,
