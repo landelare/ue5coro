@@ -46,6 +46,13 @@ FAsyncCoroutine CommonTimeline(double From, double To, double Length,
                                std::function<void(double)> Fn,
                                FLatentActionInfo = {})
 {
+#if ENABLE_NAN_DIAGNOSTIC
+	if (FMath::IsNaN(From) || FMath::IsNaN(To) || FMath::IsNaN(Length))
+	{
+		logOrEnsureNanError(TEXT("Latent timeline started with NaN parameter"));
+	}
+#endif
+
 	checkf(IsInGameThread(),
 	       TEXT("Latent coroutines may only be started on the game thread"));
 	double Start = (GWorld->*GetTime)();

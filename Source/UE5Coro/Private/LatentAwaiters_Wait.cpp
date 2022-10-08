@@ -70,6 +70,13 @@ bool WaitUntilPredicate(void*& State, bool bCleanup)
 template<auto GetTime>
 FLatentAwaiter GenericSeconds(double Seconds)
 {
+#if ENABLE_NAN_DIAGNOSTIC
+	if (FMath::IsNaN(Seconds))
+	{
+		logOrEnsureNanError(TEXT("Latent wait started with NaN time"));
+	}
+#endif
+
 	void* State = nullptr;
 	reinterpret_cast<double&>(State) = (GWorld->*GetTime)() + Seconds;
 	return FLatentAwaiter(State, &WaitUntilTime<GetTime>);
