@@ -44,6 +44,11 @@ struct FResumeTask
 	explicit FResumeTask(ENamedThreads::Type Thread, H Handle)
 		: Thread(Thread), Handle(Handle) { }
 
+	void DoTask(ENamedThreads::Type, FGraphEvent*)
+	{
+		Handle.promise().Resume();
+	}
+
 	ENamedThreads::Type GetDesiredThread() const
 	{
 		return Thread;
@@ -61,31 +66,8 @@ struct FResumeTask
 	}
 };
 
-/** The easy case of coroutine resumption:
- *  nothing else can delete an async coroutine. */
-struct FAsyncResume : FResumeTask<FAsyncPromise>
-{
-	explicit FAsyncResume(auto&&... Args)
-		: FResumeTask(std::forward<decltype(Args)>(Args)...) { }
-
-	void DoTask(ENamedThreads::Type, FGraphEvent*)
-	{
-		Handle.resume();
-	}
-};
-
-/** The hard case of coroutine resumption: a latent coroutine is owned by
- *  the latent action manager on the game thread. */
-struct FLatentResume : FResumeTask<FLatentPromise>
-{
-	explicit FLatentResume(auto&&... Args)
-		: FResumeTask(std::forward<decltype(Args)>(Args)...) { }
-
-	void DoTask(ENamedThreads::Type, FGraphEvent*)
-	{
-		Handle.promise().ThreadSafeResume();
-	}
-};
+using FAsyncResume = FResumeTask<FAsyncPromise>;
+using FLatentResume = FResumeTask<FLatentPromise>;
 }
 
 void FAsyncAwaiter::await_suspend(FAsyncHandle Handle)
@@ -105,6 +87,7 @@ void FAsyncAwaiter::await_suspend(FAsyncHandle Handle)
 
 void FAsyncAwaiter::await_suspend(FLatentHandle Handle)
 {
+	// Hard mode, the coroutine is owned by the latent action manager on the GT.
 	auto& Promise = Handle.promise();
 	checkCode(
 		auto CurrentState = Promise.GetLatentState();

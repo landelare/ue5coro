@@ -56,14 +56,7 @@ protected:
 	{
 		if constexpr (std::is_same_v<P, FLatentPromise>)
 			Handle.promise().DetachFromGameThread();
-
-		return [Handle]
-		{
-			if constexpr (std::is_same_v<P, FLatentPromise>)
-				Handle.promise().ThreadSafeResume();
-			else
-				Handle.resume();
-		};
+		return [Handle] { Handle.promise().Resume(); };
 	}
 
 public:

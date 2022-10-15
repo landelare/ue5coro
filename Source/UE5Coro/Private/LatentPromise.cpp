@@ -90,7 +90,7 @@ public:
 		{
 			CurrentAwaiter = nullptr;
 			// This might set the awaiter for next time
-			Promise.ThreadSafeResume();
+			Promise.Resume();
 		}
 
 		// Did the coroutine finish?
@@ -156,7 +156,7 @@ FLatentPromise::~FLatentPromise()
 	GLatentExitReason = ELatentExitReason::Normal;
 }
 
-void FLatentPromise::ThreadSafeResume()
+void FLatentPromise::Resume()
 {
 	// Return to latent running on the game thread, even if it's an async task.
 	if (IsInGameThread())
@@ -170,7 +170,7 @@ void FLatentPromise::ThreadSafeResume()
 	else
 		// If this promise is async running, we're committed to a resumption at
 		// this point (DeferredDestroy arrived since the if above).
-		// Deletion requests will end up in the next call to ThreadSafeResume
+		// Deletion requests will end up in the next call to Resume
 		// since the coroutine must return to the game thread in a future
 		// co_await.
 

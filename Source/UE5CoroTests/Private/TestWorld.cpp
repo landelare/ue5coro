@@ -111,6 +111,6 @@ void FTestHelper::PumpGameThread(FTestWorld& World,
 
 void FTestHelper::ForceResume(FAsyncCoroutine& Coroutine)
 {
-	// Unfit for public consumption: doesn't call ThreadSafeResume
+	// Unfit for public consumption: doesn't call Resume on the promise
 	Coroutine.Handle.resume();
 }

@@ -101,20 +101,18 @@ void FHttpAwaiter::Resume()
 {
 	// Don't needlessly dispatch AsyncTasks to the GT from the GT
 	ensureMsgf(IsInGameThread(), TEXT("Internal error"));
-	auto Dispatch = [this](std::invocable auto&& Fn)
-	{
-		bSuspended = false; // Technically not needed since this is not reusable
-		if (Thread == ENamedThreads::GameThread)
-			Fn();
-		else
-			AsyncTask(Thread, std::move(Fn));
-	};
+	bSuspended = false; // Technically not needed since this is not reusable
 
-	if (std::holds_alternative<FLatentHandle>(Handle))
-		Dispatch([this] { std::get<FLatentHandle>(Handle).promise()
-		                                                 .ThreadSafeResume(); });
+	if (Thread == ENamedThreads::GameThread)
+		std::visit([](auto Handle)
+		{
+			Handle.promise().Resume();
+		}, Handle);
 	else
-		Dispatch([this] { std::get<FAsyncHandle>(Handle).resume(); });
+		std::visit([Thread = Thread](auto Handle)
+		{
+			AsyncTask(Thread, [Handle] { Handle.promise().Resume(); });
+		}, Handle);
 }
 
 void FHttpAwaiter::RequestComplete(FHttpRequestPtr, FHttpResponsePtr Response,

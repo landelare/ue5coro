@@ -127,10 +127,10 @@ FAsyncCoroutine UE5Coro::Private::FAggregateAwaiter::Consume(
 	auto Handle = Data->Handle;
 	_.Unlock();
 
-	if (std::holds_alternative<FLatentHandle>(Handle))
-		std::get<FLatentHandle>(Handle).promise().ThreadSafeResume();
-	else if (std::holds_alternative<FAsyncHandle>(Handle))
-		std::get<FAsyncHandle>(Handle).resume();
-	else
-		; // we haven't been co_awaited yet, await_ready deals with this
+	std::visit([](auto Handle)
+	{
+		// Not co_awaited yet with a monostate, await_ready deals with this
+		if constexpr (!std::is_same_v<std::monostate, decltype(Handle)>)
+			Handle.promise().Resume();
+	}, Handle);
 }

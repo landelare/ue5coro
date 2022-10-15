@@ -169,6 +169,8 @@ public:
 class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
 {
 public:
+	void Resume();
+
 	std::suspend_never initial_suspend() { return {}; }
 	std::suspend_never final_suspend() noexcept { return {}; }
 	void return_void() { }
@@ -204,7 +206,7 @@ private:
 public:
 	explicit FLatentPromise(auto&&...);
 	~FLatentPromise();
-	void ThreadSafeResume();
+	void Resume();
 	void ThreadSafeDestroy();
 
 	ELatentState GetLatentState() const { return LatentState.load(); }

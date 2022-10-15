@@ -63,7 +63,7 @@ struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 		// Ownership moves back to the task graph tasks
 		auto Original = Handle;
 		Handle = nullptr;
-		Original.resume();
+		Original.promise().Resume();
 	}
 };
 }
