@@ -75,4 +75,56 @@ public:
 	void await_suspend(FAsyncHandle Handle);
 	void await_suspend(FLatentHandle Handle);
 };
+
+template<typename T>
+class [[nodiscard]] TFutureAwaiter final
+{
+	TFuture<T> Future;
+	std::remove_reference_t<T>* Result = nullptr; // Dangerous!
+
+public:
+	explicit TFutureAwaiter(TFuture<T>&& Future)
+		: Future(std::move(Future))
+	{
+		ensureMsgf(this->Future.IsValid(), TEXT("Awaiting invalid future"));
+	}
+	UE_NONCOPYABLE(TFutureAwaiter);
+
+	bool await_ready() { return Future.IsReady(); }
+
+	T await_resume()
+	{
+		if constexpr (std::is_lvalue_reference_v<T>)
+			return *Result;
+		else if constexpr (!std::is_void_v<T>)
+			return std::move(*Result);
+	}
+
+	template<typename P>
+	void await_suspend(std::coroutine_handle<P> Handle)
+	{
+		checkf(!Result, TEXT("Attempting to reuse spent TFutureAwaiter"));
+
+		if constexpr (std::is_same_v<P, FLatentPromise>)
+			Handle.promise().DetachFromGameThread();
+
+		Future.Then([this, Handle](auto Future)
+		{
+			// TFuture<T&> will pass T* for Value, TFuture<void> an int
+			if constexpr (std::is_lvalue_reference_v<T>)
+			{
+				static_assert(std::is_pointer_v<decltype(Future.Get())>);
+				Result = Future.Get();
+				Handle.promise().Resume();
+			}
+			else
+			{
+				// It's normally dangerous to expose a pointer to a local, but
+				auto Value = Future.Get(); // This will be alive while...
+				Result = &Value;
+				Handle.promise().Resume(); // ...await_resume moves from it here
+			}
+		});
+	}
+};
 }

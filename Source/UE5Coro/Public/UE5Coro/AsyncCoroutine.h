@@ -50,6 +50,7 @@ class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentPromise;
 class FPromise;
+template<typename> class TFutureAwaiter;
 template<typename> class TTaskAwaiter;
 namespace Test { class FTestHelper; }
 
@@ -161,6 +162,9 @@ public:
 	// Support awaiting some types that aren't awaiters themselves
 	template<typename T> T&& await_transform(T&&); // Awaiter passthrough
 	template<typename T> TTaskAwaiter<T> await_transform(UE::Tasks::TTask<T>);
+	// co_awaiting a TFuture consumes it, use MoveTemp/std::move
+	template<typename T> TFutureAwaiter<T> await_transform(TFuture<T>&) = delete;
+	template<typename T> TFutureAwaiter<T> await_transform(TFuture<T>&&);
 
 	// co_yield is not allowed in async coroutines
 	std::suspend_never yield_value(auto&&) = delete;
@@ -244,6 +248,12 @@ template<typename T>
 TTaskAwaiter<T> FPromise::await_transform(UE::Tasks::TTask<T> Task)
 {
 	return TTaskAwaiter<T>(Task, TEXT("UE5Coro automatic co_await wrapper"));
+}
+
+template<typename T>
+TFutureAwaiter<T> FPromise::await_transform(TFuture<T>&& Future)
+{
+	return TFutureAwaiter<T>(std::move(Future));
 }
 
 void FLatentPromise::Init(const UObject* WorldContext, auto&... Args)

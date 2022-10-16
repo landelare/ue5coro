@@ -25,6 +25,28 @@ system.
 `UE5Coro::Async` contains awaiters that let you conveniently move execution
 between various threads (notably between the game thread and everything else).
 
+### TFuture
+
+`TFuture<T>` is directly `co_await`able. The `co_await` expression returns the
+result of the promise and consumes the `TFuture` similarly to `Then` and `Next`.
+As a result, if your future is not a temporary it will require being moved:
+```c++
+TPromise<int> Promise;
+co_await Promise.GetFuture(); // OK, temporary future
+TFuture<int> Future = Promise.GetFuture();
+// co_await Future; // Won't compile
+co_await MoveTemp(Future); // OK
+```
+
+Unlike "raw" `TFuture::Next`, the `co_await` expression will correctly match the
+expected type, i.e., `TFuture<void>` will result in `void` instead of `int` and
+`TFuture<T&>` will result in `T&` instead of `T*`.
+
+`co_await` resumes the coroutine on the same thread that `TFuture::Then` or
+`Next` would use.
+`TSharedFuture<T>` is not supported due to the underlying implementation of it
+lacking completion callbacks.
+
 ## Latent awaiters
 
 `UE5Coro::Latent` awaiters are implemented as latent actions, even if your
