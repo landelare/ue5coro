@@ -41,6 +41,7 @@ class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentCancellation;
 class FLatentPromise;
+class FPackageLoadAwaiter;
 template<std::derived_from<UObject>> class TAsyncLoadAwaiter;
 }
 
@@ -108,6 +109,15 @@ Private::TAsyncLoadAwaiter<T> AsyncLoadObject(TSoftObjectPtr<T>);
 UE5CORO_API Private::TAsyncLoadAwaiter<UClass> AsyncLoadClass(
 	TSoftClassPtr<UObject>);
 
+/** Asynchronously starts loading the package, resumes once it's loaded.<br>
+ *  The result of the co_await expression is the UPackage*.<br>
+ *  For parameters see the engine function ::LoadPackageAsync(). */
+UE5CORO_API Private::FPackageLoadAwaiter AsyncLoadPackage(
+	const FPackagePath& Path, FName PackageNameToCreate = NAME_None,
+	EPackageFlags PackageFlags = PKG_None, int32 PIEInstanceID = INDEX_NONE,
+	TAsyncLoadPriority PackagePriority = 0,
+	const FLinkerInstancingContext* InstancingContext = nullptr);
+
 /** Polls the provided function, resumes the coroutine when it returns true. */
 UE5CORO_API Private::FLatentAwaiter Until(std::function<bool()> Function);
 }
@@ -160,6 +170,27 @@ public:
 };
 
 static_assert(sizeof(FLatentAwaiter) == sizeof(TAsyncLoadAwaiter<UObject>));
+
+class [[nodiscard]] UE5CORO_API FPackageLoadAwaiter
+{
+	FOptionalHandleVariant Handle;
+	TStrongObjectPtr<UPackage> Result; // This might be carried across co_awaits
+
+	void Loaded(const FName&, UPackage*, EAsyncLoadingResult::Type);
+
+public:
+	explicit FPackageLoadAwaiter(
+		const FPackagePath& Path, FName PackageNameToCreate,
+		EPackageFlags PackageFlags, int32 PIEInstanceID,
+		TAsyncLoadPriority PackagePriority,
+		const FLinkerInstancingContext* InstancingContext);
+	UE_NONCOPYABLE(FPackageLoadAwaiter);
+
+	bool await_ready() { return Result.IsValid(); }
+	void await_suspend(FAsyncHandle);
+	void await_suspend(FLatentHandle);
+	UPackage* await_resume();
+};
 }
 
 inline UE5Coro::Private::FLatentCancellation UE5Coro::Latent::Cancel()

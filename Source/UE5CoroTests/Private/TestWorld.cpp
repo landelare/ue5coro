@@ -68,6 +68,7 @@ FTestWorld::~FTestWorld()
 void FTestWorld::Tick(float DeltaSeconds)
 {
 	check(IsInGameThread());
+	StaticTick(DeltaSeconds);
 	World->Tick(LEVELTICK_All, DeltaSeconds);
 	EndTick();
 

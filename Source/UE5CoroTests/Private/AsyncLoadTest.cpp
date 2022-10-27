@@ -81,6 +81,22 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Loaded"), Result, UObject::StaticClass());
 	}
 
+	{
+		constexpr auto RawPath = TEXT("/Engine/BasicShapes/Cube");
+		FPackagePath Path;
+		bool bSuccess = FPackagePath::TryFromPackageName(RawPath, Path);
+		Test.TestTrue(TEXT("Package path"), bSuccess);
+		UPackage* Package = nullptr;
+		FEventRef CoroToTest;
+		World.Run(CORO
+		{
+			Package = co_await Latent::AsyncLoadPackage(Path);
+			CoroToTest->Trigger();
+		});
+		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
+		Test.TestEqual(TEXT("Package"), Package->GetName(), RawPath);
+	}
+
 #undef CORO
 }
 }

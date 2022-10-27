@@ -88,3 +88,64 @@ TAsyncLoadAwaiter<UClass> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr)
 	return Private::TAsyncLoadAwaiter<UClass>(
 		FLatentAwaiter(new FLatentLoader(Ptr), &ShouldResume));
 }
+
+FPackageLoadAwaiter Latent::AsyncLoadPackage(
+	const FPackagePath& Path, FName PackageNameToCreate,
+	EPackageFlags PackageFlags, int32 PIEInstanceID,
+	TAsyncLoadPriority PackagePriority,
+	const FLinkerInstancingContext* InstancingContext)
+{
+	checkf(IsInGameThread(),
+	       TEXT("Latent awaiters may only be used on the game thread"));
+	return FPackageLoadAwaiter(Path, PackageNameToCreate, PackageFlags,
+	                           PIEInstanceID, PackagePriority,
+	                           InstancingContext);
+}
+
+FPackageLoadAwaiter::FPackageLoadAwaiter(
+	const FPackagePath& Path, FName PackageNameToCreate,
+	EPackageFlags PackageFlags, int32 PIEInstanceID,
+	TAsyncLoadPriority PackagePriority,
+	const FLinkerInstancingContext* InstancingContext)
+{
+	auto Delegate = FLoadPackageAsyncDelegate::CreateRaw(
+		this, &FPackageLoadAwaiter::Loaded);
+	LoadPackageAsync(Path, PackageNameToCreate, std::move(Delegate),
+	                 PackageFlags, PIEInstanceID, PackagePriority,
+	                 InstancingContext);
+}
+
+void FPackageLoadAwaiter::Loaded(const FName&, UPackage* Package,
+                                 EAsyncLoadingResult::Type)
+{
+	checkf(IsInGameThread(), TEXT("Internal error"));
+	Result.Reset(Package);
+	std::visit([](auto Handle)
+	{
+		// monostate indicates that the load finished between AsyncLoadPackage()
+		// and co_await
+		if constexpr (!std::is_same_v<decltype(Handle), std::monostate>)
+			Handle.promise().Resume();
+	}, Handle);
+}
+
+void FPackageLoadAwaiter::await_suspend(FAsyncHandle InHandle)
+{
+	checkf(IsInGameThread(),
+	       TEXT("Latent awaiters may only be used on the game thread"));
+	Handle = InHandle;
+}
+
+void FPackageLoadAwaiter::await_suspend(FLatentHandle InHandle)
+{
+	checkf(IsInGameThread(),
+	       TEXT("Latent awaiters may only be used on the game thread"));
+	InHandle.promise().DetachFromGameThread();
+	Handle = InHandle;
+}
+
+UPackage* FPackageLoadAwaiter::await_resume()
+{
+	checkf(IsInGameThread(), TEXT("Internal error"));
+	return Result.Get();
+}
