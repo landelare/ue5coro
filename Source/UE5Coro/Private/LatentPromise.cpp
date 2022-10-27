@@ -278,7 +278,8 @@ void FLatentPromise::return_void()
 	LatentState = Done;
 }
 
-FLatentAwaiter FLatentPromise::await_transform(FAsyncCoroutine Other)
+FLatentAwaiter TAwaitTransform<FLatentPromise, FAsyncCoroutine>::operator()
+	(FAsyncCoroutine Other)
 {
 	auto* Done = new FTwoLives;
 	// Not using the subsystem, there's no FLatentActionInfo

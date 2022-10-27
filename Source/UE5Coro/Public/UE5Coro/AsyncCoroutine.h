@@ -60,6 +60,14 @@ using FLatentHandle = std::coroutine_handle<FLatentPromise>;
 using FHandleVariant = std::variant<FAsyncHandle, FLatentHandle>;
 using FOptionalHandleVariant = std::variant<std::monostate,
                                             FAsyncHandle, FLatentHandle>;
+
+template<typename P, typename A>
+struct TAwaitTransform
+{
+	// Default passthrough
+	A& operator()(A& Awaitable) { return Awaitable; }
+	A&& operator()(A&& Awaitable) { return std::move(Awaitable); }
+};
 }
 
 // This type has to be a USTRUCT in the global namespace to support latent
@@ -75,7 +83,8 @@ USTRUCT(BlueprintInternalUseOnly, Meta=(HiddenByDefault))
 struct UE5CORO_API FAsyncCoroutine
 {
 	GENERATED_BODY()
-	friend UE5Coro::Private::FAsyncPromise;
+	template<typename, typename>
+	friend struct UE5Coro::Private::TAwaitTransform;
 	friend UE5Coro::Private::Test::FTestHelper;
 
 private:
@@ -120,6 +129,18 @@ concept TAwaitable = requires
 
 namespace UE5Coro::Private
 {
+template<>
+struct UE5CORO_API TAwaitTransform<FAsyncPromise, FAsyncCoroutine>
+{
+	FAsyncAwaiter operator()(FAsyncCoroutine);
+};
+
+template<>
+struct UE5CORO_API TAwaitTransform<FLatentPromise, FAsyncCoroutine>
+{
+	FLatentAwaiter operator()(FAsyncCoroutine);
+};
+
 struct FInitialSuspend
 {
 	enum EAction
@@ -159,13 +180,6 @@ public:
 	FAsyncCoroutine get_return_object();
 	void unhandled_exception();
 
-	// Support awaiting some types that aren't awaiters themselves
-	template<typename T> T&& await_transform(T&&); // Awaiter passthrough
-	template<typename T> TTaskAwaiter<T> await_transform(UE::Tasks::TTask<T>);
-	// co_awaiting a TFuture consumes it, use MoveTemp/std::move
-	template<typename T> TFutureAwaiter<T> await_transform(TFuture<T>&) = delete;
-	template<typename T> TFutureAwaiter<T> await_transform(TFuture<T>&&);
-
 	// co_yield is not allowed in async coroutines
 	std::suspend_never yield_value(auto&&) = delete;
 };
@@ -179,8 +193,12 @@ public:
 	std::suspend_never final_suspend() noexcept { return {}; }
 	void return_void() { }
 
-	using FPromise::await_transform;
-	FAsyncAwaiter await_transform(FAsyncCoroutine);
+	template<typename T>
+	decltype(auto) await_transform(T&& Awaitable)
+	{
+		return TAwaitTransform<FAsyncPromise, std::remove_reference_t<T>>()
+			(std::forward<T>(Awaitable));
+	}
 };
 
 class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
@@ -226,8 +244,12 @@ public:
 	std::suspend_always final_suspend() noexcept { return {}; }
 	void return_void();
 
-	using FPromise::await_transform;
-	FLatentAwaiter await_transform(FAsyncCoroutine);
+	template<typename T>
+	decltype(auto) await_transform(T&& Awaitable)
+	{
+		return TAwaitTransform<FLatentPromise, std::remove_reference_t<T>>()
+			(std::forward<T>(Awaitable));
+	}
 };
 
 FLatentPromise::FLatentPromise(auto&&... Args)
@@ -236,24 +258,6 @@ FLatentPromise::FLatentPromise(auto&&... Args)
 	       TEXT("Latent coroutines may only be started on the game thread"));
 
 	Init(Args...); // Deliberately not forwarding to force lvalue references
-}
-
-template<typename T>
-T&& FPromise::await_transform(T&& Awaiter)
-{
-	return std::forward<T>(Awaiter);
-}
-
-template<typename T>
-TTaskAwaiter<T> FPromise::await_transform(UE::Tasks::TTask<T> Task)
-{
-	return TTaskAwaiter<T>(Task, TEXT("UE5Coro automatic co_await wrapper"));
-}
-
-template<typename T>
-TFutureAwaiter<T> FPromise::await_transform(TFuture<T>&& Future)
-{
-	return TFutureAwaiter<T>(std::move(Future));
 }
 
 void FLatentPromise::Init(const UObject* WorldContext, auto&... Args)

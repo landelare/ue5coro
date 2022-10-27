@@ -38,7 +38,8 @@ void FAsyncPromise::Resume()
 	FAsyncHandle::from_promise(*this).resume();
 }
 
-FAsyncAwaiter FAsyncPromise::await_transform(FAsyncCoroutine Other)
+FAsyncAwaiter TAwaitTransform<FAsyncPromise, FAsyncCoroutine>::operator()
+	(FAsyncCoroutine Other)
 {
 	auto Thread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
 	return FAsyncAwaiter(Thread, Other.Handle);

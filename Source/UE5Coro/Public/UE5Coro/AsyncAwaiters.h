@@ -127,4 +127,16 @@ public:
 		});
 	}
 };
+
+template<typename P, typename T>
+struct TAwaitTransform<P, TFuture<T>>
+{
+	TFutureAwaiter<T> operator()(TFuture<T>&& Future)
+	{
+		return TFutureAwaiter<T>(std::move(Future));
+	}
+
+	// co_awaiting a TFuture consumes it, use MoveTemp/std::move
+	TFutureAwaiter<T> operator()(TFuture<T>&) = delete;
+};
 }

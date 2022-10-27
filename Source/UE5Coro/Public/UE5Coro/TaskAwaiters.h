@@ -92,4 +92,13 @@ public:
 		UE::Tasks::Launch(DebugName, SuspendBase(Handle), Task);
 	}
 };
+
+template<typename P, typename T>
+struct TAwaitTransform<P, UE::Tasks::TTask<T>>
+{
+	TTaskAwaiter<T> operator()(UE::Tasks::TTask<T> Task)
+	{
+		return TTaskAwaiter<T>(Task, TEXT("UE5Coro automatic co_await wrapper"));
+	}
+};
 }
