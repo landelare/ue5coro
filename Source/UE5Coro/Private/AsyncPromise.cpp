@@ -35,6 +35,7 @@ using namespace UE5Coro::Private;
 
 void FAsyncPromise::Resume()
 {
+	FResumeScope _(this);
 	FAsyncHandle::from_promise(*this).resume();
 }
 

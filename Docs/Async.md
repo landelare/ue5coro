@@ -13,6 +13,20 @@ discard or keep around for longer than needed, but interacting with a `delete`d
 coroutine is undefined behavior as usual.
 Coroutines get `delete`d when or shortly after they finish.
 
+## Debugging
+
+`FAsyncCoroutine::SetDebugName()` applies a debug name to the currently-running
+coroutine's promise object (which is otherwise an implementation detail).
+This has no effect at runtime (and does nothing in Shipping), but it's useful
+for debug viewing these objects.
+Looking at them as part of `__coro_frame_ptr` seems to be unreliable in practice,
+moving one level up in the call stack to `Resume()` tends to work better.
+A .natvis file is provided to automatically display this debug info.
+
+In debug builds (controlled by `UE5CORO_DEBUG`) a synchronous resume stack is
+also kept to aid in debugging complex cases of coroutine resumption, mostly
+having to do with `WhenAny` or `WhenAll`.
+
 ## Execution modes
 
 There are two major execution modes of async coroutines–they can either run

@@ -31,7 +31,18 @@
 
 #include "UE5Coro/AsyncCoroutine.h"
 
+using namespace UE5Coro::Private;
+
 TMulticastDelegate<void()>& FAsyncCoroutine::OnCompletion()
 {
 	return Handle.promise().OnCompletion();
+}
+
+void FAsyncCoroutine::SetDebugName(const TCHAR* Name)
+{
+#if UE5CORO_DEBUG
+	if (ensureMsgf(FPromise::ResumeStack.Num() > 0,
+	               TEXT("Attempting to set a debug name outside a coroutine")))
+		FPromise::ResumeStack.Last()->DebugName = Name;
+#endif
 }

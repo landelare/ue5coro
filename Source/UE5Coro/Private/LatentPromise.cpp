@@ -158,6 +158,8 @@ FLatentPromise::~FLatentPromise()
 
 void FLatentPromise::Resume()
 {
+	FResumeScope _(this);
+
 	// Return to latent running on the game thread, even if it's an async task.
 	if (IsInGameThread())
 		AttachToGameThread();
@@ -260,7 +262,7 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	LAM.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, Pending);
 
 	// Let the coroutine start immediately on its calling thread
-	return {FInitialSuspend::Ready};
+	return {FInitialSuspend::Resume};
 }
 
 void FLatentPromise::return_void()

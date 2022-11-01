@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<!-- Promises. Looking at them works better from Resume() instead of __coro_frame_ptr. -->
+	<Type Name="UE5Coro::Private::FPromise">
+		<DisplayString Condition="Alive==Expected">{{{DebugPromiseType,sub}, Alive, Name={DebugName,sub}, Continuations={Continuations.InvocationList.ArrayNum}}}</DisplayString>
+		<DisplayString Condition="Alive!=Expected">{{{DebugPromiseType,sub}, ***DEAD***, Name={DebugName,sub}, Continuations={Continuations.InvocationList.ArrayNum}}}</DisplayString>
+		<Expand>
+			<Item Name="[Promise type]" Optional="true">DebugPromiseType,sub</Item>
+			<Item Name="[Alive?]" Optional="true">Alive==Expected</Item>
+			<Item Name="[Sync resume stack]" Optional="true">UE5Coro::Private::FPromise::ResumeStack</Item>
+			<Item Name="DebugName" Optional="true">DebugName,su</Item>
+			<Item Name="Continuations">Continuations</Item>
+		</Expand>
+	</Type>
+	<Type Name="UE5Coro::Private::FAsyncPromise">
+		<DisplayString Condition="Alive==Expected">{{{DebugPromiseType,sub}, Alive, Name={DebugName,sub}, Continuations={Continuations.InvocationList.ArrayNum}}}</DisplayString>
+		<DisplayString Condition="Alive!=Expected">{{{DebugPromiseType,sub}, ***DEAD***, Name={DebugName,sub}, Continuations={Continuations.InvocationList.ArrayNum}}}</DisplayString>
+		<Expand>
+			<Item Name="[Promise type]" Optional="true">DebugPromiseType,sub</Item>
+			<Item Name="[Alive?]" Optional="true">Alive==Expected</Item>
+			<Item Name="[Sync resume stack]" Optional="true">UE5Coro::Private::FPromise::ResumeStack</Item>
+			<Item Name="DebugName" Optional="true">DebugName,su</Item>
+			<Item Name="Continuations">Continuations</Item>
+		</Expand>
+	</Type>
+	<Type Name="UE5Coro::Private::FLatentPromise">
+		<DisplayString Condition="Alive==Expected">{{{DebugPromiseType,sub}, Alive, Name={DebugName,sub}, Continuations={Continuations.InvocationList.ArrayNum}}}</DisplayString>
+		<DisplayString Condition="Alive!=Expected">{{{DebugPromiseType,sub}, ***DEAD***, Name={DebugName,sub}, Continuations={Continuations.InvocationList.ArrayNum}}}</DisplayString>
+		<Expand>
+			<Item Name="[Promise type]" Optional="true">DebugPromiseType,sub</Item>
+			<Item Name="[Alive?]" Optional="true">Alive==Expected</Item>
+			<Item Name="[Sync resume stack]" Optional="true">UE5Coro::Private::FPromise::ResumeStack</Item>
+			<Item Name="DebugName" Optional="true">DebugName,su</Item>
+			<Item Name="Continuations">Continuations</Item>
+		</Expand>
+	</Type>
+</AutoVisualizer>

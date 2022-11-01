@@ -102,6 +102,10 @@ public:
 	 *  This will be Broadcast() on the same thread where the coroutine is
 	 *	destroyed. */
 	TMulticastDelegate<void()>& OnCompletion();
+
+	/** Sets a debug name for the currently-executing coroutine.
+	 *  Only valid to call from within a coroutine returning FAsyncCoroutine. */
+	static void SetDebugName(const TCHAR* Name);
 };
 
 template<typename... Args>
@@ -146,40 +150,61 @@ struct FInitialSuspend
 {
 	enum EAction
 	{
-		Ready,
-		Suspend,
+		Resume,
 		Destroy,
 	} Action;
 
-	bool await_ready() noexcept { return Action == Ready; }
+	bool await_ready() noexcept { return false; }
 	void await_resume() noexcept { }
-	void await_suspend(FLatentHandle Handle) noexcept
+	template<typename P>
+	void await_suspend(std::coroutine_handle<P> Handle) noexcept
 	{
-		if (Action == Destroy)
-			Handle.destroy();
+		switch (Action)
+		{
+			case Resume: Handle.promise().Resume(); break;
+			case Destroy: Handle.destroy(); break;
+		}
 	}
 };
 
-class [[nodiscard]] UE5CORO_API FPromise
+class [[nodiscard]] FPromise
 {
 #if UE5CORO_DEBUG
+	static thread_local TArray<FPromise*> ResumeStack;
+
 	static constexpr uint32 Expected = U'♪' << 16 | U'♫';
 	uint32 Alive = Expected;
+
+	const TCHAR* DebugPromiseType;
+	const TCHAR* DebugName = nullptr;
+	friend void FAsyncCoroutine::SetDebugName(const TCHAR*);
 #endif
 
 	TMulticastDelegate<void()> Continuations;
 
+	void Resume();
+	void EndResume();
+
 protected:
-	FPromise() = default;
+	UE5CORO_API explicit FPromise(const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
 
+	void CheckAlive();
+
+	struct FResumeScope final
+	{
+		FPromise* This;
+		explicit FResumeScope(FPromise* This) : This(This) { This->Resume(); }
+		~FResumeScope() { This->EndResume(); }
+	};
+
 public:
-	~FPromise();
+	UE5CORO_API ~FPromise();
 
-	TMulticastDelegate<void()>& OnCompletion();
+	UE5CORO_API TMulticastDelegate<void()>& OnCompletion();
 
-	FAsyncCoroutine get_return_object();
-	void unhandled_exception();
+	UE5CORO_API FAsyncCoroutine get_return_object();
+	UE5CORO_API void unhandled_exception();
 
 	// co_yield is not allowed in async coroutines
 	std::suspend_never yield_value(auto&&) = delete;
@@ -188,9 +213,10 @@ public:
 class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
 {
 public:
+	FAsyncPromise() : FPromise(TEXT("Async")) { }
 	void Resume();
 
-	std::suspend_never initial_suspend() { return {}; }
+	FInitialSuspend initial_suspend() { return {FInitialSuspend::Resume}; }
 	std::suspend_never final_suspend() noexcept { return {}; }
 	void return_void() { }
 
@@ -254,6 +280,7 @@ public:
 };
 
 FLatentPromise::FLatentPromise(auto&&... Args)
+	: FPromise(TEXT("Latent"))
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent coroutines may only be started on the game thread"));

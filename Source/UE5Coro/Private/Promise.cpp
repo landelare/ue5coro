@@ -33,12 +33,53 @@
 
 using namespace UE5Coro::Private;
 
+#if UE5CORO_DEBUG
+// This is a synchronous call stack that doesn't follow or track co_await!
+thread_local TArray<FPromise*> FPromise::ResumeStack;
+#endif
+
+FPromise::FPromise(const TCHAR* PromiseType)
+#if UE5CORO_DEBUG
+	: DebugPromiseType(PromiseType)
+#endif
+{
+}
+
 FPromise::~FPromise()
 {
 #if UE5CORO_DEBUG
 	Alive = 0;
 #endif
 	Continuations.Broadcast();
+}
+
+void FPromise::CheckAlive()
+{
+#if UE5CORO_DEBUG
+	// Best effort but ultimately unreliable check for stale objects
+	checkf(Alive == Expected,
+	       TEXT("Attempted to access or await a destroyed coroutine"));
+#endif
+}
+
+void FPromise::Resume()
+{
+	CheckAlive();
+#if UE5CORO_DEBUG
+	checkf(ResumeStack.Num() == 0 || ResumeStack.Last() != this,
+	       TEXT("Internal error"));
+	ResumeStack.Push(this);
+#endif
+}
+
+void FPromise::EndResume()
+{
+	// Coroutine resumption might result in `this` having been freed already and
+	// not being considered `Alive`. This is technically undefined behavior.
+#if UE5CORO_DEBUG
+	checkf(ResumeStack.Last() == this, TEXT("Internal error"));
+	ResumeStack.Pop();
+#endif
 }
 
 void FPromise::unhandled_exception()
@@ -52,11 +93,7 @@ void FPromise::unhandled_exception()
 
 TMulticastDelegate<void()>& FPromise::OnCompletion()
 {
-#if UE5CORO_DEBUG
-	// Best effort but ultimately unreliable check for stale objects
-	checkf(Alive == Expected,
-	       TEXT("Attempted to access or await a destroyed coroutine"));
-#endif
+	CheckAlive();
 	return Continuations;
 }
 
