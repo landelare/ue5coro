@@ -32,6 +32,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UE5Coro/Definitions.h"
 #include <coroutine>
 #include "Async/TaskGraphInterfaces.h"
 #include "UE5Coro/AsyncCoroutine.h"

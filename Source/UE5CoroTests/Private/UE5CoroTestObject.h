@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
+#include "UE5Coro/Definitions.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "UE5Coro/LatentAwaiters.h"
 #include "UE5CoroTestObject.generated.h"

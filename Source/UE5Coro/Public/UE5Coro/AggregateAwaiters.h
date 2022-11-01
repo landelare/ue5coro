@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
+#include "UE5Coro/Definitions.h"
 #include <memory>
 #include "Misc/SpinLock.h"
 #include "UE5Coro/AsyncCoroutine.h"

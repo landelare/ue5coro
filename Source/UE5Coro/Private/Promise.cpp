@@ -35,7 +35,7 @@ using namespace UE5Coro::Private;
 
 FPromise::~FPromise()
 {
-#if DO_CHECK
+#if UE5CORO_DEBUG
 	Alive = 0;
 #endif
 	Continuations.Broadcast();
@@ -52,9 +52,11 @@ void FPromise::unhandled_exception()
 
 TMulticastDelegate<void()>& FPromise::OnCompletion()
 {
+#if UE5CORO_DEBUG
 	// Best effort but ultimately unreliable check for stale objects
 	checkf(Alive == Expected,
 	       TEXT("Attempted to access or await a destroyed coroutine"));
+#endif
 	return Continuations;
 }
 

@@ -31,37 +31,6 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
-#include "UE5Coro/Definitions.h"
-#include "UE5Coro/AsyncCoroutine.h"
-
-namespace UE5Coro::Private::Test
-{
-class FTestWorld
-{
-	UWorld* World;
-
-	UWorld* PrevWorld;
-	decltype(GFrameCounter) OldFrameCounter;
-
-public:
-	FTestWorld();
-	~FTestWorld();
-
-	UWorld* operator->() const { return World; }
-
-	void Tick(float DeltaSeconds = 0.125);
-	void EndTick();
-	FAsyncCoroutine Run(std::function<FAsyncCoroutine()>);
-	FAsyncCoroutine Run(std::function<FAsyncCoroutine(FLatentActionInfo)>,
-	                    bool* = nullptr);
-};
-
-class FTestHelper
-{
-public:
-	static void PumpGameThread(FTestWorld& World,
-	                           std::function<bool()> ExitCondition);
-	static void ForceResume(FAsyncCoroutine& Coroutine);
-};
-}
+#ifndef UE5CORO_DEBUG
+#define UE5CORO_DEBUG (UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT)
+#endif

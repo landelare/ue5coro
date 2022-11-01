@@ -53,12 +53,10 @@ bool FHttpAwaiter::await_ready()
 {
 	Lock.Lock();
 
-#if DO_CHECK
-	std::visit([](std::coroutine_handle<> Handle)
+	checkCode(std::visit([](std::coroutine_handle<> Handle)
 	{
 		checkf(!Handle, TEXT("Attempting to reuse HTTP awaiter"));
-	}, Handle);
-#endif
+	}, Handle));
 
 	// Skip suspension if the request finished first
 	if (Result.has_value())

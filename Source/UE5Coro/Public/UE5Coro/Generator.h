@@ -32,6 +32,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UE5Coro/Definitions.h"
 #include <coroutine>
 
 namespace UE5Coro::Private

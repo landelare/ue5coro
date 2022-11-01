@@ -32,6 +32,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UE5Coro/Definitions.h"
 #include "Engine/LatentActionManager.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "UE5CoroSubsystem.generated.h"

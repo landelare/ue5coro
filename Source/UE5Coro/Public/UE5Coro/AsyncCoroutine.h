@@ -32,6 +32,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UE5Coro/Definitions.h"
 #include <atomic>
 #include <coroutine>
 #include <variant>
@@ -161,7 +162,7 @@ struct FInitialSuspend
 
 class [[nodiscard]] UE5CORO_API FPromise
 {
-#if DO_CHECK
+#if UE5CORO_DEBUG
 	static constexpr uint32 Expected = U'♪' << 16 | U'♫';
 	uint32 Alive = Expected;
 #endif
