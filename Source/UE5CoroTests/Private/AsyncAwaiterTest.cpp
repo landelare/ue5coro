@@ -103,6 +103,29 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Second event, new thread"), State, 2);
 	}
 
+	{
+		FEventRef TestToCoro(EEventMode::AutoReset);
+		FEventRef CoroToTest(EEventMode::AutoReset);
+		int State = 0;
+		World.Run(CORO
+		{
+			State = 1;
+			CoroToTest->Trigger();
+			co_await Async::MoveToNewThread();
+			TestToCoro->Wait();
+			State = 2;
+			CoroToTest->Trigger();
+			if constexpr (bLatent)
+				co_await Async::MoveToGameThread();
+		});
+		Test.TestEqual(TEXT("Initial state"), State, 1);
+		Test.TestEqual(TEXT("Wait 1"), CoroToTest->Wait(), true);
+		Test.TestEqual(TEXT("First event, original thread"), State, 1);
+		TestToCoro->Trigger();
+		Test.TestEqual(TEXT("Wait 2"), CoroToTest->Wait(), true);
+		Test.TestEqual(TEXT("Second event, new thread"), State, 2);
+	}
+
 #undef CORO
 }
 }

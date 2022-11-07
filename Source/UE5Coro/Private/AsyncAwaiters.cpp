@@ -32,13 +32,60 @@
 #include "UE5Coro/AsyncAwaiters.h"
 
 using namespace UE5Coro;
+using namespace UE5Coro::Private;
 
-Private::FAsyncAwaiter Async::MoveToThread(ENamedThreads::Type Thread)
+namespace
 {
-	return Private::FAsyncAwaiter(Thread);
+template<typename H>
+struct TAutoStartResumeRunnable : FRunnable
+{
+	H& Promise;
+
+	explicit TAutoStartResumeRunnable(std::coroutine_handle<H> Handle,
+	                                  EThreadPriority Priority, uint64 Affinity,
+	                                  EThreadCreateFlags Flags)
+		: Promise(Handle.promise())
+	{
+		FRunnableThread::Create(this, TEXT("UE5Coro::Async::MoveToNewThread"),
+		                        0, Priority, Affinity, Flags);
+	}
+
+	virtual uint32 Run() override
+	{
+		Promise.Resume();
+		return 0;
+	}
+
+	virtual void Exit() override
+	{
+		delete this;
+	}
+};
 }
 
-Private::FAsyncAwaiter Async::MoveToGameThread()
+FAsyncAwaiter Async::MoveToThread(ENamedThreads::Type Thread)
 {
-	return Private::FAsyncAwaiter(ENamedThreads::GameThread);
+	return FAsyncAwaiter(Thread);
+}
+
+FAsyncAwaiter Async::MoveToGameThread()
+{
+	return FAsyncAwaiter(ENamedThreads::GameThread);
+}
+
+FNewThreadAwaiter Async::MoveToNewThread(
+	EThreadPriority Priority, uint64 Affinity, EThreadCreateFlags Flags)
+{
+	return FNewThreadAwaiter(Priority, Affinity, Flags);
+}
+
+void FNewThreadAwaiter::await_suspend(FAsyncHandle Handle)
+{
+	new TAutoStartResumeRunnable(Handle, Priority, Affinity, Flags);
+}
+
+void FNewThreadAwaiter::await_suspend(FLatentHandle Handle)
+{
+	Handle.promise().DetachFromGameThread();
+	new TAutoStartResumeRunnable(Handle, Priority, Affinity, Flags);
 }

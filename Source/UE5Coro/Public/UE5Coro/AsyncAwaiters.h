@@ -42,6 +42,7 @@ namespace UE5Coro::Private
 class FAsyncAwaiter;
 class FAsyncPromise;
 class FLatentPromise;
+class FNewThreadAwaiter;
 }
 
 namespace UE5Coro::Async
@@ -52,6 +53,15 @@ UE5CORO_API Private::FAsyncAwaiter MoveToThread(ENamedThreads::Type);
 /** Convenience function to resume on the game thread.<br>
  *  Equivalent to calling Async::MoveToThread(ENamedThreads::GameThread). */
 UE5CORO_API Private::FAsyncAwaiter MoveToGameThread();
+
+/** Starts a new thread with additional control over priority, affinity, etc.
+ *  and resumes the coroutine there.<br>
+ *  Intended for long-running operations before the next co_await or co_return.
+ *  For parameters see the engine function FRunnableThread::Create(). */
+UE5CORO_API Private::FNewThreadAwaiter MoveToNewThread(
+	EThreadPriority Priority = TPri_Normal,
+	uint64 Affinity = FPlatformAffinity::GetNoAffinityMask(),
+	EThreadCreateFlags Flags = EThreadCreateFlags::None);
 }
 
 namespace UE5Coro::Private
@@ -60,9 +70,6 @@ class [[nodiscard]] UE5CORO_API FAsyncAwaiter final
 {
 	ENamedThreads::Type Thread;
 	FHandle ResumeAfter;
-
-	FAsyncAwaiter(const FAsyncAwaiter&) = delete;
-	void operator=(auto&&) = delete;
 
 public:
 	explicit FAsyncAwaiter(ENamedThreads::Type Thread,
@@ -139,5 +146,24 @@ struct TAwaitTransform<P, TFuture<T>>
 
 	// co_awaiting a TFuture consumes it, use MoveTemp/std::move
 	TFutureAwaiter<T> operator()(TFuture<T>&) = delete;
+};
+
+class [[nodiscard]] UE5CORO_API FNewThreadAwaiter
+{
+	EThreadPriority Priority;
+	uint64 Affinity;
+	EThreadCreateFlags Flags;
+
+public:
+	explicit FNewThreadAwaiter(
+		EThreadPriority Priority, uint64 Affinity, EThreadCreateFlags Flags)
+		: Priority(Priority), Affinity(Affinity), Flags(Flags) { }
+	FNewThreadAwaiter(FNewThreadAwaiter&&) = default;
+
+	bool await_ready() { return false; }
+	void await_resume() { }
+
+	void await_suspend(FAsyncHandle);
+	void await_suspend(FLatentHandle);
 };
 }

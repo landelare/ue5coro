@@ -20,7 +20,7 @@ co_await UE5Coro::WhenAll(Async, Latent, Task);
 The code above might resume in an AsyncTask, game thread Tick, or the UE::Tasks
 system.
 
-## Async tasks
+## Async awaiters
 
 `UE5Coro::Async` contains awaiters that let you conveniently move execution
 between various threads (notably between the game thread and everything else).
