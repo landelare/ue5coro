@@ -105,6 +105,7 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Async unexpected exception"), false);
 	}
 
+	FTestWorld World;
 	try
 	{
 		int State = 0;
@@ -114,7 +115,6 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 			co_await std::suspend_always();
 			throw FTestException("latent");
 		};
-		FTestWorld World;
 		auto Coro = World.Run(Fn);
 		TestEqual(TEXT("Latent init value"), State, 1);
 		// Cannot use "natural" UE resumption from the latent action manager

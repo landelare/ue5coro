@@ -118,12 +118,14 @@ void DoConsumeTest(FAutomationTestBase& Test)
 	constexpr bool bLatent = sizeof...(T) == 1;
 
 	{
+		FEventRef TestToCoro(EEventMode::AutoReset);
 		FEventRef CoroToTest(EEventMode::AutoReset);
 		std::atomic<int> State = 0;
 		World.Run(CORO
 		{
 			co_await UE::Tasks::Launch(UE_SOURCE_LOCATION, [&]
 			{
+				TestToCoro->Wait();
 				++State;
 			});
 			++State;
@@ -131,11 +133,13 @@ void DoConsumeTest(FAutomationTestBase& Test)
 			if constexpr (bLatent)
 				co_await Async::MoveToGameThread();
 		});
+		TestToCoro->Trigger();
 		CoroToTest->Wait();
 		Test.TestEqual(TEXT("Final state"), State, 2);
 	}
 
 	{
+		FEventRef TestToCoro(EEventMode::AutoReset);
 		FEventRef CoroToTest(EEventMode::AutoReset);
 		int State = 0;
 		int Retval = 0;
@@ -143,6 +147,7 @@ void DoConsumeTest(FAutomationTestBase& Test)
 		{
 			Retval = co_await UE::Tasks::Launch(UE_SOURCE_LOCATION, [&]
 			{
+				TestToCoro->Wait();
 				++State;
 				return 3;
 			});
@@ -151,6 +156,7 @@ void DoConsumeTest(FAutomationTestBase& Test)
 			if constexpr (bLatent)
 				co_await Async::MoveToGameThread();
 		});
+		TestToCoro->Trigger();
 		CoroToTest->Wait();
 		Test.TestEqual(TEXT("Final state"), State, 2);
 		Test.TestEqual(TEXT("Return value"), Retval, 3);

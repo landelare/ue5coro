@@ -60,11 +60,12 @@ void DoTest(FAutomationTestBase& Test)
 		FEventRef CoroToTest;
 		World.Run(CORO
 		{
+			co_await Latent::NextTick();
 			TSoftObjectPtr<UWorld> Soft = Object.Get();
 			Result = co_await Latent::AsyncLoadObject(Soft);
 			CoroToTest->Trigger();
 		});
-		CoroToTest->Wait();
+		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
 		Test.TestEqual(TEXT("Loaded"), Result, Object.Get());
 	}
 
@@ -73,11 +74,12 @@ void DoTest(FAutomationTestBase& Test)
 		FEventRef CoroToTest;
 		World.Run(CORO
 		{
+			co_await Latent::NextTick();
 			TSoftClassPtr<UObject> Soft = UObject::StaticClass();
 			Result = co_await Latent::AsyncLoadClass(Soft);
 			CoroToTest->Trigger();
 		});
-		CoroToTest->Wait();
+		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
 		Test.TestEqual(TEXT("Loaded"), Result, UObject::StaticClass());
 	}
 
@@ -90,6 +92,7 @@ void DoTest(FAutomationTestBase& Test)
 		FEventRef CoroToTest;
 		World.Run(CORO
 		{
+			co_await Latent::NextTick();
 			Package = co_await Latent::AsyncLoadPackage(Path);
 			CoroToTest->Trigger();
 		});
