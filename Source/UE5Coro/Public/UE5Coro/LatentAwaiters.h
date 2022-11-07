@@ -53,6 +53,8 @@ namespace UE5Coro::Latent
  *  aborted. */
 Private::FLatentCancellation Cancel();
 
+#pragma region Tick
+
 /** Resumes the coroutine in the next tick.<br>
  *  @see Latent::Until for an alternative to while-NextTick loops. */
 UE5CORO_API Private::FLatentAwaiter NextTick();
@@ -62,6 +64,13 @@ UE5CORO_API Private::FLatentAwaiter Frames(int32);
 
 /** Resumes the coroutine the given number of ticks later. */
 UE5CORO_API Private::FLatentAwaiter Ticks(int64);
+
+/** Polls the provided function, resumes the coroutine when it returns true. */
+UE5CORO_API Private::FLatentAwaiter Until(std::function<bool()> Function);
+
+#pragma endregion
+
+#pragma region Time
 
 /** Resumes the coroutine the specified amount of seconds later.<br>
  *  This is affected by both pause and time dilation. */
@@ -78,6 +87,10 @@ UE5CORO_API Private::FLatentAwaiter RealSeconds(double);
 /** Resumes the coroutine the specified amount of seconds later.<br>
  *  This is affected by pause only, NOT time dilation. */
 UE5CORO_API Private::FLatentAwaiter AudioSeconds(double);
+
+#pragma endregion
+
+#pragma region Chain
 
 /** Resumes the coroutine once the chained static latent action has finished,
  *  with automatic parameter matching.<br>Example usage:<br>
@@ -100,6 +113,10 @@ Private::FLatentAwaiter Chain(auto (Class::*Function)(FnParams...),
  *  co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1.0f, _2); */
 Private::FLatentAwaiter ChainEx(auto&& Function, auto&&... Args);
 
+#pragma endregion
+
+#pragma region Async loading
+
 /** Asynchronously starts loading the object, resumes once it's loaded.<br>
  *  The result of the co_await expression is the T*. */
 template<std::derived_from<UObject> T>
@@ -119,8 +136,7 @@ UE5CORO_API Private::FPackageLoadAwaiter AsyncLoadPackage(
 	TAsyncLoadPriority PackagePriority = 0,
 	const FLinkerInstancingContext* InstancingContext = nullptr);
 
-/** Polls the provided function, resumes the coroutine when it returns true. */
-UE5CORO_API Private::FLatentAwaiter Until(std::function<bool()> Function);
+#pragma endregion
 }
 
 namespace UE5Coro::Private

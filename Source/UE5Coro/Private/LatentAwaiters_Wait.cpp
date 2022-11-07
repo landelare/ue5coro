@@ -102,6 +102,13 @@ FLatentAwaiter Latent::Ticks(int64 Ticks)
 	return FLatentAwaiter(reinterpret_cast<void*>(Target), &WaitUntilFrame);
 }
 
+FLatentAwaiter Latent::Until(std::function<bool()> Function)
+{
+	checkf(Function, TEXT("Provided function is empty"));
+	return FLatentAwaiter(new std::function(std::move(Function)),
+		&WaitUntilPredicate);
+}
+
 FLatentAwaiter Latent::Seconds(double Seconds)
 {
 	return GenericSeconds<&UWorld::GetTimeSeconds>(Seconds);
@@ -120,11 +127,4 @@ FLatentAwaiter Latent::RealSeconds(double Seconds)
 FLatentAwaiter Latent::AudioSeconds(double Seconds)
 {
 	return GenericSeconds<&UWorld::GetAudioTimeSeconds>(Seconds);
-}
-
-FLatentAwaiter Latent::Until(std::function<bool()> Function)
-{
-	checkf(Function, TEXT("Provided function is empty"));
-	return FLatentAwaiter(new std::function(std::move(Function)),
-	                      &WaitUntilPredicate);
 }
