@@ -44,6 +44,7 @@ class FLatentCancellation;
 class FLatentPromise;
 class FPackageLoadAwaiter;
 template<std::derived_from<UObject>> class TAsyncLoadAwaiter;
+template<typename> class TAsyncQueryAwaiter;
 }
 
 namespace UE5Coro::Latent
@@ -137,6 +138,66 @@ UE5CORO_API Private::FPackageLoadAwaiter AsyncLoadPackage(
 	const FLinkerInstancingContext* InstancingContext = nullptr);
 
 #pragma endregion
+
+#pragma region Async collision queries
+
+// Async UWorld queries. For parameters, see their originals in World.h.
+
+UE5CORO_API Private::TAsyncQueryAwaiter<FHitResult> AsyncLineTraceByChannel(
+	const UObject* WorldContextObject, EAsyncTraceType InTraceType,
+	const FVector& Start, const FVector& End, ECollisionChannel TraceChannel,
+	const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam,
+	const FCollisionResponseParams& ResponseParam = FCollisionResponseParams::DefaultResponseParam);
+
+UE5CORO_API Private::TAsyncQueryAwaiter<FHitResult> AsyncLineTraceByObjectType(
+	const UObject* WorldContextObject, EAsyncTraceType InTraceType,
+	const FVector& Start, const FVector& End,
+	const FCollisionObjectQueryParams& ObjectQueryParams,
+	const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam);
+
+UE5CORO_API Private::TAsyncQueryAwaiter<FHitResult> AsyncLineTraceByProfile(
+	const UObject* WorldContextObject, EAsyncTraceType InTraceType,
+	const FVector& Start, const FVector& End, FName ProfileName,
+	const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam);
+
+UE5CORO_API Private::TAsyncQueryAwaiter<FHitResult> AsyncSweepByChannel(
+	const UObject* WorldContextObject, EAsyncTraceType InTraceType,
+	const FVector& Start, const FVector& End, const FQuat& Rot,
+	ECollisionChannel TraceChannel, const FCollisionShape& CollisionShape,
+	const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam,
+	const FCollisionResponseParams& ResponseParam = FCollisionResponseParams::DefaultResponseParam);
+
+UE5CORO_API Private::TAsyncQueryAwaiter<FHitResult> AsyncSweepByObjectType(
+	const UObject* WorldContextObject, EAsyncTraceType InTraceType,
+	const FVector& Start, const FVector& End, const FQuat& Rot,
+	const FCollisionObjectQueryParams& ObjectQueryParams,
+	const FCollisionShape& CollisionShape,
+	const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam);
+
+UE5CORO_API Private::TAsyncQueryAwaiter<FHitResult> AsyncSweepByProfile(
+	const UObject* WorldContextObject, EAsyncTraceType InTraceType,
+	const FVector& Start, const FVector& End, const FQuat& Rot,
+	FName ProfileName, const FCollisionShape& CollisionShape,
+	const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam);
+
+UE5CORO_API Private::TAsyncQueryAwaiter<FOverlapResult> AsyncOverlapByChannel(
+	const UObject* WorldContextObject, const FVector& Pos, const FQuat& Rot,
+	ECollisionChannel TraceChannel, const FCollisionShape& CollisionShape,
+	const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam,
+	const FCollisionResponseParams& ResponseParam = FCollisionResponseParams::DefaultResponseParam);
+
+UE5CORO_API Private::TAsyncQueryAwaiter<FOverlapResult> AsyncOverlapByObjectType(
+	const UObject* WorldContextObject, const FVector& Pos, const FQuat& Rot,
+	const FCollisionObjectQueryParams& ObjectQueryParams,
+	const FCollisionShape& CollisionShape,
+	const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam);
+
+UE5CORO_API Private::TAsyncQueryAwaiter<FOverlapResult> AsyncOverlapByProfile(
+	const UObject* WorldContextObject, const FVector& Pos, const FQuat& Rot,
+	FName ProfileName, const FCollisionShape& CollisionShape,
+	const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam);
+
+#pragma endregion
 }
 
 namespace UE5Coro::Private
@@ -207,6 +268,24 @@ public:
 	void await_suspend(FAsyncHandle);
 	void await_suspend(FLatentHandle);
 	UPackage* await_resume();
+};
+
+template<typename T>
+class [[nodiscard]] TAsyncQueryAwaiter
+{
+	class TImpl;
+	TImpl* Impl;
+
+public:
+	template<typename... P>
+	explicit TAsyncQueryAwaiter(UWorld*, FTraceHandle (UWorld::*)(P...), auto...);
+	UE5CORO_API ~TAsyncQueryAwaiter();
+	UE_NONCOPYABLE(TAsyncQueryAwaiter);
+
+	UE5CORO_API bool await_ready();
+	UE5CORO_API void await_suspend(FAsyncHandle);
+	UE5CORO_API void await_suspend(FLatentHandle);
+	UE5CORO_API TArray<T> await_resume();
 };
 }
 

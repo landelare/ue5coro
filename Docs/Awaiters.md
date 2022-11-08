@@ -49,19 +49,25 @@ lacking completion callbacks.
 
 ## Latent awaiters
 
-`UE5Coro::Latent` awaiters are implemented as latent actions, even if your
-coroutine is otherwise not one. This makes their lifetime tied to the world so
-it's possible, e.g., if PIE ends that `co_await`ing them will not resume your
-coroutine. In this case your stack is still unwound normally (similarly to if
-an exception was thrown) and your destructors are called so it's safe to use
-`FScopeLock`s, smart pointers, etc. across a `co_await`, but something like
-this could cause problems:
+`UE5Coro::Latent` awaiters are locked to the game thread.
+Their lifetime is tied to the world so it's possible, e.g., if PIE ends that
+`co_await`ing them will not resume your coroutine.
+In this case your stack is still unwound normally (similarly to if an exception
+was thrown) and your destructors are called so it's safe to use `FScopeLock`s,
+smart pointers, etc. across a `co_await`, but something like this could cause
+problems:
 
 ```cpp
 T* Thing = new T();
 co_await UE5Coro::Latent::Something(); // This may not resume
 delete Thing;
 ```
+
+It's undefined when exactly your coroutine stack is unwound, it might be, e.g.,
+when the latent action is destroyed or when the `co_await` would normally resume
+the coroutine.
+In practice, for awaiters in this namespace it will usually happen within 2
+ticks.
 
 ### Latent callbacks
 
