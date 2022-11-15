@@ -33,6 +33,7 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
+#include <functional>
 #include "UE5Coro/AsyncCoroutine.h"
 
 namespace UE5Coro::Latent
