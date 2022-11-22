@@ -66,7 +66,8 @@ void UK2Node_UE5CoroCallCoroutine::GetMenuActions(
 
 			// Sign up to create a coroutine call K2Node instead
 			auto* BNS = UBlueprintNodeSpawner::Create(GetClass());
-			BNS->CustomizeNodeDelegate.BindStatic(&ThisClass::CustomizeNode, Fn);
+			BNS->CustomizeNodeDelegate.BindWeakLambda(
+				Fn, &ThisClass::CustomizeNode, Fn);
 
 			auto& Menu = BNS->DefaultMenuSignature;
 			Menu.MenuName = Fn->GetDisplayNameText();
