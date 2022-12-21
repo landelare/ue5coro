@@ -1,10 +1,10 @@
 # UE5Coro
 
-This library implements C++20
+This library implements C\+\+
 [coroutines](https://en.cppreference.com/w/cpp/language/coroutines) for
 Unreal Engine 5 with a focus on gameplay logic and BP integration.
 
-## Installing
+## Setup
 
 Download the release that you wish to use from the
 [Releases](https://github.com/landelare/ue5coro/releases) page, extract it to
@@ -12,14 +12,28 @@ your project's Plugins folder and in case you downloaded a source code zip,
 rename the folder that it contains to just `UE5Coro` so that you end up with
 `YourProject\Plugins\UE5Coro\UE5Coro.uplugin`.
 
+### C++20
+
 In modules where you wish to use coroutines, add or change this line in the
-corresponding Build.cs file to enable the required language features:
+corresponding **Build.cs** file:
 ```c#
 CppStandard = CppStandardVersion.Cpp20;
 ```
+
 Add `"UE5Coro"` to your dependency module names in the same Build.cs file – up
 to you if it's private or public – enable the plugin in the Unreal editor,
 and you're ready to go!
+
+### C++17
+
+In your **Target.cs** files for projects where you wish to use coroutines,
+add this line:
+```c#
+bEnableCppCoroutinesForEvaluation = true;
+```
+
+No additional per-module setup is needed in this case, add `"UE5Coro"` to your
+dependency module names and enable the plugin like any other.
 
 ## Features
 
