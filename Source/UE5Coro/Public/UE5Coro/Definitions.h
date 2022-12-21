@@ -31,6 +31,18 @@
 
 #pragma once
 
+#ifndef UE5CORO_CPP20
+#define UE5CORO_CPP20 0
+#endif
+
+#if __has_include(<coroutine>)
+#include <coroutine>
+#elif __has_include(<experimental/coroutine>)
+#include <experimental/coroutine>
+#else
+#error UE5Coro requires C++20 or the Coroutines TS for C++17.
+#endif
+
 #ifndef UE5CORO_DEBUG
 #define UE5CORO_DEBUG (UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT)
 #endif

@@ -34,14 +34,9 @@
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
 #include <atomic>
-#include <coroutine>
 #include <variant>
 #include "Engine/LatentActionManager.h"
 #include "AsyncCoroutine.generated.h"
-
-#ifndef __cpp_lib_coroutine
-#error UE5Coro requires C++20.
-#endif
 
 namespace UE5Coro::Private
 {

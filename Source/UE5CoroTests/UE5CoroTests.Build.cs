@@ -36,7 +36,12 @@ public class UE5CoroTests : ModuleRules
 	public UE5CoroTests(ReadOnlyTargetRules Target)
 		: base(Target)
 	{
-		CppStandard = CppStandardVersion.Cpp20;
+		if (!Target.bEnableCppCoroutinesForEvaluation)
+		{
+			CppStandard = CppStandardVersion.Cpp20;
+			PublicDefinitions.Add("UE5CORO_CPP20=1");
+		}
+
 		bUseUnity = false;
 
 		PublicDependencyModuleNames.AddRange(new[]
