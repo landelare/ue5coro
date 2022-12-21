@@ -93,6 +93,7 @@ UE5CORO_API Private::FLatentAwaiter AudioSeconds(double);
 
 #pragma region Chain
 
+#if UE5CORO_CPP20
 /** Resumes the coroutine once the chained static latent action has finished,
  *  with automatic parameter matching.<br>Example usage:<br>
  *  co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1.0f); */
@@ -106,6 +107,7 @@ Private::FLatentAwaiter Chain(auto (*Function)(FnParams...), auto&&... Args);
 template<std::derived_from<UObject> Class, typename... FnParams>
 Private::FLatentAwaiter Chain(auto (Class::*Function)(FnParams...),
                               Class* Object, auto&&... Args);
+#endif
 
 /** Resumes the coroutine once the chained latent action has finished,
  *  with manual parameter matching.<br>

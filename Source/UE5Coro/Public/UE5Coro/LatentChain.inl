@@ -42,6 +42,7 @@ namespace UE5Coro::Private
 UE5CORO_API bool ShouldResumeChain(void*&, bool);
 UE5CORO_API std::tuple<FLatentActionInfo, bool*> MakeLatentInfo();
 
+#if UE5CORO_CPP20
 template<typename T>
 concept TWorldContext = std::same_as<std::decay_t<T>, UObject*> ||
                         std::same_as<std::decay_t<T>, const UObject*> ||
@@ -115,10 +116,12 @@ struct FLatentChain<bWorld, bInfo, Type, Types...>
 			TForwardRef<decltype(Args)>(Args)...);
 	}
 };
+#endif
 }
 
 namespace UE5Coro::Latent
 {
+#if UE5CORO_CPP20
 template<typename... FnParams>
 Private::FLatentAwaiter Chain(auto (*Function)(FnParams...), auto&&... Args)
 {
@@ -141,6 +144,7 @@ Private::FLatentAwaiter Chain(auto (Class::*Function)(FnParams...),
 		std::forward<decltype(Args)>(Args)...);
 	return Private::FLatentAwaiter(Done, &Private::ShouldResumeChain);
 }
+#endif
 
 Private::FLatentAwaiter ChainEx(auto&& Function, auto&&... Args)
 {

@@ -39,12 +39,12 @@ using namespace std::placeholders;
 using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncChainTest, "UE5Coro.Async.Chain",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncChainTest, "UE5Coro.Chain.Async",
                                  EAutomationTestFlags::ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentChainTest, "UE5Coro.Latent.Chain",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentChainTest, "UE5Coro.Chain.Latent",
                                  EAutomationTestFlags::ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
@@ -73,7 +73,12 @@ void DoTest(FAutomationTestBase& Test)
 		World.Run(CORO
 		{
 			State = 1;
+#if UE5CORO_CPP20
 			co_await Latent::Chain(&UKismetSystemLibrary::DelayUntilNextTick);
+#else
+			co_await Latent::ChainEx(&UKismetSystemLibrary::DelayUntilNextTick,
+			                         _1, _2);
+#endif
 			State = 2;
 			co_await Latent::ChainEx(&UKismetSystemLibrary::DelayUntilNextTick,
 			                         _1, _2);
@@ -91,7 +96,11 @@ void DoTest(FAutomationTestBase& Test)
 			State = 1;
 			co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1, _2);
 			State = 2;
+#if UE5CORO_CPP20
 			co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1);
+#else
+			co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1, _2);
+#endif
 			State = 3;
 		});
 		Test.TestEqual(TEXT("Initial state"), State, 1);
@@ -108,7 +117,11 @@ void DoTest(FAutomationTestBase& Test)
 			State = 1;
 			auto* Obj = NewObject<UUE5CoroTestObject>();
 			TStrongObjectPtr<UObject> KeepAlive(Obj);
+#if UE5CORO_CPP20
 			co_await Latent::Chain(&UUE5CoroTestObject::Latent, Obj);
+#else
+			co_await Latent::ChainEx(&UUE5CoroTestObject::Latent, Obj, _2);
+#endif
 			State = 2;
 			co_await Latent::ChainEx(&UUE5CoroTestObject::Latent, Obj, _2);
 			State = 3;
