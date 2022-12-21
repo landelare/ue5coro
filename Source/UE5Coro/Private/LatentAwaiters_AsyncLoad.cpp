@@ -120,12 +120,12 @@ void FPackageLoadAwaiter::Loaded(const FName&, UPackage* Package,
 {
 	checkf(IsInGameThread(), TEXT("Internal error"));
 	Result.Reset(Package);
-	std::visit([](auto Handle)
+	std::visit([](auto InHandle)
 	{
 		// monostate indicates that the load finished between AsyncLoadPackage()
 		// and co_await
-		if constexpr (!std::is_same_v<decltype(Handle), std::monostate>)
-			Handle.promise().Resume();
+		if constexpr (!std::is_same_v<decltype(InHandle), std::monostate>)
+			InHandle.promise().Resume();
 	}, Handle);
 }
 

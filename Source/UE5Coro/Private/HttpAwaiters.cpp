@@ -53,9 +53,9 @@ bool FHttpAwaiter::await_ready()
 {
 	Lock.Lock();
 
-	checkCode(std::visit([](stdcoro::coroutine_handle<> Handle)
+	checkCode(std::visit([](stdcoro::coroutine_handle<> InHandle)
 	{
-		checkf(!Handle, TEXT("Attempting to reuse HTTP awaiter"));
+		checkf(!InHandle, TEXT("Attempting to reuse HTTP awaiter"));
 	}, Handle));
 
 	// Skip suspension if the request finished first
@@ -102,14 +102,14 @@ void FHttpAwaiter::Resume()
 	bSuspended = false; // Technically not needed since this is not reusable
 
 	if (Thread == ENamedThreads::GameThread)
-		std::visit([](auto Handle)
+		std::visit([](auto InHandle)
 		{
-			Handle.promise().Resume();
+			InHandle.promise().Resume();
 		}, Handle);
 	else
-		std::visit([Thread = Thread](auto Handle)
+		std::visit([Thread = Thread](auto InHandle)
 		{
-			AsyncTask(Thread, [Handle] { Handle.promise().Resume(); });
+			AsyncTask(Thread, [InHandle] { InHandle.promise().Resume(); });
 		}, Handle);
 }
 

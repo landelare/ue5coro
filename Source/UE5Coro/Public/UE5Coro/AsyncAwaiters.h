@@ -115,19 +115,19 @@ public:
 		if constexpr (std::is_same_v<P, FLatentPromise>)
 			Handle.promise().DetachFromGameThread();
 
-		Future.Then([this, Handle](auto Future)
+		Future.Then([this, Handle](auto InFuture)
 		{
 			// TFuture<T&> will pass T* for Value, TFuture<void> an int
 			if constexpr (std::is_lvalue_reference_v<T>)
 			{
-				static_assert(std::is_pointer_v<decltype(Future.Get())>);
-				Result = Future.Get();
+				static_assert(std::is_pointer_v<decltype(InFuture.Get())>);
+				Result = InFuture.Get();
 				Handle.promise().Resume();
 			}
 			else
 			{
 				// It's normally dangerous to expose a pointer to a local, but
-				auto Value = Future.Get(); // This will be alive while...
+				auto Value = InFuture.Get(); // This will be alive while...
 				Result = &Value;
 				Handle.promise().Resume(); // ...await_resume moves from it here
 			}

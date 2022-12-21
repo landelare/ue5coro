@@ -129,10 +129,10 @@ FAsyncCoroutine UE5Coro::Private::FAggregateAwaiter::Consume(
 	auto Handle = Data->Handle;
 	_.Unlock();
 
-	std::visit([](auto Handle)
+	std::visit([](auto InHandle)
 	{
 		// Not co_awaited yet with a monostate, await_ready deals with this
-		if constexpr (!std::is_same_v<std::monostate, decltype(Handle)>)
-			Handle.promise().Resume();
+		if constexpr (!std::is_same_v<std::monostate, decltype(InHandle)>)
+			InHandle.promise().Resume();
 	}, Handle);
 }
