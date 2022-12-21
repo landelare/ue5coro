@@ -108,7 +108,7 @@ public:
 	}
 
 	template<typename P>
-	void await_suspend(std::coroutine_handle<P> Handle)
+	void await_suspend(stdcoro::coroutine_handle<P> Handle)
 	{
 		checkf(!Result, TEXT("Attempting to reuse spent TFutureAwaiter"));
 

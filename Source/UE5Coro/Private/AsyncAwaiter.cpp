@@ -35,7 +35,7 @@ using namespace UE5Coro::Private;
 
 namespace
 {
-template<typename T, typename H = std::coroutine_handle<T>>
+template<typename T, typename H = stdcoro::coroutine_handle<T>>
 struct FResumeTask
 {
 	ENamedThreads::Type Thread;

@@ -50,9 +50,9 @@ template<typename> class TFutureAwaiter;
 template<typename> class TTaskAwaiter;
 namespace Test { class FTestHelper; }
 
-using FHandle = std::coroutine_handle<FPromise>;
-using FAsyncHandle = std::coroutine_handle<FAsyncPromise>;
-using FLatentHandle = std::coroutine_handle<FLatentPromise>;
+using FHandle = stdcoro::coroutine_handle<FPromise>;
+using FAsyncHandle = stdcoro::coroutine_handle<FAsyncPromise>;
+using FLatentHandle = stdcoro::coroutine_handle<FLatentPromise>;
 using FHandleVariant = std::variant<FAsyncHandle, FLatentHandle>;
 using FOptionalHandleVariant = std::variant<std::monostate,
                                             FAsyncHandle, FLatentHandle>;
@@ -104,7 +104,7 @@ public:
 };
 
 template<typename... Args>
-struct std::coroutine_traits<FAsyncCoroutine, Args...>
+struct UE5Coro::Private::stdcoro::coroutine_traits<FAsyncCoroutine, Args...>
 {
 	static constexpr int LatentInfoCount =
 		(0 + ... + std::is_convertible_v<Args, FLatentActionInfo>);
@@ -152,7 +152,7 @@ struct FInitialSuspend
 	bool await_ready() noexcept { return false; }
 	void await_resume() noexcept { }
 	template<typename P>
-	void await_suspend(std::coroutine_handle<P> Handle) noexcept
+	void await_suspend(stdcoro::coroutine_handle<P> Handle) noexcept
 	{
 		switch (Action)
 		{
@@ -202,7 +202,7 @@ public:
 	UE5CORO_API void unhandled_exception();
 
 	// co_yield is not allowed in async coroutines
-	std::suspend_never yield_value(auto&&) = delete;
+	stdcoro::suspend_never yield_value(auto&&) = delete;
 };
 
 class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
@@ -212,7 +212,7 @@ public:
 	void Resume();
 
 	FInitialSuspend initial_suspend() { return {FInitialSuspend::Resume}; }
-	std::suspend_never final_suspend() noexcept { return {}; }
+	stdcoro::suspend_never final_suspend() noexcept { return {}; }
 	void return_void() { }
 
 	template<typename T>
@@ -263,7 +263,7 @@ public:
 	void SetCurrentAwaiter(FLatentAwaiter*);
 
 	FInitialSuspend initial_suspend();
-	std::suspend_always final_suspend() noexcept { return {}; }
+	stdcoro::suspend_always final_suspend() noexcept { return {}; }
 	void return_void();
 
 	template<typename T>

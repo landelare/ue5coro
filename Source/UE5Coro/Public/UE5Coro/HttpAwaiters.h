@@ -64,7 +64,7 @@ class [[nodiscard]] UE5CORO_API FHttpAwaiter
 	std::optional<TTuple<FHttpResponsePtr, bool>> Result;
 
 	template<typename T>
-	void SetHandleAndUnlock(std::coroutine_handle<T>);
+	void SetHandleAndUnlock(stdcoro::coroutine_handle<T>);
 	void Resume();
 	void RequestComplete(FHttpRequestPtr, FHttpResponsePtr, bool);
 

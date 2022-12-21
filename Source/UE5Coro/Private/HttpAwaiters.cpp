@@ -53,7 +53,7 @@ bool FHttpAwaiter::await_ready()
 {
 	Lock.Lock();
 
-	checkCode(std::visit([](std::coroutine_handle<> Handle)
+	checkCode(std::visit([](stdcoro::coroutine_handle<> Handle)
 	{
 		checkf(!Handle, TEXT("Attempting to reuse HTTP awaiter"));
 	}, Handle));
@@ -87,7 +87,7 @@ void FHttpAwaiter::await_suspend(FAsyncHandle InHandle)
 }
 
 template<typename T>
-void FHttpAwaiter::SetHandleAndUnlock(std::coroutine_handle<T> InHandle)
+void FHttpAwaiter::SetHandleAndUnlock(stdcoro::coroutine_handle<T> InHandle)
 {
 	// This should be locked from await_ready
 	checkf(!Lock.TryLock(), TEXT("Internal error"));

@@ -37,8 +37,16 @@
 
 #if __has_include(<coroutine>)
 #include <coroutine>
+namespace UE5Coro::Private
+{
+	namespace stdcoro = ::std;
+}
 #elif __has_include(<experimental/coroutine>)
 #include <experimental/coroutine>
+namespace UE5Coro::Private
+{
+	namespace stdcoro = ::std::experimental;
+}
 #else
 #error UE5Coro requires C++20 or the Coroutines TS for C++17.
 #endif

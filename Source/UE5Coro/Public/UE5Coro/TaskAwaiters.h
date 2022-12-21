@@ -55,7 +55,7 @@ protected:
 	const TCHAR* DebugName;
 
 	template<typename P>
-	decltype(auto) SuspendBase(std::coroutine_handle<P> Handle)
+	decltype(auto) SuspendBase(stdcoro::coroutine_handle<P> Handle)
 	{
 		if constexpr (std::is_same_v<P, FLatentPromise>)
 			Handle.promise().DetachFromGameThread();
@@ -70,7 +70,7 @@ public:
 	void await_resume() { }
 
 	template<typename P>
-	void await_suspend(std::coroutine_handle<P> Handle)
+	void await_suspend(stdcoro::coroutine_handle<P> Handle)
 	{
 		UE::Tasks::Launch(DebugName, SuspendBase(Handle));
 	}
@@ -90,7 +90,7 @@ public:
 	auto await_resume() requires (!std::is_void_v<T>) { return Task.GetResult(); }
 
 	template<typename P>
-	void await_suspend(std::coroutine_handle<P> Handle)
+	void await_suspend(stdcoro::coroutine_handle<P> Handle)
 	{
 		UE::Tasks::Launch(DebugName, SuspendBase(Handle), Task);
 	}

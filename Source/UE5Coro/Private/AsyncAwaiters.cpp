@@ -41,7 +41,7 @@ struct TAutoStartResumeRunnable : FRunnable
 {
 	H& Promise;
 
-	explicit TAutoStartResumeRunnable(std::coroutine_handle<H> Handle,
+	explicit TAutoStartResumeRunnable(stdcoro::coroutine_handle<H> Handle,
 	                                  EThreadPriority Priority, uint64 Affinity,
 	                                  EThreadCreateFlags Flags)
 		: Promise(Handle.promise())
