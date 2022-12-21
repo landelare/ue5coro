@@ -38,7 +38,7 @@ bool Private::ShouldResumeChain(void*& State, bool bCleanup)
 {
 	bool* Done = static_cast<bool*>(State);
 
-	if (bCleanup) [[unlikely]]
+	if (UNLIKELY(bCleanup))
 	{
 		delete Done;
 		return false;

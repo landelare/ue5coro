@@ -55,7 +55,7 @@ struct FTwoLives
 bool ShouldResume(void*& State, bool bCleanup)
 {
 	auto* This = static_cast<FTwoLives*>(State);
-	if (bCleanup) [[unlikely]]
+	if (UNLIKELY(bCleanup))
 	{
 		This->Release();
 		return false;
@@ -165,10 +165,10 @@ void FLatentPromise::Resume()
 		AttachToGameThread();
 
 	// Was there a deferred deletion request?
-	if (LatentState == DeferredDestroy) [[unlikely]]
+	if (UNLIKELY(LatentState == DeferredDestroy))
 		// Finish on the game thread: exit reason, destructors, etc.
 		AsyncTask(ENamedThreads::GameThread,
-		          std::bind_front(&FLatentPromise::ThreadSafeDestroy, this));
+		          std::bind(&FLatentPromise::ThreadSafeDestroy, this));
 	else
 		// If this promise is async running, we're committed to a resumption at
 		// this point (DeferredDestroy arrived since the if above).

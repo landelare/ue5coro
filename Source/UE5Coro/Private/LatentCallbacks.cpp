@@ -50,19 +50,19 @@ void CleanupIf(std::function<void()>& Fn) // lvalue ref to work around TScopeGua
 }
 
 FOnAbnormalExit::FOnAbnormalExit(std::function<void()> Fn)
-	: TScopeGuard(std::bind_front(&CleanupIf<ELatentExitReason::AnyAbnormal>,
-	                              std::move(Fn)))
+	: TScopeGuard(std::bind(&CleanupIf<ELatentExitReason::AnyAbnormal>,
+	                        std::move(Fn)))
 {
 }
 
 FOnActionAborted::FOnActionAborted(std::function<void()> Fn)
-	: TScopeGuard(std::bind_front(&CleanupIf<ELatentExitReason::ActionAborted>,
-	                              std::move(Fn)))
+	: TScopeGuard(std::bind(&CleanupIf<ELatentExitReason::ActionAborted>,
+	                        std::move(Fn)))
 {
 }
 
 FOnObjectDestroyed::FOnObjectDestroyed(std::function<void()> Fn)
-	: TScopeGuard(std::bind_front(&CleanupIf<ELatentExitReason::ObjectDestroyed>,
-	                              std::move(Fn)))
+	: TScopeGuard(std::bind(&CleanupIf<ELatentExitReason::ObjectDestroyed>,
+	                        std::move(Fn)))
 {
 }

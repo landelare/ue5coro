@@ -146,15 +146,15 @@ Private::FLatentAwaiter Chain(auto (Class::*Function)(FnParams...),
 }
 #endif
 
-Private::FLatentAwaiter ChainEx(auto&& Function, auto&&... Args)
+template<typename F, typename... A>
+Private::FLatentAwaiter ChainEx(F&& Function, A&&... Args)
 {
-	static_assert(
-		(... || (std::is_placeholder_v<std::decay_t<decltype(Args)>> == 2)),
-		"The _2 parameter for LatentInfo is mandatory");
+	static_assert((... || (std::is_placeholder_v<std::decay_t<A>> == 2)),
+	              "The _2 parameter for LatentInfo is mandatory");
 
 	auto [LatentInfo, Done] = Private::MakeLatentInfo();
-	std::bind(std::forward<decltype(Function)>(Function),
-	          std::forward<decltype(Args)>(Args)...)(GWorld, LatentInfo);
+	std::bind(std::forward<F>(Function),
+	          std::forward<A>(Args)...)(GWorld, LatentInfo);
 	return Private::FLatentAwaiter(Done, &Private::ShouldResumeChain);
 }
 }

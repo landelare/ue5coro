@@ -86,7 +86,7 @@ public:
 	/**	Resumes the generator. Returns true if Current() is valid. */
 	bool Resume()
 	{
-		if (*this) [[likely]]
+		if (LIKELY(*this))
 			Handle.resume();
 		return operator bool();
 	}
@@ -124,13 +124,22 @@ public:
 	explicit operator bool() const { return Generator != nullptr; }
 
 	/** Compares this iterator with another. Provided for STL compatibility. */
-	bool operator==(const TGeneratorIterator& Other) const = default;
+	bool operator==(const TGeneratorIterator& Other) const
+	{
+		return Generator == Other.Generator;
+	}
+
+	/** Compares this iterator with another. Provided for STL compatibility. */
+	bool operator!=(const TGeneratorIterator& Other) const
+	{
+		return Generator != Other.Generator;
+	}
 
 	/** Advances the generator. */
 	TGeneratorIterator& operator++()
 	{
 		checkf(Generator, TEXT("Attempted to move iterator past end()"));
-		if (!Generator->Resume()) [[unlikely]] // Did the coroutine finish?
+		if (UNLIKELY(!Generator->Resume())) // Did the coroutine finish?
 			Generator = nullptr; // Become end() if it did
 		return *this;
 	}
@@ -170,7 +179,8 @@ public:
 	void unhandled_exception();
 
 	// co_await is not allowed in generators
-	stdcoro::suspend_never await_transform(auto&&) = delete;
+	template<typename T>
+	stdcoro::suspend_never await_transform(T&&) = delete;
 };
 
 template<typename T>

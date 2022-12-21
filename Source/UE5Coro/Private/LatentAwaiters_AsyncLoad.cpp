@@ -42,7 +42,8 @@ struct FLatentLoader
 	FStreamableManager Manager;
 	TSharedPtr<FStreamableHandle> Handle;
 
-	explicit FLatentLoader(const auto& Path)
+	template<typename T>
+	explicit FLatentLoader(const T& Path)
 	{
 		Handle = Manager.RequestAsyncLoad(Path.ToSoftObjectPath());
 	}
@@ -58,7 +59,7 @@ bool ShouldResume(void*& Loader, bool bCleanup)
 {
 	auto* This = static_cast<FLatentLoader*>(Loader);
 
-	if (bCleanup) [[unlikely]]
+	if (UNLIKELY(bCleanup))
 	{
 		delete This;
 		return false;

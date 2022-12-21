@@ -55,7 +55,7 @@ void UK2Node_UE5CoroCallCoroutine::GetMenuActions(
 	// Sign up for every BPCallable UFUNCTION that returns a FAsyncCoroutine
 	for (auto* Fn : TObjectRange<UFunction>())
 		if (auto* Return = CastField<FStructProperty>(Fn->GetReturnProperty());
-			Return && Return->Struct == Struct) [[unlikely]]
+			UNLIKELY(Return && Return->Struct == Struct))
 		{
 			if (!Fn->HasAllFunctionFlags(FUNC_BlueprintCallable))
 				continue;

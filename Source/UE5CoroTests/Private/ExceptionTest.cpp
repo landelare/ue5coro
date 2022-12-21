@@ -49,12 +49,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExceptionTest, "UE5Coro.Exceptions",
 
 namespace
 {
-struct FTestException : std::exception
+class FTestException : public std::exception
 {
-	explicit FTestException(const char* What)
-		: exception(What)
-	{
-	}
+	const char* What;
+
+public:
+	explicit FTestException(const char* What) : What(What) { }
+	virtual const char* what() const noexcept override { return What; }
 };
 }
 

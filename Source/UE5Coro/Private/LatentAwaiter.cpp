@@ -84,7 +84,7 @@ FLatentAwaiter::FLatentAwaiter(FLatentAwaiter&& Other)
 
 FLatentAwaiter::~FLatentAwaiter()
 {
-	if (Resume) [[likely]]
+	if (LIKELY(Resume))
 		(*Resume)(State, true);
 	State = nullptr;
 	Resume = nullptr;

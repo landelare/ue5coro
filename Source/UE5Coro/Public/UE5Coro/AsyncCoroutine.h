@@ -117,6 +117,7 @@ struct UE5Coro::Private::stdcoro::coroutine_traits<FAsyncCoroutine, Args...>
 
 namespace UE5Coro
 {
+#if UE5CORO_CPP20
 template<typename T>
 concept TAwaitable = requires
 {
@@ -125,6 +126,7 @@ concept TAwaitable = requires
 		co_await Awaiter;
 	};
 };
+#endif
 }
 
 namespace UE5Coro::Private
@@ -202,7 +204,8 @@ public:
 	UE5CORO_API void unhandled_exception();
 
 	// co_yield is not allowed in async coroutines
-	stdcoro::suspend_never yield_value(auto&&) = delete;
+	template<typename T>
+	stdcoro::suspend_never yield_value(T&&) = delete;
 };
 
 class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
@@ -243,12 +246,14 @@ private:
 
 	void CreateLatentAction(FLatentActionInfo&&);
 	void Init();
-	void Init(const UObject*, auto&...);
-	void Init(FLatentActionInfo, auto&...);
-	void Init(auto&, auto&...);
+	template<typename... T> void Init(const UObject*, T&...);
+	template<typename... T> void Init(FLatentActionInfo, T&...);
+	template<typename T, typename... A> void Init(T&, A&...);
 
 public:
-	explicit FLatentPromise(auto&&...);
+	template<typename... T>
+	explicit FLatentPromise(T&&...);
+
 	~FLatentPromise();
 	void Resume();
 	void ThreadSafeDestroy();
@@ -274,7 +279,8 @@ public:
 	}
 };
 
-FLatentPromise::FLatentPromise(auto&&... Args)
+template<typename... T>
+FLatentPromise::FLatentPromise(T&&... Args)
 	: FPromise(TEXT("Latent"))
 {
 	checkf(IsInGameThread(),
@@ -283,7 +289,8 @@ FLatentPromise::FLatentPromise(auto&&... Args)
 	Init(Args...); // Deliberately not forwarding to force lvalue references
 }
 
-void FLatentPromise::Init(const UObject* WorldContext, auto&... Args)
+template<typename... T>
+void FLatentPromise::Init(const UObject* WorldContext, T&... Args)
 {
 	// Keep trying to find a world from the UObjects passed in
 	if (!World && WorldContext)
@@ -292,7 +299,8 @@ void FLatentPromise::Init(const UObject* WorldContext, auto&... Args)
 	Init(Args...);
 }
 
-void FLatentPromise::Init(FLatentActionInfo LatentInfo, auto&... Args)
+template<typename... T>
+void FLatentPromise::Init(FLatentActionInfo LatentInfo, T&... Args)
 {
 	// The static_assert on coroutine_traits prevents this
 	check(!PendingLatentCoroutine);
@@ -301,10 +309,11 @@ void FLatentPromise::Init(FLatentActionInfo LatentInfo, auto&... Args)
 	Init(Args...);
 }
 
-void FLatentPromise::Init(auto& First, auto&... Args)
+template<typename T, typename... A>
+void FLatentPromise::Init(T& First, A&... Args)
 {
 	// Convert UObject& to UObject* for world context
-	if constexpr (std::is_convertible_v<decltype(First), const UObject&>)
+	if constexpr (std::is_convertible_v<T&, const UObject&>)
 		Init(static_cast<const UObject*>(std::addressof(First)), Args...);
 	else
 		Init(Args...);

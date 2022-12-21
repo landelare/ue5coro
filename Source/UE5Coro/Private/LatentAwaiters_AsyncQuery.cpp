@@ -96,10 +96,10 @@ public:
 };
 
 template<typename T>
-template<typename... P>
+template<typename... P, typename... A>
 TAsyncQueryAwaiter<T>::TAsyncQueryAwaiter(UWorld* World,
                                           FTraceHandle (UWorld::*Fn)(P...),
-                                          auto... Params)
+                                          A... Params)
 	: Impl(new TImpl)
 {
 	checkf(IsInGameThread(),

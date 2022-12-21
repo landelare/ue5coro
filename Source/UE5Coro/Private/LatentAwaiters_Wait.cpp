@@ -46,7 +46,7 @@ template<auto GetTime>
 bool WaitUntilTime(void*& State, bool bCleanup)
 {
 	// Don't attempt to access GWorld in this case, it could be nullptr
-	if (bCleanup) [[unlikely]]
+	if (UNLIKELY(bCleanup))
 		return false;
 
 	static_assert(sizeof(void*) >= sizeof(double),
@@ -58,7 +58,7 @@ bool WaitUntilTime(void*& State, bool bCleanup)
 bool WaitUntilPredicate(void*& State, bool bCleanup)
 {
 	auto* Function = static_cast<std::function<bool()>*>(State);
-	if (bCleanup) [[unlikely]]
+	if (UNLIKELY(bCleanup))
 	{
 		delete Function;
 		return false;
