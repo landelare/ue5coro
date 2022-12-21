@@ -52,11 +52,9 @@ namespace
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
-	constexpr bool bLatent = sizeof...(T) == 1;
 
-	if constexpr (bLatent)
+	IF_CORO_LATENT
 	{
 		bool bStarted = false;
 		bool bDone = false;
@@ -138,8 +136,6 @@ void DoTest(FAutomationTestBase& Test)
 		World.Tick(1);
 		Test.TestEqual(TEXT("Seconds 2"), State, 2);
 	}
-
-#undef CORO
 }
 }
 

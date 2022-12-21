@@ -55,9 +55,7 @@ namespace
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
-	constexpr bool bLatent = sizeof...(T) == 1;
 
 	std::atomic<bool> bDone = false;
 	World.Run(CORO
@@ -88,14 +86,12 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Success"), bSuccess, false);
 		Test.TestEqual(TEXT("Response"), static_cast<bool>(Response), true);
 		FPlatformMisc::MemoryBarrier();
-		if constexpr (bLatent)
+		IF_CORO_LATENT
 			co_await Async::MoveToGameThread();
 		bDone = true;
 	});
 	// Test is being used by the coroutine on another thread here
 	FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
-
-#undef CORO
 }
 }
 

@@ -62,9 +62,8 @@ namespace
 template<typename... T>
 void DoCreateTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
-	constexpr bool bLatent = sizeof...(T) == 1;
+
 	{
 		FEventRef TestToCoro(EEventMode::AutoReset);
 		FEventRef CoroToTest(EEventMode::AutoReset);
@@ -76,7 +75,7 @@ void DoCreateTest(FAutomationTestBase& Test)
 			TestToCoro->Wait();
 			State = 1;
 			CoroToTest->Trigger();
-			if constexpr (bLatent)
+			IF_CORO_LATENT
 				co_await Async::MoveToGameThread();
 		});
 
@@ -97,7 +96,7 @@ void DoCreateTest(FAutomationTestBase& Test)
 			TestToCoro->Wait();
 			State = 1;
 			CoroToTest->Trigger();
-			if constexpr (bLatent)
+			IF_CORO_LATENT
 				co_await Async::MoveToGameThread();
 		});
 
@@ -106,16 +105,12 @@ void DoCreateTest(FAutomationTestBase& Test)
 		CoroToTest->Wait();
 		Test.TestEqual(TEXT("Final state"), State, 1);
 	}
-
-#undef CORO
 }
 
 template<typename... T>
 void DoConsumeTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
-	constexpr bool bLatent = sizeof...(T) == 1;
 
 	{
 		FEventRef TestToCoro(EEventMode::AutoReset);
@@ -130,7 +125,7 @@ void DoConsumeTest(FAutomationTestBase& Test)
 			});
 			++State;
 			CoroToTest->Trigger();
-			if constexpr (bLatent)
+			IF_CORO_LATENT
 				co_await Async::MoveToGameThread();
 		});
 		TestToCoro->Trigger();
@@ -153,7 +148,7 @@ void DoConsumeTest(FAutomationTestBase& Test)
 			});
 			++State;
 			CoroToTest->Trigger();
-			if constexpr (bLatent)
+			IF_CORO_LATENT
 				co_await Async::MoveToGameThread();
 		});
 		TestToCoro->Trigger();
@@ -161,8 +156,6 @@ void DoConsumeTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Final state"), State, 2);
 		Test.TestEqual(TEXT("Return value"), Retval, 3);
 	}
-
-#undef CORO
 }
 }
 

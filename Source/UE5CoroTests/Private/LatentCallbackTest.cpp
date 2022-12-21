@@ -56,12 +56,10 @@ FAsyncCoroutine UUE5CoroTestObject::ObjectDestroyedTest(
 
 bool FLatentCallbackTest::RunTest(const FString& Parameters)
 {
-#define CORO [&](FLatentActionInfo) -> FAsyncCoroutine
-
 	int State;
 	{
 		FTestWorld World;
-		World.Run(CORO
+		World.Run([&](FLatentActionInfo) -> FAsyncCoroutine
 		{
 			ON_SCOPE_EXIT { State = 2; };
 			State = 1;
@@ -117,7 +115,5 @@ bool FLatentCallbackTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("On object destroyed"), State, 3);
 		TestEqual(TEXT("Abnormal exit"), bAbnormal, true);
 	}
-
-#undef CORO
 	return true;
 }

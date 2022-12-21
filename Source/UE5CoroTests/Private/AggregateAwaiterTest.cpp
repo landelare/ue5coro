@@ -54,7 +54,6 @@ namespace
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
 
 	{
@@ -150,8 +149,6 @@ void DoTest(FAutomationTestBase& Test)
 		World.Tick();
 		Test.TestEqual("Resumer index", First.value(), 0);
 	}
-
-#undef CORO
 }
 }
 

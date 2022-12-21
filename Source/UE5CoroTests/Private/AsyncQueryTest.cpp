@@ -34,6 +34,7 @@
 #include "UE5Coro/LatentAwaiters.h"
 
 using namespace UE5Coro;
+using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncQueryTestAsync, "UE5Coro.AsyncQuery.Async",
@@ -46,12 +47,20 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncQueryTestLatent, "UE5Coro.AsyncQuery.Late
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter);
 
+#if defined(_MSC_VER) && _MSVC_LANG < 2020'02L
+// MSVC workaround - DoTest is not a coroutine but it won't compile without this
+template<>
+struct stdcoro::coroutine_traits<void, FAutomationTestBase&>
+{
+	using promise_type = UE5Coro::Private::FAsyncPromise;
+};
+#endif
+
 namespace
 {
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
 
 	{
@@ -121,8 +130,6 @@ void DoTest(FAutomationTestBase& Test)
 		World.Tick(); // This will end Ticks(2)
 		Test.TestEqual(TEXT("Results"), State, 0);
 	}
-
-#undef CORO
 }
 }
 

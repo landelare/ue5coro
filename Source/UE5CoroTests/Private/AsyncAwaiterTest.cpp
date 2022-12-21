@@ -51,11 +51,9 @@ namespace
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
-	constexpr bool bLatent = sizeof...(T) == 1;
 
-	if constexpr (bLatent)
+	IF_CORO_LATENT
 	{
 		FEventRef TestToCoro(EEventMode::AutoReset);
 		FEventRef CoroToTest(EEventMode::AutoReset);
@@ -64,10 +62,10 @@ void DoTest(FAutomationTestBase& Test)
 		World.Run(CORO
 		{
 			bStarted = true;
-			co_await Async::MoveToThread(ENamedThreads::AnyThread);
+			co_await UE5Coro::Async::MoveToThread(ENamedThreads::AnyThread);
 			TestToCoro->Wait();
 			bDone = true;
-			co_await Async::MoveToGameThread();
+			co_await UE5Coro::Async::MoveToGameThread();
 			CoroToTest->Trigger();
 		}, &bDone);
 		Test.TestEqual(TEXT("Started"), bStarted, true);
@@ -92,8 +90,8 @@ void DoTest(FAutomationTestBase& Test)
 			TestToCoro->Wait();
 			State = 2;
 			CoroToTest->Trigger();
-			if constexpr (bLatent)
-				co_await Async::MoveToGameThread();
+			IF_CORO_LATENT
+				co_await UE5Coro::Async::MoveToGameThread();
 		});
 		Test.TestEqual(TEXT("Initial state"), State, 1);
 		Test.TestEqual(TEXT("Wait 1"), CoroToTest->Wait(), true);
@@ -111,12 +109,12 @@ void DoTest(FAutomationTestBase& Test)
 		{
 			State = 1;
 			CoroToTest->Trigger();
-			co_await Async::MoveToNewThread();
+			co_await UE5Coro::Async::MoveToNewThread();
 			TestToCoro->Wait();
 			State = 2;
 			CoroToTest->Trigger();
-			if constexpr (bLatent)
-				co_await Async::MoveToGameThread();
+			IF_CORO_LATENT
+				co_await UE5Coro::Async::MoveToGameThread();
 		});
 		Test.TestEqual(TEXT("Initial state"), State, 1);
 		Test.TestEqual(TEXT("Wait 1"), CoroToTest->Wait(), true);
@@ -125,8 +123,6 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Wait 2"), CoroToTest->Wait(), true);
 		Test.TestEqual(TEXT("Second event, new thread"), State, 2);
 	}
-
-#undef CORO
 }
 }
 

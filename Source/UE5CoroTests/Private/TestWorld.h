@@ -36,6 +36,9 @@
 #include <functional>
 #include "UE5Coro/AsyncCoroutine.h"
 
+#define CORO [&](T...) -> FAsyncCoroutine
+#define IF_CORO_LATENT if constexpr (sizeof...(T) == 1)
+
 namespace UE5Coro::Private::Test
 {
 class FTestWorld

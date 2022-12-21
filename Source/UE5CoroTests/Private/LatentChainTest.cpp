@@ -54,7 +54,6 @@ namespace
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
 	int State = 0;
 
@@ -130,8 +129,6 @@ void DoTest(FAutomationTestBase& Test)
 		DoubleTick(2, 0);
 		DoubleTick(3, 0);
 	}
-
-#undef CORO
 }
 }
 

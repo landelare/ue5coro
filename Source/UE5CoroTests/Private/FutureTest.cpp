@@ -47,19 +47,20 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFutureLatent, "UE5Coro.Future.Latent",
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
+#ifdef _MSC_VER
 // MSVC workaround - DoTest is not a coroutine but it won't compile without this
 template<>
 struct stdcoro::coroutine_traits<void, FAutomationTestBase&>
 {
 	using promise_type = UE5Coro::Private::FAsyncPromise;
 };
+#endif
 
 namespace
 {
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
 
 	{
@@ -106,8 +107,6 @@ void DoTest(FAutomationTestBase& Test)
 		Promise.SetValue(Two);
 		Test.TestEqual(TEXT("After"), State, 2);
 	}
-
-#undef CORO
 }
 } // namespace
 

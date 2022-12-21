@@ -51,7 +51,6 @@ namespace
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
-#define CORO [&](T...) -> FAsyncCoroutine
 	FTestWorld World;
 
 	{
@@ -99,8 +98,6 @@ void DoTest(FAutomationTestBase& Test)
 		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
 		Test.TestEqual(TEXT("Package"), Package->GetName(), RawPath);
 	}
-
-#undef CORO
 }
 }
 
