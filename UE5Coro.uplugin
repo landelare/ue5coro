@@ -1,9 +1,9 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "1.4",
+	"VersionName": "1.5",
 	"FriendlyName": "UE5Coro",
-	"Description": "C++20 coroutine implementation for Unreal Engine",
+	"Description": "C++17/20 coroutine implementation for Unreal Engine",
 	"Category": "Programming",
 	"CreatedBy": "Laura Andelare",
 	"CreatedByURL": "https://github.com/landelare/ue5coro",

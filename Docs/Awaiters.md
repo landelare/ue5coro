@@ -89,16 +89,17 @@ as neither of these but a normal completion.
 
 Most existing latent actions in the engine return void so there's nothing
 that you could take or store to co_await them.
-There are two wrappers provided in UE5Coro::Latent to make this work:
+There are two wrappers provided in UE5Coro::Latent to make this work,
+one of which is available even in C++17:
 
 ```cpp
 using namespace std::placeholders; // for ChainEx
 using namespace UE5Coro;
 
-// Automatic parameter matching: simply skip WorldContextObject and LatentInfo
+// Automatic parameter matching (C++20 only): skip WorldContextObject and LatentInfo
 co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1.0f);
 
-// For members, provide the object as the first parameter:
+// For members, provide the object as the first parameter (C++20 only):
 co_await Latent::Chain(&UMediaPlayer::OpenSourceLatent, MediaPlayer /*this*/,
                        MediaSource, Options, bSuccess);
 
@@ -116,9 +117,9 @@ to figure out which parameter truly is the world context object, Chain uses
 * All other parameters of these types are treated as regular parameters and are
   expected to be passed in.
 
-If this doesn't apply to your function, use `Latent::ChainEx` and explicitly
-provide `_1` for the world context (if needed) and `_2` for the latent info
-(mandatory) where they belong.
+If this doesn't apply to your function or you're using C++17, use
+`Latent::ChainEx` and explicitly provide `_1` for the world context (if needed)
+and `_2` for the latent info (mandatory) where they belong.
 They work exactly like they do in
 [std::bind](https://en.cppreference.com/w/cpp/utility/functional/bind).
 
