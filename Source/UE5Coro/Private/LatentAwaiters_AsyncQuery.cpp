@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5Coro/LatentAwaiters.h"
+#include "Engine/Engine.h"
 #include <optional>
 
 using namespace UE5Coro;

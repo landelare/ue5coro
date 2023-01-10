@@ -32,9 +32,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CollisionQueryParams.h"
+#include "UObject/StrongObjectPtr.h"
 #include "UE5Coro/Definitions.h"
 #include <functional>
 #include "UE5Coro/AsyncCoroutine.h"
+
+struct FHitResult;
+struct FOverlapResult;
+struct FTraceHandle;
+enum class EAsyncTraceType : uint8;
+enum ECollisionChannel;
 
 namespace UE5Coro::Private
 {
