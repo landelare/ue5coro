@@ -34,6 +34,7 @@
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
 #include <functional>
+#include "Engine/StreamableManager.h"
 #include "UE5Coro/AsyncCoroutine.h"
 
 namespace UE5Coro::Private
@@ -125,12 +126,14 @@ Private::FLatentAwaiter ChainEx(F&& Function, A&&... Args);
  *  The result of the co_await expression is the T*. */
 template<typename T>
 std::enable_if_t<std::is_base_of_v<UObject, T>, Private::TAsyncLoadAwaiter<T>>
-AsyncLoadObject(TSoftObjectPtr<T>);
+AsyncLoadObject(TSoftObjectPtr<T>,
+                TAsyncLoadPriority = FStreamableManager::DefaultAsyncLoadPriority);
 
 /** Asynchronously starts loading the class, resumes once it's loaded.<br>
  *  The result of the co_await expression is the UClass*. */
 UE5CORO_API Private::TAsyncLoadAwaiter<UClass> AsyncLoadClass(
-	TSoftClassPtr<UObject>);
+	TSoftClassPtr<UObject>,
+	TAsyncLoadPriority = FStreamableManager::DefaultAsyncLoadPriority);
 
 /** Asynchronously starts loading the package, resumes once it's loaded.<br>
  *  The result of the co_await expression is the UPackage*.<br>
@@ -237,7 +240,8 @@ public:
 
 namespace AsyncLoad
 {
-UE5CORO_API FLatentAwaiter InternalAsyncLoadObject(TSoftObjectPtr<UObject>);
+UE5CORO_API FLatentAwaiter InternalAsyncLoadObject(TSoftObjectPtr<UObject>,
+                                                   TAsyncLoadPriority);
 UE5CORO_API UObject* InternalResume(void*);
 }
 
@@ -301,10 +305,11 @@ inline UE5Coro::Private::FLatentCancellation UE5Coro::Latent::Cancel()
 template<typename T>
 std::enable_if_t<std::is_base_of_v<UObject, T>,
                  UE5Coro::Private::TAsyncLoadAwaiter<T>>
-UE5Coro::Latent::AsyncLoadObject(TSoftObjectPtr<T> Ptr)
+UE5Coro::Latent::AsyncLoadObject(TSoftObjectPtr<T> Ptr,
+                                 TAsyncLoadPriority Priority)
 {
 	return Private::TAsyncLoadAwaiter<T>(
-		Private::AsyncLoad::InternalAsyncLoadObject(Ptr));
+		Private::AsyncLoad::InternalAsyncLoadObject(Ptr, Priority));
 }
 
 #include "LatentChain.inl"

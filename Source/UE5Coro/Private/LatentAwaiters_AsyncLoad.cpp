@@ -29,7 +29,6 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "Engine/StreamableManager.h"
 #include "UE5Coro/LatentAwaiters.h"
 
 using namespace UE5Coro;
@@ -43,9 +42,10 @@ struct FLatentLoader
 	TSharedPtr<FStreamableHandle> Handle;
 
 	template<typename T>
-	explicit FLatentLoader(const T& Path)
+	explicit FLatentLoader(const T& Path, TAsyncLoadPriority Priority)
 	{
-		Handle = Manager.RequestAsyncLoad(Path.ToSoftObjectPath());
+		Handle = Manager.RequestAsyncLoad(Path.ToSoftObjectPath(),
+		                                  FStreamableDelegate(), Priority);
 	}
 
 	~FLatentLoader()
@@ -71,9 +71,10 @@ bool ShouldResume(void*& Loader, bool bCleanup)
 }
 }
 
-FLatentAwaiter AsyncLoad::InternalAsyncLoadObject(TSoftObjectPtr<UObject> Ptr)
+FLatentAwaiter AsyncLoad::InternalAsyncLoadObject(TSoftObjectPtr<UObject> Ptr,
+                                                  TAsyncLoadPriority Priority)
 {
-	return FLatentAwaiter(new FLatentLoader(Ptr), &ShouldResume);
+	return FLatentAwaiter(new FLatentLoader(Ptr, Priority), &ShouldResume);
 }
 
 UObject* AsyncLoad::InternalResume(void* State)
@@ -84,10 +85,11 @@ UObject* AsyncLoad::InternalResume(void* State)
 	return This->Handle ? This->Handle->GetLoadedAsset() : nullptr;
 }
 
-TAsyncLoadAwaiter<UClass> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr)
+TAsyncLoadAwaiter<UClass> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr,
+                                                 TAsyncLoadPriority Priority)
 {
-	return Private::TAsyncLoadAwaiter<UClass>(
-		FLatentAwaiter(new FLatentLoader(Ptr), &ShouldResume));
+	return TAsyncLoadAwaiter<UClass*>(
+		FLatentAwaiter(new FLatentLoader(Ptr, Priority), &ShouldResume));
 }
 
 FPackageLoadAwaiter Latent::AsyncLoadPackage(
