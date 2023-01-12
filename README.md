@@ -35,6 +35,10 @@ bEnableCppCoroutinesForEvaluation = true;
 No additional per-module setup is needed in this case, add `"UE5Coro"` to your
 dependency module names and enable the plugin like any other.
 
+_Potential UE5.1 bug:_ if you're building the engine from source and it seems to
+be rebuilding itself for no reason once you've done the Target.cs change above,
+edit TargetRules.cs in the engine instead so that this flag is true by default.
+
 ## Features
 
 Click these links for the detailed description of the main features provided
