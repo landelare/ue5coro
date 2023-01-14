@@ -44,7 +44,7 @@ namespace
 template<auto GetTime>
 FAsyncCoroutine CommonTimeline(double From, double To, double Length,
                                std::function<void(double)> Fn,
-                               FLatentActionInfo = {})
+                               FLatentActionInfo)
 {
 #if ENABLE_NAN_DIAGNOSTIC
 	if (FMath::IsNaN(From) || FMath::IsNaN(To) || FMath::IsNaN(Length))
