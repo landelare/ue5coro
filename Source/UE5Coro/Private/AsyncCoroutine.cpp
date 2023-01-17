@@ -38,6 +38,14 @@ TMulticastDelegate<void()>& FAsyncCoroutine::OnCompletion()
 	return Handle.promise().OnCompletion();
 }
 
+bool FAsyncCoroutine::Wait(uint32 WaitTimeMilliseconds,
+                           bool bIgnoreThreadIdleStats)
+{
+	FEventRef Done;
+	OnCompletion().AddLambda([&] { Done->Trigger(); });
+	return Done->Wait(WaitTimeMilliseconds, bIgnoreThreadIdleStats);
+}
+
 void FAsyncCoroutine::SetDebugName(const TCHAR* Name)
 {
 #if UE5CORO_DEBUG

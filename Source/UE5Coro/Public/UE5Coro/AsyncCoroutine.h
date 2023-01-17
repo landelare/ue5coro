@@ -98,6 +98,14 @@ public:
 	 *	destroyed. */
 	TMulticastDelegate<void()>& OnCompletion();
 
+	/** Blocks until the coroutine completes for any reason, including being
+	 *  unsuccessful or canceled.
+	 *  This could result in a deadlock if the coroutine wants to use the thread
+	 *  that's blocking.
+	 *  @return True if the coroutine completed, false on timeout. */
+	bool Wait(uint32 WaitTimeMilliseconds = MAX_uint32,
+	          bool bIgnoreThreadIdleStats = false);
+
 	/** Sets a debug name for the currently-executing coroutine.
 	 *  Only valid to call from within a coroutine returning FAsyncCoroutine. */
 	static void SetDebugName(const TCHAR* Name);
