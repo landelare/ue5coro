@@ -42,7 +42,7 @@
  * You never need to interact with it directly.
  */
 UCLASS(Hidden)
-class UE5CORO_API UUE5CoroSubsystem : public UWorldSubsystem
+class UE5CORO_API UUE5CoroSubsystem final : public UTickableWorldSubsystem
 {
 	GENERATED_BODY()
 
@@ -59,4 +59,11 @@ public:
 	/** Signals the coroutine suspended with this linkage that it may resume. */
 	UFUNCTION()
 	void ExecuteLink(int32 Link);
+
+#pragma region UTickableWorldSubsystem overrides
+	virtual bool IsTickableWhenPaused() const override { return true; }
+	virtual bool IsTickableInEditor() const override { return true; }
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override;
+#pragma endregion
 };

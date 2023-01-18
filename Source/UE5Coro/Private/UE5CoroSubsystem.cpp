@@ -36,7 +36,7 @@ FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo()
 	checkf(IsInGameThread(), TEXT("Unexpected latent info off the game thread"));
 	// Using INDEX_NONE linkage and next as the UUID is marginally faster due
 	// to an early exit in FLatentActionManager::TickLatentActionForObject.
-	return {INDEX_NONE, NextLinkage++, TEXT("None"), GetWorld()};
+	return {INDEX_NONE, NextLinkage++, TEXT("None"), this};
 }
 
 FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo(bool* Done)
@@ -50,5 +50,22 @@ FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo(bool* Done)
 
 void UUE5CoroSubsystem::ExecuteLink(int32 Link)
 {
+	// Passing INDEX_NONE in MakeLatentInfo() should protect against the check()
+	// within this call.
 	*Targets.FindAndRemoveChecked(Link) = true;
+}
+
+void UUE5CoroSubsystem::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	// ProcessLatentActions refuses to work on non-BP classes.
+	GetClass()->ClassFlags |= CLASS_CompiledFromBlueprint;
+	GetWorld()->GetLatentActionManager().ProcessLatentActions(this, DeltaTime);
+	GetClass()->ClassFlags &= ~CLASS_CompiledFromBlueprint;
+}
+
+TStatId UUE5CoroSubsystem::GetStatId() const
+{
+	RETURN_QUICK_DECLARE_CYCLE_STAT(UUE5CoroSubsystem, STATGROUP_Tickables);
 }
