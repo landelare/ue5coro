@@ -88,11 +88,6 @@ FLatentAwaiter Latent::NextTick()
 	return Ticks(1);
 }
 
-FLatentAwaiter Latent::Frames(int32 Frames)
-{
-	return Ticks(Frames);
-}
-
 FLatentAwaiter Latent::Ticks(int64 Ticks)
 {
 	ensureMsgf(Ticks >= 0, TEXT("Invalid number of ticks %lld"), Ticks);
