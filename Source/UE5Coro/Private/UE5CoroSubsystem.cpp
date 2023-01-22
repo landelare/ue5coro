@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5Coro/UE5CoroSubsystem.h"
+#include "UE5Coro/UE5CoroCallbackTarget.h"
 
 using namespace UE5Coro::Private;
 
@@ -63,17 +64,30 @@ FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo()
 FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo(FTwoLives* State)
 {
 	checkf(IsInGameThread(), TEXT("Unexpected latent info off the game thread"));
+
+	// Lazy delegate binding in order to not affect
+	// projects that never use Chain/ChainEx.
+	if (UNLIKELY(!LatentActionsChangedHandle.IsValid()))
+		LatentActionsChangedHandle = FLatentActionManager::OnLatentActionsChanged()
+		.AddUObject(this, &ThisClass::LatentActionsChanged);
+
 	int32 Linkage = NextLinkage++;
 	checkf(!Targets.Contains(Linkage), TEXT("Unexpected linkage collision"));
-	Targets.Add(Linkage, State);
-	return {Linkage, Linkage, TEXT("ExecuteLink"), this};
+	// Pooling these objects was found to be consistently slower
+	// than making new ones every time.
+	auto* Target = NewObject<UUE5CoroCallbackTarget>(this);
+	Target->Activate(Linkage, State);
+	Targets.Add(Linkage, Target);
+	return {Linkage, Linkage, TEXT("ExecuteLink"), Target};
 }
 
-void UUE5CoroSubsystem::ExecuteLink(int32 Link)
+void UUE5CoroSubsystem::Deinitialize()
 {
-	// Passing INDEX_NONE in MakeLatentInfo() should protect against the check()
-	// within this call.
-	Targets.FindAndRemoveChecked(Link)->Release();
+	Super::Deinitialize();
+
+	if (LatentActionsChangedHandle.IsValid())
+		FLatentActionManager::OnLatentActionsChanged().Remove(
+			LatentActionsChangedHandle);
 }
 
 void UUE5CoroSubsystem::Tick(float DeltaTime)
@@ -89,4 +103,21 @@ void UUE5CoroSubsystem::Tick(float DeltaTime)
 TStatId UUE5CoroSubsystem::GetStatId() const
 {
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UUE5CoroSubsystem, STATGROUP_Tickables);
+}
+
+void UUE5CoroSubsystem::LatentActionsChanged(
+	UObject* Object, ELatentActionChangeType Change)
+{
+	checkf(IsInGameThread(),
+	       TEXT("Unexpected latent action update off the game thread"));
+
+	if (Change != ELatentActionChangeType::ActionsRemoved)
+		return;
+
+	if (auto* Target = Cast<UUE5CoroCallbackTarget>(Object);
+		IsValid(Target) && Target->GetOuter() == this)
+	{
+		verify(Targets.Remove(Target->GetExpectedLink()) == 1);
+		Target->Deactivate();
+	}
 }

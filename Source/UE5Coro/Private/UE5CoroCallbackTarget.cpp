@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -29,57 +29,56 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
+#include "UE5Coro/UE5CoroCallbackTarget.h"
+#include "UE5Coro/UE5CoroSubsystem.h"
 
-#include "CoreMinimal.h"
-#include "UE5Coro/Definitions.h"
-#include "Engine/LatentActionManager.h"
-#include "Subsystems/WorldSubsystem.h"
-#include "UE5CoroSubsystem.generated.h"
+using namespace UE5Coro::Private;
 
-namespace UE5Coro::Private
+void UUE5CoroCallbackTarget::Activate(int32 InExpectedLink, FTwoLives* InState)
 {
-class [[nodiscard]] UE5CORO_API FTwoLives
-{
-	std::atomic<int> RefCount = 2;
-
-public:
-	void Release(); // Dangerous! Only call externally exactly once!
-
-	// Generic implementation for FLatentAwaiter
-	static bool ShouldResume(void*& State, bool bCleanup);
-};
+	check(IsInGameThread());
+	checkf(!State, TEXT("Unexpected double activation"));
+	ExpectedLink = InExpectedLink;
+	State = InState;
 }
 
-/**
- * Subsystem supporting some async coroutine functionality.<br>
- * You never need to interact with it directly.
- */
-UCLASS(Hidden)
-class UE5CORO_API UUE5CoroSubsystem final : public UTickableWorldSubsystem
+void UUE5CoroCallbackTarget::Deactivate()
 {
-	GENERATED_BODY()
+	check(IsInGameThread());
+	checkf(State, TEXT("Unexpected deactivation while not active"));
+	// Leave ExpectedLink stale for the check in ExecuteLink
+	State->Release();
+	State = nullptr;
+}
 
-	UPROPERTY()
-	TMap<int32, class UUE5CoroCallbackTarget*> Targets;
-	int32 NextLinkage = 0;
-	FDelegateHandle LatentActionsChangedHandle;
+int32 UUE5CoroCallbackTarget::GetExpectedLink() const
+{
+	check(IsInGameThread());
+	checkf(State, TEXT("Unexpected linkage query on inactive object"));
+	return ExpectedLink;
+}
 
-public:
-	/** Creates a unique LatentInfo that does not lead anywhere. */
-	FLatentActionInfo MakeLatentInfo();
+void UUE5CoroCallbackTarget::ExecuteLink(int32 Link)
+{
+	// Although this is the standard way latent actions resume, every call
+	// to this function will have an accompanying Deactivate, where resumptions
+	// and cancellations are handled together.
+	check(IsInGameThread());
+	checkf(!State && Link == ExpectedLink, TEXT("Unexpected linkage"));
+}
 
-	/** Creates a LatentInfo suitable for the Latent::Chain* functions. */
-	FLatentActionInfo MakeLatentInfo(UE5Coro::Private::FTwoLives* State);
+void UUE5CoroCallbackTarget::Tick(float DeltaTime)
+{
+	if (!State)
+		return;
 
-#pragma region UTickableWorldSubsystem overrides
-	virtual void Deinitialize() override;
-	virtual bool IsTickableWhenPaused() const override { return true; }
-	virtual bool IsTickableInEditor() const override { return true; }
-	virtual void Tick(float DeltaTime) override;
-	virtual TStatId GetStatId() const override;
-#pragma endregion
+	// ProcessLatentActions refuses to work on non-BP classes.
+	GetClass()->ClassFlags |= CLASS_CompiledFromBlueprint;
+	GetWorld()->GetLatentActionManager().ProcessLatentActions(this, DeltaTime);
+	GetClass()->ClassFlags &= ~CLASS_CompiledFromBlueprint;
+}
 
-private:
-	void LatentActionsChanged(UObject* Object, ELatentActionChangeType Change);
-};
+TStatId UUE5CoroCallbackTarget::GetStatId() const
+{
+	RETURN_QUICK_DECLARE_CYCLE_STAT(UUE5CoroCallbackTarget, STATGROUP_Tickables);
+}
