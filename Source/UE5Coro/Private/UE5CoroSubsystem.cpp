@@ -31,6 +31,27 @@
 
 #include "UE5Coro/UE5CoroSubsystem.h"
 
+using namespace UE5Coro::Private;
+
+void FTwoLives::Release()
+{
+	// The <= 2 part should help catch use-after-free bugs in full debug builds.
+	checkf(RefCount > 0 && RefCount <= 2, TEXT("Internal error"));
+	if (--RefCount == 0)
+		delete this;
+}
+
+bool FTwoLives::ShouldResume(void*& State, bool bCleanup)
+{
+	auto* This = static_cast<FTwoLives*>(State);
+	if (UNLIKELY(bCleanup))
+	{
+		This->Release();
+		return false;
+	}
+	return This->RefCount < 2;
+}
+
 FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo()
 {
 	checkf(IsInGameThread(), TEXT("Unexpected latent info off the game thread"));
@@ -39,12 +60,12 @@ FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo()
 	return {INDEX_NONE, NextLinkage++, TEXT("None"), this};
 }
 
-FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo(bool* Done)
+FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo(FTwoLives* State)
 {
 	checkf(IsInGameThread(), TEXT("Unexpected latent info off the game thread"));
 	int32 Linkage = NextLinkage++;
 	checkf(!Targets.Contains(Linkage), TEXT("Unexpected linkage collision"));
-	Targets.Add(Linkage, Done);
+	Targets.Add(Linkage, State);
 	return {Linkage, Linkage, TEXT("ExecuteLink"), this};
 }
 
@@ -52,7 +73,7 @@ void UUE5CoroSubsystem::ExecuteLink(int32 Link)
 {
 	// Passing INDEX_NONE in MakeLatentInfo() should protect against the check()
 	// within this call.
-	*Targets.FindAndRemoveChecked(Link) = true;
+	Targets.FindAndRemoveChecked(Link)->Release();
 }
 
 void UUE5CoroSubsystem::Tick(float DeltaTime)

@@ -34,6 +34,7 @@
 #include "UE5Coro/AsyncAwaiters.h"
 
 using namespace UE5Coro;
+using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncAwaiterTest, "UE5Coro.Async.TrueAsync",
@@ -67,7 +68,7 @@ void DoTest(FAutomationTestBase& Test)
 			bDone = true;
 			co_await UE5Coro::Async::MoveToGameThread();
 			CoroToTest->Trigger();
-		}, &bDone);
+		});
 		Test.TestEqual(TEXT("Started"), bStarted, true);
 		Test.TestEqual(TEXT("Not done yet 1"), bDone, false);
 		TestToCoro->Trigger();

@@ -34,36 +34,12 @@
 #include "UE5Coro/AsyncAwaiters.h"
 #include "UE5Coro/AsyncCoroutine.h"
 #include "UE5Coro/LatentAwaiters.h"
+#include "UE5Coro/UE5CoroSubsystem.h"
 
 using namespace UE5Coro::Private;
 
 namespace
 {
-// ~FLatentAwaiter and OnCompleted() both release this in an unknown order.
-struct FTwoLives
-{
-	std::atomic<int> RefCount = 2;
-
-	void Release()
-	{
-		checkf(RefCount > 0, TEXT("Internal error"));
-		if (--RefCount == 0)
-			delete this;
-	}
-};
-
-bool ShouldResume(void*& State, bool bCleanup)
-{
-	auto* This = static_cast<FTwoLives*>(State);
-	if (UNLIKELY(bCleanup))
-	{
-		This->Release();
-		return false;
-	}
-	// The only other thing Releasing this is OnCompletion()
-	return This->RefCount < 2;
-}
-
 class [[nodiscard]] FPendingLatentCoroutine : public FPendingLatentAction
 {
 	FLatentPromise& Promise;
@@ -283,8 +259,8 @@ void FLatentPromise::return_void()
 FLatentAwaiter TAwaitTransform<FLatentPromise, FAsyncCoroutine>::operator()
 	(FAsyncCoroutine Other)
 {
-	auto* Done = new FTwoLives;
+	auto* Done = new FTwoLives; // FLatentAwaiter will do the second Release
 	// Not using the subsystem, there's no FLatentActionInfo
 	Other.OnCompletion().AddLambda([Done] { Done->Release(); });
-	return FLatentAwaiter(Done, &ShouldResume);
+	return FLatentAwaiter(Done, &FTwoLives::ShouldResume);
 }

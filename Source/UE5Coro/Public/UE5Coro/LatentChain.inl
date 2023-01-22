@@ -36,11 +36,11 @@
 #include <functional>
 #include "Engine/LatentActionManager.h"
 #include "Engine/World.h"
+#include "UE5Coro/UE5CoroSubsystem.h"
 
 namespace UE5Coro::Private
 {
-UE5CORO_API bool ShouldResumeChain(void*&, bool);
-UE5CORO_API std::tuple<FLatentActionInfo, bool*> MakeLatentInfo();
+UE5CORO_API std::tuple<FLatentActionInfo, FTwoLives*> MakeLatentInfo();
 
 #if UE5CORO_CPP20
 template<typename T>
@@ -130,7 +130,7 @@ Private::FLatentAwaiter Chain(auto (*Function)(FnParams...), auto&&... Args)
 		Function,
 		LatentInfo,
 		std::forward<decltype(Args)>(Args)...);
-	return Private::FLatentAwaiter(Done, &Private::ShouldResumeChain);
+	return Private::FLatentAwaiter(Done, &Private::FTwoLives::ShouldResume);
 }
 
 template<std::derived_from<UObject> Class, typename... FnParams>
@@ -142,7 +142,7 @@ Private::FLatentAwaiter Chain(auto (Class::*Function)(FnParams...),
 		std::bind_front(Function, Object),
 		LatentInfo,
 		std::forward<decltype(Args)>(Args)...);
-	return Private::FLatentAwaiter(Done, &Private::ShouldResumeChain);
+	return Private::FLatentAwaiter(Done, &Private::FTwoLives::ShouldResume);
 }
 #endif
 
@@ -155,6 +155,6 @@ Private::FLatentAwaiter ChainEx(F&& Function, A&&... Args)
 	auto [LatentInfo, Done] = Private::MakeLatentInfo();
 	std::bind(std::forward<F>(Function),
 	          std::forward<A>(Args)...)(GWorld, LatentInfo);
-	return Private::FLatentAwaiter(Done, &Private::ShouldResumeChain);
+	return Private::FLatentAwaiter(Done, &Private::FTwoLives::ShouldResume);
 }
 }

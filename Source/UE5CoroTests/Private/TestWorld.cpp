@@ -35,11 +35,6 @@
 
 using namespace UE5Coro::Private::Test;
 
-namespace
-{
-bool GDummy;
-}
-
 FTestWorld::FTestWorld()
 	: World(UWorld::CreateWorld(EWorldType::Game, false))
 {
@@ -97,13 +92,10 @@ FAsyncCoroutine FTestWorld::Run(std::function<FAsyncCoroutine()> Fn)
 }
 
 FAsyncCoroutine FTestWorld::Run(
-	std::function<FAsyncCoroutine(FLatentActionInfo)> Fn, bool* Done)
+	std::function<FAsyncCoroutine(FLatentActionInfo)> Fn)
 {
-	if (!Done)
-		Done = &GDummy;
-
 	auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
-	auto LatentInfo = Sys->MakeLatentInfo(Done);
+	auto LatentInfo = Sys->MakeLatentInfo();
 
 	auto* Copy = new std::function(std::move(Fn));
 	auto Coro = (*Copy)(std::move(LatentInfo));

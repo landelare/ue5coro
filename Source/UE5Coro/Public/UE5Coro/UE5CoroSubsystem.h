@@ -37,6 +37,20 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "UE5CoroSubsystem.generated.h"
 
+namespace UE5Coro::Private
+{
+class [[nodiscard]] UE5CORO_API FTwoLives
+{
+	std::atomic<int> RefCount = 2;
+
+public:
+	void Release(); // Dangerous! Only call externally exactly once!
+
+	// Generic implementation for FLatentAwaiter
+	static bool ShouldResume(void*& State, bool bCleanup);
+};
+}
+
 /**
  * Subsystem supporting some async coroutine functionality.<br>
  * You never need to interact with it directly.
@@ -47,14 +61,14 @@ class UE5CORO_API UUE5CoroSubsystem final : public UTickableWorldSubsystem
 	GENERATED_BODY()
 
 	int32 NextLinkage = 0;
-	TMap<int32, bool*> Targets;
+	TMap<int32, UE5Coro::Private::FTwoLives*> Targets;
 
 public:
 	/** Creates a unique LatentInfo that does not lead anywhere. */
 	FLatentActionInfo MakeLatentInfo();
 
 	/** Creates a LatentInfo suitable for the Latent::Chain* functions. */
-	FLatentActionInfo MakeLatentInfo(bool* Done);
+	FLatentActionInfo MakeLatentInfo(UE5Coro::Private::FTwoLives* State);
 
 	/** Signals the coroutine suspended with this linkage that it may resume. */
 	UFUNCTION()

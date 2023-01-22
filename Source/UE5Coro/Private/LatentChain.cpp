@@ -33,23 +33,13 @@
 #include "UE5Coro/UE5CoroSubsystem.h"
 
 using namespace UE5Coro;
+using namespace UE5Coro::Private;
 
-bool Private::ShouldResumeChain(void*& State, bool bCleanup)
-{
-	bool* Done = static_cast<bool*>(State);
-
-	if (UNLIKELY(bCleanup))
-	{
-		delete Done;
-		return false;
-	}
-
-	return Done && *Done;
-}
-
-std::tuple<FLatentActionInfo, bool*> Private::MakeLatentInfo()
+std::tuple<FLatentActionInfo, FTwoLives*> Private::MakeLatentInfo()
 {
 	auto* Sys = GWorld->GetSubsystem<UUE5CoroSubsystem>();
-	auto* Done = new bool(false); // ShouldResumeChain will delete
+	// Will be Released by the FLatentAwaiter from the caller
+	// and UUE5CoroSubsystem on the latent action's completion.
+	auto* Done = new FTwoLives;
 	return {Sys->MakeLatentInfo(Done), Done};
 }

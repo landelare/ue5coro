@@ -60,15 +60,17 @@ void DoTest(FAutomationTestBase& Test)
 		bool bDone = false;
 		auto Fn = CORO
 		{
+			ON_SCOPE_EXIT
+			{
+				bDone = true;
+			};
 			bStarted = true;
 			co_return;
 		};
-		World.Run(Fn, &bDone);
+		World.Run(Fn);
 
-		Test.TestEqual(TEXT("Null latent coroutine start"), bStarted, true);
-		Test.TestEqual(TEXT("Null latent coroutine not done"), bDone, false);
-		World.Tick();
-		Test.TestEqual(TEXT("Null latent coroutine after tick"), bDone, true);
+		Test.TestEqual(TEXT("Null latent coroutine started"), bStarted, true);
+		Test.TestEqual(TEXT("Null latent coroutine finished"), bDone, true);
 	}
 
 	{

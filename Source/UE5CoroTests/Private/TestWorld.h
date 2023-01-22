@@ -57,8 +57,7 @@ public:
 	void Tick(float DeltaSeconds = 0.125);
 	void EndTick();
 	FAsyncCoroutine Run(std::function<FAsyncCoroutine()>);
-	FAsyncCoroutine Run(std::function<FAsyncCoroutine(FLatentActionInfo)>,
-	                    bool* = nullptr);
+	FAsyncCoroutine Run(std::function<FAsyncCoroutine(FLatentActionInfo)>);
 };
 
 class FTestHelper
