@@ -44,7 +44,9 @@ class [[nodiscard]] UE5CORO_API FTwoLives
 	std::atomic<int> RefCount = 2;
 
 public:
-	void Release(); // Dangerous! Only call externally exactly once!
+	int UserData = 0;
+
+	bool Release(); // Dangerous! Only call externally exactly once!
 
 	// Generic implementation for FLatentAwaiter
 	static bool ShouldResume(void*& State, bool bCleanup);

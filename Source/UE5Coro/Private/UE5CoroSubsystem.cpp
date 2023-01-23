@@ -34,12 +34,16 @@
 
 using namespace UE5Coro::Private;
 
-void FTwoLives::Release()
+bool FTwoLives::Release()
 {
 	// The <= 2 part should help catch use-after-free bugs in full debug builds.
 	checkf(RefCount > 0 && RefCount <= 2, TEXT("Internal error"));
 	if (--RefCount == 0)
+	{
 		delete this;
+		return false;
+	}
+	return true;
 }
 
 bool FTwoLives::ShouldResume(void*& State, bool bCleanup)

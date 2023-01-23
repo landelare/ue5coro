@@ -47,8 +47,8 @@ void UUE5CoroCallbackTarget::Deactivate()
 	check(IsInGameThread());
 	checkf(State, TEXT("Unexpected deactivation while not active"));
 	// Leave ExpectedLink stale for the check in ExecuteLink
-	State->Release();
-	State = nullptr;
+	if (!State->Release())
+		State = nullptr; // The other side is not interested anymore
 }
 
 int32 UUE5CoroCallbackTarget::GetExpectedLink() const
@@ -60,11 +60,13 @@ int32 UUE5CoroCallbackTarget::GetExpectedLink() const
 
 void UUE5CoroCallbackTarget::ExecuteLink(int32 Link)
 {
-	// Although this is the standard way latent actions resume, every call
-	// to this function will have an accompanying Deactivate, where resumptions
-	// and cancellations are handled together.
 	check(IsInGameThread());
-	checkf(!State && Link == ExpectedLink, TEXT("Unexpected linkage"));
+	checkf(Link == ExpectedLink, TEXT("Unexpected linkage"));
+	if (State)
+	{
+		State->UserData = 1;
+		State = nullptr;
+	}
 }
 
 void UUE5CoroCallbackTarget::Tick(float DeltaTime)

@@ -42,6 +42,7 @@ namespace UE5Coro::Private
 class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentCancellation;
+class FLatentChainAwaiter;
 class FLatentPromise;
 class FPackageLoadAwaiter;
 template<typename> class TAsyncLoadAwaiter;
@@ -93,27 +94,35 @@ UE5CORO_API Private::FLatentAwaiter AudioSeconds(double);
 
 #if UE5CORO_CPP20
 /** Resumes the coroutine once the chained static latent action has finished,
- *  with automatic parameter matching.<br>Example usage:<br>
+ *  with automatic parameter matching.<br>
+ *  The result of the co_await expression is true if the chained latent action
+ *  finished normally, false if it didn't.<br>
+ *  Example usage:<br>
  *  co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1.0f); */
 template<typename... FnParams>
-Private::FLatentAwaiter Chain(auto (*Function)(FnParams...), auto&&... Args);
+Private::FLatentChainAwaiter Chain(auto (*Function)(FnParams...), auto&&... Args);
 
 /** Resumes the coroutine once the chained member latent action has finished,
- *  with automatic parameter matching.<br>Example usage:<br>
+ *  with automatic parameter matching.
+ *  The result of the co_await expression is true if the chained latent action
+ *  finished normally, false if it didn't.<br>
+ *  Example usage:<br>
  *  co_await Latent::Chain(&UMediaPlayer::OpenSourceLatent, MediaPlayer,
  *                        MediaSource, Options, bSuccess); */
 template<std::derived_from<UObject> Class, typename... FnParams>
-Private::FLatentAwaiter Chain(auto (Class::*Function)(FnParams...),
-                              Class* Object, auto&&... Args);
+Private::FLatentChainAwaiter Chain(auto (Class::*Function)(FnParams...),
+                                   Class* Object, auto&&... Args);
 #endif
 
 /** Resumes the coroutine once the chained latent action has finished,
  *  with manual parameter matching.<br>
+ *  The result of the co_await expression is true if the chained latent action
+ *  finished normally, false if it didn't.<br>
  *  Use std::placeholders::_1 and _2 for the world context and LatentInfo.<br>
  *  Example usage:<br>
  *  co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1.0f, _2); */
 template<typename F, typename... A>
-Private::FLatentAwaiter ChainEx(F&& Function, A&&... Args);
+Private::FLatentChainAwaiter ChainEx(F&& Function, A&&... Args);
 
 #pragma endregion
 
