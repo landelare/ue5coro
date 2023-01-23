@@ -67,6 +67,11 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Latent state"), State, ExpectedState);
 	};
 
+	auto ExpectFail = [&](bool bValue)
+	{
+		Test.TestFalse(TEXT("Chain aborted"), bValue);
+	};
+
 	{
 		TSet<UUE5CoroCallbackTarget*> Targets;
 		for (auto* Target : TObjectRange<UUE5CoroCallbackTarget>())
@@ -76,9 +81,10 @@ void DoTest(FAutomationTestBase& Test)
 		{
 			State = 1;
 #if UE5CORO_CPP20
-			co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1);
+			ExpectFail(co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1));
 #else
-			co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1, _2);
+			ExpectFail(co_await Latent::ChainEx(&UKismetSystemLibrary::Delay,
+				_1, 1, _2));
 #endif
 			State = 2;
 		});

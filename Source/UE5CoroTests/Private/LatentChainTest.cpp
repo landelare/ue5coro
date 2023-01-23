@@ -67,20 +67,26 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Latent state"), State, ExpectedState);
 	};
 
+	auto ExpectSuccess = [&](bool bValue)
+	{
+		Test.TestTrue(TEXT("Chain not aborted"), bValue);
+	};
+
 	{
 		State = 0;
 		World.Run(CORO
 		{
 			State = 1;
 #if UE5CORO_CPP20
-			co_await Latent::Chain(&UKismetSystemLibrary::DelayUntilNextTick);
+			ExpectSuccess(co_await Latent::Chain(
+				&UKismetSystemLibrary::DelayUntilNextTick));
 #else
-			co_await Latent::ChainEx(&UKismetSystemLibrary::DelayUntilNextTick,
-			                         _1, _2);
+			ExpectSuccess(co_await Latent::ChainEx(
+				&UKismetSystemLibrary::DelayUntilNextTick, _1, _2));
 #endif
 			State = 2;
-			co_await Latent::ChainEx(&UKismetSystemLibrary::DelayUntilNextTick,
-			                         _1, _2);
+			ExpectSuccess(co_await Latent::ChainEx(
+				&UKismetSystemLibrary::DelayUntilNextTick, _1, _2));
 			State = 3;
 		});
 		Test.TestEqual(TEXT("Initial state"), State, 1);
@@ -93,12 +99,15 @@ void DoTest(FAutomationTestBase& Test)
 		World.Run(CORO
 		{
 			State = 1;
-			co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1, _2);
+			ExpectSuccess(co_await Latent::ChainEx(
+				&UKismetSystemLibrary::Delay, _1, 1, _2));
 			State = 2;
 #if UE5CORO_CPP20
-			co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1);
+			ExpectSuccess(co_await Latent::Chain(&UKismetSystemLibrary::Delay,
+				1));
 #else
-			co_await Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1, _2);
+			ExpectSuccess(co_await Latent::ChainEx(&UKismetSystemLibrary::Delay,
+				_1, 1, _2));
 #endif
 			State = 3;
 		});
@@ -117,12 +126,15 @@ void DoTest(FAutomationTestBase& Test)
 			auto* Obj = NewObject<UUE5CoroTestObject>();
 			TStrongObjectPtr<UObject> KeepAlive(Obj);
 #if UE5CORO_CPP20
-			co_await Latent::Chain(&UUE5CoroTestObject::Latent, Obj);
+			ExpectSuccess(co_await Latent::Chain(&UUE5CoroTestObject::Latent,
+				Obj));
 #else
-			co_await Latent::ChainEx(&UUE5CoroTestObject::Latent, Obj, _2);
+			ExpectSuccess(co_await Latent::ChainEx(&UUE5CoroTestObject::Latent,
+				Obj, _2));
 #endif
 			State = 2;
-			co_await Latent::ChainEx(&UUE5CoroTestObject::Latent, Obj, _2);
+			ExpectSuccess(co_await Latent::ChainEx(&UUE5CoroTestObject::Latent,
+				Obj, _2));
 			State = 3;
 		});
 		Test.TestEqual(TEXT("Initial state"), State, 1);
