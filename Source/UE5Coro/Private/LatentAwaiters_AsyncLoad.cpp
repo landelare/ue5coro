@@ -71,13 +71,6 @@ bool ShouldResume(void*& Loader, bool bCleanup)
 }
 }
 
-FLatentAwaiter AsyncLoad::InternalAsyncLoadObject(TArray<FSoftObjectPath> Paths,
-                                                  TAsyncLoadPriority Priority)
-{
-	return FLatentAwaiter(new FLatentLoader(std::move(Paths), Priority),
-		&ShouldResume);
-}
-
 TArray<UObject*> AsyncLoad::InternalResume(void* State)
 {
 	checkf(ShouldResume(State, false), TEXT("Internal error"));
@@ -88,11 +81,18 @@ TArray<UObject*> AsyncLoad::InternalResume(void* State)
 	return Assets;
 }
 
+FLatentAwaiter Latent::AsyncLoadObjects(TArray<FSoftObjectPath> Paths,
+                                        TAsyncLoadPriority Priority)
+{
+	return FLatentAwaiter(new FLatentLoader(std::move(Paths), Priority),
+		&ShouldResume);
+}
+
 TAsyncLoadAwaiter<UClass*> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr,
                                                   TAsyncLoadPriority Priority)
 {
-	return TAsyncLoadAwaiter<UClass*>(AsyncLoad::InternalAsyncLoadObject(
-		TArray{Ptr.ToSoftObjectPath()}, Priority));
+	return TAsyncLoadAwaiter<UClass*>(
+		AsyncLoadObjects(TArray{Ptr.ToSoftObjectPath()}, Priority));
 }
 
 TAsyncLoadAwaiter<TArray<UClass*>> Latent::AsyncLoadClasses(
@@ -105,7 +105,7 @@ TAsyncLoadAwaiter<TArray<UClass*>> Latent::AsyncLoadClasses(
 		Paths.Add(Ptr.ToSoftObjectPath());
 
 	return TAsyncLoadAwaiter<TArray<UClass*>>(
-		AsyncLoad::InternalAsyncLoadObject(std::move(Paths), Priority));
+		AsyncLoadObjects(std::move(Paths), Priority));
 }
 
 FPackageLoadAwaiter Latent::AsyncLoadPackage(

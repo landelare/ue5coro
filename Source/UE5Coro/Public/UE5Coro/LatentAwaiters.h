@@ -143,6 +143,12 @@ std::enable_if_t<std::is_base_of_v<UObject, T>,
 AsyncLoadObjects(const TArray<TSoftObjectPtr<T>>&,
                  TAsyncLoadPriority = FStreamableManager::DefaultAsyncLoadPriority);
 
+/** Asynchronously starts loading the objects at the given paths,
+ *  resumes once they're loaded. The loaded objects are not resolved. */
+UE5CORO_API Private::FLatentAwaiter AsyncLoadObjects(
+	TArray<FSoftObjectPath>,
+	TAsyncLoadPriority = FStreamableManager::DefaultAsyncLoadPriority);
+
 /** Asynchronously starts loading the class, resumes once it's loaded.<br>
  *  The result of the co_await expression is the loaded UClass*. */
 UE5CORO_API Private::TAsyncLoadAwaiter<UClass*> AsyncLoadClass(
@@ -260,8 +266,6 @@ public:
 
 namespace AsyncLoad
 {
-UE5CORO_API FLatentAwaiter InternalAsyncLoadObject(TArray<FSoftObjectPath>,
-                                                   TAsyncLoadPriority);
 UE5CORO_API TArray<UObject*> InternalResume(void*);
 }
 
@@ -353,8 +357,7 @@ UE5Coro::Latent::AsyncLoadObject(TSoftObjectPtr<T> Ptr,
                                  TAsyncLoadPriority Priority)
 {
 	return Private::TAsyncLoadAwaiter<T*>(
-		Private::AsyncLoad::InternalAsyncLoadObject(
-			TArray{Ptr.ToSoftObjectPath()}, Priority));
+		AsyncLoadObjects(TArray{Ptr.ToSoftObjectPath()}, Priority));
 }
 
 template<typename T>
@@ -369,7 +372,7 @@ UE5Coro::Latent::AsyncLoadObjects(const TArray<TSoftObjectPtr<T>>& Ptrs,
 		Paths.Add(Ptr.ToSoftObjectPath());
 
 	return Private::TAsyncLoadAwaiter<TArray<T*>>(
-		Private::AsyncLoad::InternalAsyncLoadObject(std::move(Paths), Priority));
+		AsyncLoadObjects(std::move(Paths), Priority));
 }
 
 #include "LatentChain.inl"

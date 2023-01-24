@@ -89,6 +89,22 @@ void DoTest(FAutomationTestBase& Test)
 	}
 
 	{
+		TStrongObjectPtr<UObject> Object1(World.operator->());
+		TStrongObjectPtr<UObject> Object2(NewObject<UUE5CoroTestObject>());
+		FEventRef CoroToTest;
+		World.Run(CORO
+		{
+			co_await Latent::NextTick();
+			FSoftObjectPath Soft1 = Object1.Get();
+			FSoftObjectPath Soft2 = Object2.Get();
+			co_await Latent::AsyncLoadObjects(TArray{Soft1, Soft2});
+			CoroToTest->Trigger();
+		});
+		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
+		// Nothing to test for this overload, other than it triggering the event
+	}
+
+	{
 		UClass* Result;
 		FEventRef CoroToTest;
 		World.Run(CORO
