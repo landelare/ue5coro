@@ -41,11 +41,11 @@ struct FLatentLoader
 	FStreamableManager Manager;
 	TSharedPtr<FStreamableHandle> Handle;
 
-	template<typename T>
-	explicit FLatentLoader(const T& Path, TAsyncLoadPriority Priority)
+	explicit FLatentLoader(TArray<FSoftObjectPath> Paths,
+	                       TAsyncLoadPriority Priority)
 	{
-		Handle = Manager.RequestAsyncLoad(Path.ToSoftObjectPath(),
-		                                  FStreamableDelegate(), Priority);
+		Handle = Manager.RequestAsyncLoad(
+			std::move(Paths), FStreamableDelegate(), Priority);
 	}
 
 	~FLatentLoader()
@@ -71,25 +71,28 @@ bool ShouldResume(void*& Loader, bool bCleanup)
 }
 }
 
-FLatentAwaiter AsyncLoad::InternalAsyncLoadObject(TSoftObjectPtr<UObject> Ptr,
+FLatentAwaiter AsyncLoad::InternalAsyncLoadObject(TArray<FSoftObjectPath> Paths,
                                                   TAsyncLoadPriority Priority)
 {
-	return FLatentAwaiter(new FLatentLoader(Ptr, Priority), &ShouldResume);
+	return FLatentAwaiter(new FLatentLoader(std::move(Paths), Priority),
+		&ShouldResume);
 }
 
-UObject* AsyncLoad::InternalResume(void* State)
+TArray<UObject*> AsyncLoad::InternalResume(void* State)
 {
 	checkf(ShouldResume(State, false), TEXT("Internal error"));
 
-	auto* This = static_cast<FLatentLoader*>(State);
-	return This->Handle ? This->Handle->GetLoadedAsset() : nullptr;
+	TArray<UObject*> Assets;
+	if (auto* This = static_cast<FLatentLoader*>(State); This->Handle)
+		This->Handle->GetLoadedAssets(Assets);
+	return Assets;
 }
 
-TAsyncLoadAwaiter<UClass> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr,
-                                                 TAsyncLoadPriority Priority)
+TAsyncLoadAwaiter<UClass*> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr,
+                                                  TAsyncLoadPriority Priority)
 {
-	return TAsyncLoadAwaiter<UClass*>(
-		FLatentAwaiter(new FLatentLoader(Ptr, Priority), &ShouldResume));
+	return TAsyncLoadAwaiter<UClass*>(AsyncLoad::InternalAsyncLoadObject(
+		TArray{Ptr.ToSoftObjectPath()}, Priority));
 }
 
 FPackageLoadAwaiter Latent::AsyncLoadPackage(
