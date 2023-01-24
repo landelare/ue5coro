@@ -129,16 +129,30 @@ Private::FLatentChainAwaiter ChainEx(F&& Function, A&&... Args);
 #pragma region Async loading
 
 /** Asynchronously starts loading the object, resumes once it's loaded.<br>
- *  The result of the co_await expression is the T*. */
+ *  The result of the co_await expression is the loaded T*. */
 template<typename T>
 std::enable_if_t<std::is_base_of_v<UObject, T>, Private::TAsyncLoadAwaiter<T*>>
 AsyncLoadObject(TSoftObjectPtr<T>,
                 TAsyncLoadPriority = FStreamableManager::DefaultAsyncLoadPriority);
 
+/** Asynchronously starts loading the objects, resumes once they're loaded.<br>
+ *  The result of the co_await expression is TArray<T*>. */
+template<typename T>
+std::enable_if_t<std::is_base_of_v<UObject, T>,
+                 Private::TAsyncLoadAwaiter<TArray<T*>>>
+AsyncLoadObjects(const TArray<TSoftObjectPtr<T>>&,
+                 TAsyncLoadPriority = FStreamableManager::DefaultAsyncLoadPriority);
+
 /** Asynchronously starts loading the class, resumes once it's loaded.<br>
- *  The result of the co_await expression is the UClass*. */
+ *  The result of the co_await expression is the loaded UClass*. */
 UE5CORO_API Private::TAsyncLoadAwaiter<UClass*> AsyncLoadClass(
 	TSoftClassPtr<UObject>,
+	TAsyncLoadPriority = FStreamableManager::DefaultAsyncLoadPriority);
+
+/** Asynchronously starts loading the classes, resumes once they're loaded.<br>
+ *  The result of the co_await expression is TArray<UClass*>. */
+UE5CORO_API Private::TAsyncLoadAwaiter<TArray<UClass*>> AsyncLoadClasses(
+	const TArray<TSoftClassPtr<UObject>>&,
 	TAsyncLoadPriority = FStreamableManager::DefaultAsyncLoadPriority);
 
 /** Asynchronously starts loading the package, resumes once it's loaded.<br>
@@ -341,6 +355,21 @@ UE5Coro::Latent::AsyncLoadObject(TSoftObjectPtr<T> Ptr,
 	return Private::TAsyncLoadAwaiter<T*>(
 		Private::AsyncLoad::InternalAsyncLoadObject(
 			TArray{Ptr.ToSoftObjectPath()}, Priority));
+}
+
+template<typename T>
+std::enable_if_t<std::is_base_of_v<UObject, T>,
+                 UE5Coro::Private::TAsyncLoadAwaiter<TArray<T*>>>
+UE5Coro::Latent::AsyncLoadObjects(const TArray<TSoftObjectPtr<T>>& Ptrs,
+                                  TAsyncLoadPriority Priority)
+{
+	TArray<FSoftObjectPath> Paths;
+	Paths.Reserve(Ptrs.Num());
+	for (const auto& Ptr : Ptrs)
+		Paths.Add(Ptr.ToSoftObjectPath());
+
+	return Private::TAsyncLoadAwaiter<TArray<T*>>(
+		Private::AsyncLoad::InternalAsyncLoadObject(std::move(Paths), Priority));
 }
 
 #include "LatentChain.inl"

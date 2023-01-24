@@ -32,6 +32,7 @@
 #include "TestWorld.h"
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/LatentAwaiters.h"
+#include "UE5CoroTestObject.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;
@@ -69,6 +70,25 @@ void DoTest(FAutomationTestBase& Test)
 	}
 
 	{
+		TStrongObjectPtr<UObject> Object1(World.operator->());
+		TStrongObjectPtr<UObject> Object2(NewObject<UUE5CoroTestObject>());
+		TArray<UObject*> Result;
+		FEventRef CoroToTest;
+		World.Run(CORO
+		{
+			co_await Latent::NextTick();
+			TSoftObjectPtr<UObject> Soft1 = Object1.Get();
+			TSoftObjectPtr<UObject> Soft2 = Object2.Get();
+			Result = co_await Latent::AsyncLoadObjects(TArray{Soft1, Soft2});
+			CoroToTest->Trigger();
+		});
+		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
+		Test.TestEqual(TEXT("Num"), Result.Num(), 2);
+		Test.TestEqual(TEXT("Loaded 1"), Result[0], Object1.Get());
+		Test.TestEqual(TEXT("Loaded 2"), Result[1], Object2.Get());
+	}
+
+	{
 		UClass* Result;
 		FEventRef CoroToTest;
 		World.Run(CORO
@@ -80,6 +100,23 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
 		Test.TestEqual(TEXT("Loaded"), Result, UObject::StaticClass());
+	}
+
+	{
+		TArray<UClass*> Result;
+		FEventRef CoroToTest;
+		World.Run(CORO
+		{
+			co_await Latent::NextTick();
+			TSoftClassPtr<UObject> Soft1 = UObject::StaticClass();
+			TSoftClassPtr<UObject> Soft2 = AActor::StaticClass();
+			Result = co_await Latent::AsyncLoadClasses(TArray{Soft1, Soft2});
+			CoroToTest->Trigger();
+		});
+		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
+		Test.TestEqual(TEXT("Num"), Result.Num(), 2);
+		Test.TestEqual(TEXT("Loaded 1"), Result[0], UObject::StaticClass());
+		Test.TestEqual(TEXT("Loaded 2"), Result[1], AActor::StaticClass());
 	}
 
 	{

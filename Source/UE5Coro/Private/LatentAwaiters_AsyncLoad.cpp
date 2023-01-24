@@ -95,6 +95,19 @@ TAsyncLoadAwaiter<UClass*> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr,
 		TArray{Ptr.ToSoftObjectPath()}, Priority));
 }
 
+TAsyncLoadAwaiter<TArray<UClass*>> Latent::AsyncLoadClasses(
+	const TArray<TSoftClassPtr<UObject>>& Ptrs,
+	TAsyncLoadPriority Priority)
+{
+	TArray<FSoftObjectPath> Paths;
+	Paths.Reserve(Ptrs.Num());
+	for (const auto& Ptr : Ptrs)
+		Paths.Add(Ptr.ToSoftObjectPath());
+
+	return TAsyncLoadAwaiter<TArray<UClass*>>(
+		AsyncLoad::InternalAsyncLoadObject(std::move(Paths), Priority));
+}
+
 FPackageLoadAwaiter Latent::AsyncLoadPackage(
 	const FPackagePath& Path, FName PackageNameToCreate,
 	EPackageFlags PackageFlags, int32 PIEInstanceID,
