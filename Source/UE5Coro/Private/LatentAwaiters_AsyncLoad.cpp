@@ -29,6 +29,7 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "Engine/AssetManager.h"
 #include "UE5Coro/LatentAwaiters.h"
 
 using namespace UE5Coro;
@@ -36,28 +37,81 @@ using namespace UE5Coro::Private;
 
 namespace
 {
-struct FLatentLoader
+template<typename T, typename Item>
+struct TLatentLoader
 {
-	FStreamableManager Manager;
+	T Manager;
+	TArray<Item> Sources;
 	TSharedPtr<FStreamableHandle> Handle;
 
-	explicit FLatentLoader(TArray<FSoftObjectPath> Paths,
+	explicit TLatentLoader(TArray<Item> Paths,
 	                       TAsyncLoadPriority Priority)
+#if UE5CORO_CPP20
+		requires std::is_same_v<Item, FSoftObjectPath>
+#endif
+		: Sources(std::move(Paths))
 	{
-		Handle = Manager.RequestAsyncLoad(
-			std::move(Paths), FStreamableDelegate(), Priority);
+		static_assert(std::is_same_v<T, FStreamableManager>);
+		checkf(IsInGameThread(),
+		       TEXT("Latent awaiters may only be used on the game thread"));
+		Handle = Manager.RequestAsyncLoad(Sources, FStreamableDelegate(),
+		                                  Priority);
 	}
 
-	~FLatentLoader()
+	explicit TLatentLoader(TArray<Item> AssetIds,
+	                       const TArray<FName>& Bundles,
+	                       TAsyncLoadPriority Priority)
+#if UE5CORO_CPP20
+		requires std::is_same_v<Item, FPrimaryAssetId>
+#endif
+		: Manager(UAssetManager::Get()), Sources(std::move(AssetIds))
 	{
+		static_assert(std::is_same_v<T, UAssetManager&>);
+		checkf(IsInGameThread(),
+		       TEXT("Latent awaiters may only be used on the game thread"));
+		Handle = Manager.LoadPrimaryAssets(Sources, Bundles,
+		                                   FStreamableDelegate(), Priority);
+	}
+
+	~TLatentLoader()
+	{
+		checkf(IsInGameThread(), TEXT("Unexpected cleanup off the game thread"));
 		if (Handle)
 			Handle->ReleaseHandle();
 	}
-};
 
+	TArray<UObject*> ResolveItems()
+	{
+		checkf(IsInGameThread(),
+		       TEXT("Unexpected object resolve request off the game thread"));
+		// Handle->GetLoadedAssets() is unreliable, the async loading BP nodes
+		// re-resolve the sources instead once loading is done. Let's do that.
+		TArray<UObject*> Items;
+		for (auto& i : Sources)
+		{
+			UObject* Obj = nullptr;
+			if constexpr (std::is_same_v<Item, FSoftObjectPath>)
+				Obj = i.ResolveObject();
+			else if constexpr (std::is_same_v<Item, FPrimaryAssetId>)
+				Obj = Manager.GetPrimaryAssetObject(i);
+			else
+				// This needs to depend on a template parameter
+				static_assert(false && std::is_void_v<Item>, "Unknown type");
+
+			// Null filtering matches how the array BP nodes behave
+			if (IsValid(Obj))
+				Items.Add(Obj);
+		}
+		return Items;
+	}
+};
+using FLatentLoader = TLatentLoader<FStreamableManager, FSoftObjectPath>;
+using FPrimaryLoader = TLatentLoader<UAssetManager&, FPrimaryAssetId>;
+
+template<typename T>
 bool ShouldResume(void*& Loader, bool bCleanup)
 {
-	auto* This = static_cast<FLatentLoader*>(Loader);
+	auto* This = static_cast<T*>(Loader);
 
 	if (UNLIKELY(bCleanup))
 	{
@@ -65,37 +119,57 @@ bool ShouldResume(void*& Loader, bool bCleanup)
 		return false;
 	}
 
-	// This is the same logic that FLoadAssetActionBase::UpdateOperation() uses
+	// This is the same logic that FLoadAssetActionBase::UpdateOperation() uses.
+	// !Handle is how UAssetManager communicates an instant/synchronous finish.
 	auto& Handle = This->Handle;
 	return !Handle || Handle->HasLoadCompleted() || Handle->WasCanceled();
 }
 }
 
+template<int HiddenType>
 TArray<UObject*> AsyncLoad::InternalResume(void* State)
 {
-	checkf(ShouldResume(State, false), TEXT("Internal error"));
+	using T = std::conditional_t<HiddenType == 0, FLatentLoader, FPrimaryLoader>;
+	checkf(ShouldResume<T>(State, false), TEXT("Internal error"));
 
-	TArray<UObject*> Assets;
-	if (auto* This = static_cast<FLatentLoader*>(State); This->Handle)
-		This->Handle->GetLoadedAssets(Assets);
-	return Assets;
+	return static_cast<T*>(State)->ResolveItems();
 }
+template UE5CORO_API TArray<UObject*> AsyncLoad::InternalResume<0>(void*);
+template UE5CORO_API TArray<UObject*> AsyncLoad::InternalResume<1>(void*);
 
 FLatentAwaiter Latent::AsyncLoadObjects(TArray<FSoftObjectPath> Paths,
                                         TAsyncLoadPriority Priority)
 {
 	return FLatentAwaiter(new FLatentLoader(std::move(Paths), Priority),
-		&ShouldResume);
+	                      &ShouldResume<FLatentLoader>);
 }
 
-TAsyncLoadAwaiter<UClass*> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr,
-                                                  TAsyncLoadPriority Priority)
+FLatentAwaiter Latent::AsyncLoadPrimaryAsset(
+	const FPrimaryAssetId& AssetToLoad,
+	const TArray<FName>& LoadBundles,
+	TAsyncLoadPriority Priority)
 {
-	return TAsyncLoadAwaiter<UClass*>(
+	return AsyncLoadPrimaryAssets(TArray{AssetToLoad}, LoadBundles, Priority);
+}
+
+FLatentAwaiter Latent::AsyncLoadPrimaryAssets(
+	TArray<FPrimaryAssetId> AssetsToLoad,
+	const TArray<FName>& LoadBundles,
+	TAsyncLoadPriority Priority)
+{
+	return FLatentAwaiter(
+		new FPrimaryLoader(std::move(AssetsToLoad), LoadBundles, Priority),
+		&ShouldResume<FPrimaryLoader>);
+}
+
+TAsyncLoadAwaiter<UClass*, 0> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr,
+                                                     TAsyncLoadPriority Priority)
+{
+	return TAsyncLoadAwaiter<UClass*, 0>(
 		AsyncLoadObjects(TArray{Ptr.ToSoftObjectPath()}, Priority));
 }
 
-TAsyncLoadAwaiter<TArray<UClass*>> Latent::AsyncLoadClasses(
+TAsyncLoadAwaiter<TArray<UClass*>, 0> Latent::AsyncLoadClasses(
 	const TArray<TSoftClassPtr<UObject>>& Ptrs,
 	TAsyncLoadPriority Priority)
 {
@@ -104,7 +178,7 @@ TAsyncLoadAwaiter<TArray<UClass*>> Latent::AsyncLoadClasses(
 	for (const auto& Ptr : Ptrs)
 		Paths.Add(Ptr.ToSoftObjectPath());
 
-	return TAsyncLoadAwaiter<TArray<UClass*>>(
+	return TAsyncLoadAwaiter<TArray<UClass*>, 0>(
 		AsyncLoadObjects(std::move(Paths), Priority));
 }
 
