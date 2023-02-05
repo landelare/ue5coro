@@ -34,13 +34,14 @@
 using namespace UE5Coro::Private;
 
 #if UE5CORO_DEBUG
+std::atomic<int> FPromise::LastDebugID = -1; // -1 = no coroutines yet
 // This is a synchronous call stack that doesn't follow or track co_await!
 thread_local TArray<FPromise*> FPromise::ResumeStack;
 #endif
 
 FPromise::FPromise(const TCHAR* PromiseType)
 #if UE5CORO_DEBUG
-	: DebugPromiseType(PromiseType)
+	: DebugID(++LastDebugID), DebugPromiseType(PromiseType)
 #endif
 {
 }
@@ -48,6 +49,7 @@ FPromise::FPromise(const TCHAR* PromiseType)
 FPromise::~FPromise()
 {
 #if UE5CORO_DEBUG
+	checkf(Alive == Expected, TEXT("Double coroutine destruction"));
 	Alive = 0;
 #endif
 	Continuations.Broadcast();

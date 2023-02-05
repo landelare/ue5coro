@@ -175,10 +175,12 @@ struct FInitialSuspend
 class [[nodiscard]] FPromise
 {
 #if UE5CORO_DEBUG
+	static std::atomic<int> LastDebugID;
 	static thread_local TArray<FPromise*> ResumeStack;
 
 	static constexpr uint32 Expected = U'♪' << 16 | U'♫';
 	uint32 Alive = Expected;
+	int DebugID;
 
 	const TCHAR* DebugPromiseType;
 	const TCHAR* DebugName = nullptr;
