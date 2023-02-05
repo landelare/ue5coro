@@ -83,6 +83,7 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual("First tick", State, 5); // A resumed
 		World.Tick();
 		Test.TestEqual("Second tick", State, 7); // B and outer resumed
+		World.Tick();
 	}
 
 	{
@@ -115,6 +116,7 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual("Resumer index", First.value(), 0);
 		World.Tick();
 		Test.TestEqual("Second tick", State, 7); // B resumed
+		World.Tick();
 	}
 
 	{
@@ -131,6 +133,7 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestFalse("Not resumed yet", First.has_value());
 		World.Tick();
 		Test.TestEqual("Resumer index", First.value(), 2);
+		World.Tick();
 	}
 
 	{
@@ -145,9 +148,27 @@ void DoTest(FAutomationTestBase& Test)
 		World.EndTick();
 		Test.TestFalse("Not resumed yet", First.has_value());
 		World.Tick();
+		Test.TestFalse("Not resumed yet", First.has_value());
 		World.Tick();
+		Test.TestFalse("Not resumed yet", First.has_value());
 		World.Tick();
 		Test.TestEqual("Resumer index", First.value(), 0);
+		World.Tick();
+	}
+
+	{
+		std::optional<int> First;
+		World.Run(CORO
+		{
+			auto A = Latent::Ticks(1);
+			auto B = Latent::Ticks(2);
+			First = co_await WhenAny(A, B);
+		});
+		World.EndTick();
+		Test.TestFalse("Not resumed yet", First.has_value());
+		World.Tick();
+		Test.TestEqual("Resumer index", First.value(), 0);
+		World.Tick();
 	}
 }
 }
