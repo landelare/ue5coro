@@ -14,11 +14,24 @@ resume - for example:
 auto Async = UE5Coro::Async::MoveToThread(...);
 auto Latent = UE5Coro::Latent::Seconds(...);
 auto Task = UE5Coro::Tasks::MoveToTask();
-co_await UE5Coro::WhenAll(Async, Latent, Task);
+co_await UE5Coro::WhenAll(Async, MoveTemp(Latent), Task);
 ```
 The code above might resume in an AsyncTask, game thread Tick, or the UE::Tasks
 system.
 WhenAll/WhenAny are thread safe.
+Some awaiters (mostly Latent ones) require being moved into the call like in the
+example above.
+C\+\+20 will let you know that the call's constraints were not satisfied on the
+calling line.
+C\+\+17 will hit a static_assert inside the function, prompting you to fix it.
+The calling line will often be found in the error's notes somewhere.
+
+Every parameter is consumed and counts as co_awaited by these calls, even if
+WhenAny finishes early.
+
+The return values of these functions are copyable and allow one concurrent
+co_await across all copies.
+Once the initial co_await has finished, further ones continue synchronously.
 
 ## Async awaiters
 
@@ -26,6 +39,9 @@ The UE5Coro::Async namespace contains awaiters that let you conveniently move
 execution between various named threads, notably between the game thread and
 everything else.
 See UE5Coro\:\:Tasks for support of the more modern UE\:\:Tasks system.
+
+The return values of these functions are copyable, thread-safe, and allow any
+number of concurrent co_awaits.
 
 ### TFuture
 
@@ -51,6 +67,8 @@ would use.
 TSharedFuture\<T\> is not supported due to the underlying implementation of it
 lacking completion callbacks.
 
+TFuture\<T\> itself is movable and can only be used (including co_await) once.
+
 ## Latent awaiters
 
 UE5Coro::Latent awaiters are locked to the game thread.
@@ -73,11 +91,14 @@ the coroutine.
 In practice, for awaiters in this namespace it will usually happen within 2
 ticks.
 
+The return values of these functions are movable and some of them support
+multiple concurrent co_awaits, but relying on the latter is not recommended.
+
 ### Latent callbacks
 
-To help with the situation above, the engine's own `ON_SCOPE_EXIT` can be used
-to place code in a destructor, ensuring that it will always run even if the
-latent action manager cancels the coroutine.
+To help with the example code from the previous section above, the engine's own
+`ON_SCOPE_EXIT` can be used to place code in a destructor, ensuring that it will
+always run even if the latent action manager cancels the coroutine.
 
 The types in UE5Coro/LatentCallbacks.h provide specialized versions of this that
 only execute the provided function/lambda if the coroutine is canceled for a
@@ -123,6 +144,9 @@ and `_2` for the latent info (mandatory) where they belong.
 They work exactly like they do in
 [std::bind](https://en.cppreference.com/w/cpp/utility/functional/bind).
 
+The return values of these functions are movable, game thread only, and support
+multiple concurrent co_awaits.
+
 #### Debugging/implementation notes
 
 In popular debuggers (Visual Studio 2022 and JetBrains Rider 2022.1 tested)
@@ -156,8 +180,9 @@ completed.
 The result of the co_await expression will be T& (not T!) or void, matching
 TTask\<T\>::GetResult().
 
-The UE5Coro::Tasks namespace provides a convenience function to move to a
-TTask without having to use the lambda syntax.
+The UE5Coro::Tasks namespace provides a convenience function (MoveToTask) to
+move to a TTask without having to use the lambda syntax.
+The return value of MoveToTask is copyable, thread-safe, and reusable.
 
 Latent coroutines will need to `co_await Async::MoveToGameThread();` at some
 later point to return to the game thread and correctly complete.
@@ -168,3 +193,7 @@ UE5Coro\:\:Http\:\:ProcessAsync wraps a FHttpRequestRef in an awaiter that
 resumes your coroutine when the request is done (including errors).
 Unlike OnProcessRequestComplete() this does **not** force you back on the game
 thread, but you can start and finish there if you wish of course.
+
+The return type of this function is copyable, thread-safe, supports one
+concurrent co_await across all copies, and any number of sequential ones after
+that.

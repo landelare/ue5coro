@@ -94,21 +94,26 @@ be recreating them for consistency.
 It's recommended to treat every awaiter as "moved-from" or invalid after they've
 been co_awaited. This includes being co_awaited through wrappers such as WhenAll.
 
-The awaiter types that are in the `UE5Coro::Private` namespace are subject to
-change in any future version with no prior deprecation.
+The awaiter types that are in the `UE5Coro::Private` namespace are not
+documented and subject to change in any future version with no prior deprecation.
 Most of the time, you don't even need to know about them, e.g.,
 `co_await Something();`.
-If you want to store them in a variable (see below), use `auto` for source
-compatibility.
+This usage is ideal and recommended for most scenarios.
 
-There are some additional situations that could cause unexpected behavior, such
-as crashes or coroutines "deadlocking":
-* co_awaiting UE5Coro::Latent awaiters off the game thread.
-* Moving to a named thread that's not enabled, e.g., RHI.
-* Expecting to resume a latent awaiter while paused or otherwise not ticking.
+If you want to store them in a variable (see next section), use `auto` for
+source compatibility.
 
+If you want to pass them around, these internal types are mostly copyable and
+are limited to one active co_await across all copies.
+**It's undefined behavior to move an awaiter that's currently being co_awaited.**
+Multiple sequential co_awaits are usually allowed, with the second and beyond
+succeeding immediately.
+
+Some of these are locked to the game thread.
 Generally speaking, the same rules and limitations apply as the underlying
-engine systems that drive the current awaiter and its awaiting coroutine.
+engine systems that drive the current awaiter and its awaiting coroutine, e.g.,
+awaiters dealing with UObjects or from the Latent namespace are usually locked
+to the game thread.
 
 ### Overlapping awaiters
 
