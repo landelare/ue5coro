@@ -55,26 +55,28 @@ namespace UE5Coro::Private
 {
 class [[nodiscard]] UE5CORO_API FHttpAwaiter
 {
-	const ENamedThreads::Type Thread;
-	const FHttpRequestRef Request;
-	UE::FSpinLock Lock;
-	FHandleVariant Handle;
-	bool bSuspended;
-	// end Lock
-	std::optional<TTuple<FHttpResponsePtr, bool>> Result;
+	struct [[nodiscard]] UE5CORO_API FState
+	{
+		const ENamedThreads::Type Thread;
+		const FHttpRequestRef Request;
+		UE::FSpinLock Lock;
+		FHandleVariant Handle;
+		bool bSuspended = false;
+		// end Lock
+		std::optional<TTuple<FHttpResponsePtr, bool>> Result;
 
-	template<typename T>
-	void SetHandleAndUnlock(stdcoro::coroutine_handle<T>);
-	void Resume();
-	void RequestComplete(FHttpRequestPtr, FHttpResponsePtr, bool);
+		explicit FState(FHttpRequestRef&&);
+		void RequestComplete(FHttpRequestPtr, FHttpResponsePtr, bool);
+		void Resume();
+	};
+	TSharedPtr<FState> State;
 
 public:
 	explicit FHttpAwaiter(FHttpRequestRef&& Request);
-	UE_NONCOPYABLE(FHttpAwaiter);
 
 	bool await_ready();
-	void await_suspend(FLatentHandle);
-	void await_suspend(FAsyncHandle);
+	template<typename P>
+	void await_suspend(stdcoro::coroutine_handle<P>);
 
 	TTuple<FHttpResponsePtr, bool> await_resume();
 };

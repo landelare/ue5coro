@@ -35,6 +35,7 @@
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/AsyncAwaiters.h"
 #include "UE5Coro/HttpAwaiters.h"
+#include "UE5Coro/LatentAwaiters.h"
 #include "UE5Coro/TaskAwaiters.h"
 
 using namespace UE5Coro;
@@ -64,7 +65,13 @@ void DoTest(FAutomationTestBase& Test)
 		// We're not testing HTTP, just the awaiter
 		Request->SetURL(TEXT(".invalid"));
 		Request->SetTimeout(0.01);
-		auto [Response, bSuccess] = co_await Http::ProcessAsync(Request);
+		auto Awaiter = Http::ProcessAsync(Request);
+		auto AwaiterCopy = Awaiter;
+		auto [Response, bSuccess] = co_await AwaiterCopy;
+		Test.TestEqual(TEXT("Success"), bSuccess, false);
+		Test.TestEqual(TEXT("Response"), static_cast<bool>(Response), true);
+		bSuccess = true;
+		Tie(Response, bSuccess) = co_await Awaiter;
 		Test.TestEqual(TEXT("Success"), bSuccess, false);
 		Test.TestEqual(TEXT("Response"), static_cast<bool>(Response), true);
 		bDone = true;
@@ -92,6 +99,17 @@ void DoTest(FAutomationTestBase& Test)
 	});
 	// Test is being used by the coroutine on another thread here
 	FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
+
+	World.Run(CORO
+	{
+		auto Request = FHttpModule::Get().CreateRequest();
+		// We're not testing HTTP, just the awaiter
+		Request->SetURL(TEXT(".invalid"));
+		Request->SetTimeout(0.01);
+		[[maybe_unused]] auto Unused = Http::ProcessAsync(Request);
+		co_await Latent::NextTick(); // Run() requires some co_await
+	});
+	World.Tick(); // Nothing to test here besides not crashing
 }
 }
 

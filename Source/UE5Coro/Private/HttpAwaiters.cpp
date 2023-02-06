@@ -40,66 +40,61 @@ FHttpAwaiter Http::ProcessAsync(FHttpRequestRef Request)
 	return FHttpAwaiter(std::move(Request));
 }
 
-FHttpAwaiter::FHttpAwaiter(FHttpRequestRef&& Request)
+FHttpAwaiter::FState::FState(FHttpRequestRef&& Request)
 	: Thread(FTaskGraphInterface::Get().GetCurrentThreadIfKnown())
 	, Request(std::move(Request))
 {
-	Request->OnProcessRequestComplete().BindRaw(
-		this, &FHttpAwaiter::RequestComplete);
-	Request->ProcessRequest();
+}
+
+FHttpAwaiter::FHttpAwaiter(FHttpRequestRef&& Request)
+	: State(new FState(std::move(Request)))
+{
+	State->Request->OnProcessRequestComplete().BindSP(
+		State.ToSharedRef(), &FState::RequestComplete);
+	State->Request->ProcessRequest();
 }
 
 bool FHttpAwaiter::await_ready()
 {
-	Lock.Lock();
-
-	checkCode(std::visit([](stdcoro::coroutine_handle<> InHandle)
-	{
-		checkf(!InHandle, TEXT("Attempting to reuse HTTP awaiter"));
-	}, Handle));
+	State->Lock.Lock();
 
 	// Skip suspension if the request finished first
-	if (Result.has_value())
+	if (State->Result.has_value())
 	{
-		Lock.Unlock();
+		State->Lock.Unlock();
 		return true;
 	}
 	else
 	{
-		// Lock is deliberately left locked
-		bSuspended = true;
+		// State->Lock is deliberately left locked
+		checkf(!State->bSuspended, TEXT("Attempted second concurrent co_await"));
+		State->bSuspended = true;
 		return false;
 	}
 }
 
-void FHttpAwaiter::await_suspend(FLatentHandle InHandle)
+template<typename P>
+void FHttpAwaiter::await_suspend(stdcoro::coroutine_handle<P> InHandle)
 {
 	// Even if the entire co_await starts and ends on the game thread we need
 	// to take temporary ownership in case the latent action manager decides to
 	// delete the latent action.
-	InHandle.promise().DetachFromGameThread();
-	SetHandleAndUnlock(InHandle);
-}
+	if constexpr (std::is_same_v<P, FLatentPromise>)
+		InHandle.promise().DetachFromGameThread();
 
-void FHttpAwaiter::await_suspend(FAsyncHandle InHandle)
-{
-	SetHandleAndUnlock(InHandle);
-}
-
-template<typename T>
-void FHttpAwaiter::SetHandleAndUnlock(stdcoro::coroutine_handle<T> InHandle)
-{
 	// This should be locked from await_ready
-	checkf(!Lock.TryLock(), TEXT("Internal error"));
-	Handle = InHandle;
-	Lock.Unlock();
+	checkf(!State->Lock.TryLock(), TEXT("Internal error"));
+	State->Handle = InHandle;
+	State->Lock.Unlock();
 }
+template UE5CORO_API void FHttpAwaiter::await_suspend(FAsyncHandle);
+template UE5CORO_API void FHttpAwaiter::await_suspend(FLatentHandle);
 
-void FHttpAwaiter::Resume()
+void FHttpAwaiter::FState::Resume()
 {
 	// Don't needlessly dispatch AsyncTasks to the GT from the GT
 	ensureMsgf(IsInGameThread(), TEXT("Internal error"));
-	bSuspended = false; // Technically not needed since this is not reusable
+	// leave bSuspended true to prevent any further suspensions (not co_awaits)
 
 	if (Thread == ENamedThreads::GameThread)
 		std::visit([](auto InHandle)
@@ -113,17 +108,21 @@ void FHttpAwaiter::Resume()
 		}, Handle);
 }
 
-void FHttpAwaiter::RequestComplete(FHttpRequestPtr, FHttpResponsePtr Response,
-                                   bool bConnectedSuccessfully)
+void FHttpAwaiter::FState::RequestComplete(FHttpRequestPtr,
+                                           FHttpResponsePtr Response,
+                                           bool bConnectedSuccessfully)
 {
 	UE::TScopeLock _(Lock);
 	Result = {std::move(Response), bConnectedSuccessfully};
 	if (bSuspended)
+	{
+		_.Unlock();
 		Resume();
+	}
 }
 
 TTuple<FHttpResponsePtr, bool> FHttpAwaiter::await_resume()
 {
-	checkf(Result.has_value(), TEXT("Internal error"));
-	return std::move(Result).value();
+	checkf(State->Result.has_value(), TEXT("Internal error"));
+	return State->Result.value();
 }
