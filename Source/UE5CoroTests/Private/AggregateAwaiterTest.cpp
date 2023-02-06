@@ -170,6 +170,33 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual("Resumer index", First.value(), 0);
 		World.Tick();
 	}
+
+	{
+		int State = 0;
+		World.Run(CORO
+		{
+			auto A = Latent::Ticks(1);
+			auto B = Latent::Ticks(2);
+			auto C = Latent::Ticks(3);
+			auto D = Latent::Ticks(4);
+			auto E = WhenAll(std::move(A), std::move(C));
+			auto F = WhenAny(std::move(B), std::move(D));
+			auto E2 = E;
+			auto F2 = F;
+			State = 1;
+			co_await WhenAll(std::move(E2), std::move(F2));
+			State = 2;
+		});
+		World.EndTick();
+		Test.TestEqual(TEXT("Initial state"), State, 1);
+		World.Tick();
+		Test.TestEqual(TEXT("Hasn't resumed yet"), State, 1);
+		World.Tick();
+		Test.TestEqual(TEXT("Hasn't resumed yet"), State, 1);
+		World.Tick();
+		Test.TestEqual(TEXT("Resumed"), State, 2);
+		World.Tick();
+	}
 }
 }
 

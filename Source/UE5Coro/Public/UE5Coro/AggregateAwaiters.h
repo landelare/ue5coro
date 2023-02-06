@@ -101,7 +101,6 @@ public:
 		int Idx = 0;
 		(Consume(Data, Idx++, std::forward<T>(Awaiters)), ...);
 	}
-	UE_NONCOPYABLE(FAggregateAwaiter);
 
 	bool await_ready();
 	void await_suspend(FAsyncHandle);

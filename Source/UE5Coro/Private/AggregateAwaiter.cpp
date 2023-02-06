@@ -42,6 +42,7 @@ int FAggregateAwaiter::GetResumerIndex() const
 
 bool FAggregateAwaiter::await_ready()
 {
+	checkf(Data, TEXT("Attempting to await moved-from aggregate awaiter"));
 	Data->Lock.Lock();
 	checkf(std::holds_alternative<std::monostate>(Data->Handle),
 	       TEXT("Attempting to reuse aggregate awaiter"));
