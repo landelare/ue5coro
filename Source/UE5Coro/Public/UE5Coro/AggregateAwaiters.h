@@ -37,17 +37,25 @@
 #include "Misc/SpinLock.h"
 #include "UE5Coro/AsyncCoroutine.h"
 
-#if UE5CORO_CPP20
-#define UE5CORO_AWAITABLE UE5Coro::TAwaitable
-#else
-#define UE5CORO_AWAITABLE typename
-#endif
-
 namespace UE5Coro::Private
 {
 class FAnyAwaiter;
 class FAllAwaiter;
+
+#if UE5CORO_CPP20
+// If your WhenAny/WhenAll call doesn't satisfy this concept, you'll need to
+// move the affected parameter into the function call with MoveTemp/std::move/etc.
+template<typename T>
+concept TAggregateAwaitable =
+	TAwaitable<T> && std::is_constructible_v<std::remove_reference_t<T>, T&&>;
+#endif
 }
+
+#if UE5CORO_CPP20
+	#define UE5CORO_AWAITABLE UE5Coro::Private::TAggregateAwaitable
+#else
+	#define UE5CORO_AWAITABLE typename
+#endif
 
 namespace UE5Coro
 {
@@ -122,12 +130,18 @@ public:
 template<UE5CORO_AWAITABLE... T>
 UE5Coro::Private::FAnyAwaiter UE5Coro::WhenAny(T&&... Args)
 {
+	static_assert(
+		std::conjunction_v<std::is_constructible<std::remove_reference_t<T>, T&&>...>,
+		"Attempted to copy a noncopyable awaiter, move it instead");
 	return {sizeof...(Args) ? 1 : 0, std::forward<T>(Args)...};
 }
 
 template<UE5CORO_AWAITABLE... T>
 UE5Coro::Private::FAllAwaiter UE5Coro::WhenAll(T&&... Args)
 {
+	static_assert(
+		std::conjunction_v<std::is_constructible<std::remove_reference_t<T>, T&&>...>,
+		"Attempted to copy a noncopyable awaiter, move it instead");
 	return {sizeof...(Args), std::forward<T>(Args)...};
 }
 
@@ -135,7 +149,11 @@ template<typename T>
 FAsyncCoroutine UE5Coro::Private::FAggregateAwaiter::Consume(
 	std::shared_ptr<FData> Data, int Index, T&& Awaiter)
 {
-	co_await Awaiter;
+	auto AwaiterCopy = std::forward<T>(Awaiter); // If this line doesn't compile,
+	// you'll need to fix your usage of WhenAny/WhenAll and move the affected
+	// noncopyable parameter into the call with MoveTemp/std::move/etc.
+
+	co_await std::move(AwaiterCopy);
 
 	UE::TScopeLock _(Data->Lock);
 	if (--Data->Count != 0)

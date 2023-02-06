@@ -143,7 +143,7 @@ void DoTest(FAutomationTestBase& Test)
 			auto A = Latent::Ticks(1);
 			auto B = Latent::Ticks(2);
 			co_await Latent::Ticks(3);
-			First = co_await WhenAny(A, B);
+			First = co_await WhenAny(std::move(A), std::move(B));
 		});
 		World.EndTick();
 		Test.TestFalse("Not resumed yet", First.has_value());
@@ -162,7 +162,7 @@ void DoTest(FAutomationTestBase& Test)
 		{
 			auto A = Latent::Ticks(1);
 			auto B = Latent::Ticks(2);
-			First = co_await WhenAny(A, B);
+			First = co_await WhenAny(std::move(A), std::move(B));
 		});
 		World.EndTick();
 		Test.TestFalse("Not resumed yet", First.has_value());
