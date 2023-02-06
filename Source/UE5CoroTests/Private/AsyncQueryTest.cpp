@@ -121,7 +121,7 @@ void DoTest(FAutomationTestBase& Test)
 				ECC_WorldStatic, FCollisionShape::MakeBox(FVector::OneVector));
 			co_await Latent::Ticks(2); // Make sure the async query is complete
 			Test.TestTrue(TEXT("Ready"), Awaiter.await_ready());
-			State = (co_await Awaiter).Num();
+			State = (co_await std::move(Awaiter)).Num();
 		});
 		World.Tick(); // This queries the async trace on the game thread
 		Test.TestEqual(TEXT("No results yet"), State, -1);

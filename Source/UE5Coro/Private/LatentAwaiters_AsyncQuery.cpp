@@ -50,9 +50,9 @@ template<typename T>
 void SuspendCore(T Handle, FOptionalHandleVariant* Variant)
 {
 	checkf(IsInGameThread(),
-		TEXT("Async queries may only be awaited on the game thread."));
+	       TEXT("Async queries may only be awaited on the game thread."));
 	checkf(std::holds_alternative<std::monostate>(*Variant),
-		TEXT("Attempted to reuse async query awaiter"));
+	       TEXT("Attempted second concurrent co_await"));
 	if constexpr (std::is_same_v<T, FLatentHandle>)
 		Handle.promise().DetachFromGameThread();
 	*Variant = Handle;
@@ -62,18 +62,9 @@ void SuspendCore(T Handle, FOptionalHandleVariant* Variant)
 template<typename T>
 class TAsyncQueryAwaiter<T>::TImpl
 {
-	int RefCount = 2;
-
 public:
 	FOptionalHandleVariant Handle;
 	std::optional<TArray<T>> Result;
-
-	void Release()
-	{
-		checkf(IsInGameThread(), TEXT("Internal error"));
-		if (--RefCount == 0)
-			delete this;
-	}
 
 	void ReceiveResult(const FTraceHandle&, TQueryDatum<T>& Datum)
 	{
@@ -89,9 +80,6 @@ public:
 			if constexpr (!std::is_same_v<decltype(InHandle), std::monostate>)
 				InHandle.promise().Resume();
 		}, Handle);
-
-		// Clean up
-		Release();
 	}
 };
 
@@ -104,15 +92,13 @@ TAsyncQueryAwaiter<T>::TAsyncQueryAwaiter(UWorld* World,
 {
 	checkf(IsInGameThread(),
 	       TEXT("Async queries may only be started from the game thread."));
-	auto Delegate = TQueryDelegate<T>::CreateRaw(Impl, &TImpl::ReceiveResult);
+	auto Delegate =
+		TQueryDelegate<T>::CreateSP(Impl.ToSharedRef(), &TImpl::ReceiveResult);
 	(World->*Fn)(Params..., &Delegate, 0);
 }
 
 template<typename T>
-TAsyncQueryAwaiter<T>::~TAsyncQueryAwaiter()
-{
-	Impl->Release();
-}
+TAsyncQueryAwaiter<T>::~TAsyncQueryAwaiter() = default;
 
 template<typename T>
 bool TAsyncQueryAwaiter<T>::await_ready()
@@ -135,10 +121,17 @@ void TAsyncQueryAwaiter<T>::await_suspend(FLatentHandle Handle)
 }
 
 template<typename T>
-TArray<T> TAsyncQueryAwaiter<T>::await_resume()
+const TArray<T>& TAsyncQueryAwaiter<T>::await_resume() &
 {
-	checkf(Impl->Result.has_value(), TEXT("Internal error"));
-	return std::move(Impl->Result.value());
+	checkf(IsInGameThread() && Impl->Result.has_value(), TEXT("Internal error"));
+	return Impl->Result.value();
+}
+
+template<typename T>
+TArray<T> TAsyncQueryAwaiter<T>::await_resume() &&
+{
+	checkf(IsInGameThread() && Impl->Result.has_value(), TEXT("Internal error"));
+	return std::move(Impl->Result).value();
 }
 
 template class TAsyncQueryAwaiter<FHitResult>;

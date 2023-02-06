@@ -214,6 +214,7 @@ UE5CORO_API Private::FPackageLoadAwaiter AsyncLoadPackage(
 #pragma region Async collision queries
 
 // Async UWorld queries. For parameters, see their originals in World.h.
+// It's slightly more efficient to co_await rvalues of these instead of lvalues.
 
 UE5CORO_API Private::TAsyncQueryAwaiter<FHitResult> AsyncLineTraceByChannel(
 	const UObject* WorldContextObject, EAsyncTraceType InTraceType,
@@ -378,18 +379,18 @@ template<typename T>
 class [[nodiscard]] TAsyncQueryAwaiter
 {
 	class TImpl;
-	TImpl* Impl;
+	TSharedPtr<TImpl, ESPMode::NotThreadSafe> Impl;
 
 public:
 	template<typename... P, typename... A>
 	explicit TAsyncQueryAwaiter(UWorld*, FTraceHandle (UWorld::*)(P...), A...);
 	UE5CORO_API ~TAsyncQueryAwaiter();
-	UE_NONCOPYABLE(TAsyncQueryAwaiter);
 
 	UE5CORO_API bool await_ready();
 	UE5CORO_API void await_suspend(FAsyncHandle);
 	UE5CORO_API void await_suspend(FLatentHandle);
-	UE5CORO_API TArray<T> await_resume();
+	UE5CORO_API const TArray<T>& await_resume() &;
+	UE5CORO_API TArray<T> await_resume() &&;
 };
 }
 
