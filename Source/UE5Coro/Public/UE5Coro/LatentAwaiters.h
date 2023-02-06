@@ -280,6 +280,9 @@ public:
 	bool await_ready() { return false; }
 	void await_resume() { }
 	void await_suspend(FLatentHandle);
+
+	// co_awaiting this in async mode is meaningless, co_return instead.
+	void await_suspend(FAsyncHandle) = delete;
 };
 
 class [[nodiscard]] UE5CORO_API FLatentAwaiter
