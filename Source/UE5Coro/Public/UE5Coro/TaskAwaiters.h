@@ -43,7 +43,9 @@ class FTaskAwaiter;
 
 namespace UE5Coro::Tasks
 {
-/** Suspends the coroutine and resumes it in a UE::Tasks::TTask. */
+/** Suspends the coroutine and resumes it in a UE::Tasks::TTask.<br>
+ *  The return value of this function is reusable. Repeated co_awaits will
+ *  keep resuming in a new TTask every time. */
 UE5CORO_API Private::FTaskAwaiter MoveToTask(const TCHAR* DebugName = nullptr);
 }
 
@@ -64,7 +66,6 @@ protected:
 
 public:
 	explicit FTaskAwaiter(const TCHAR* DebugName) : DebugName(DebugName) { }
-	UE_NONCOPYABLE(FTaskAwaiter);
 
 	bool await_ready() { return false; }
 	void await_resume() { }

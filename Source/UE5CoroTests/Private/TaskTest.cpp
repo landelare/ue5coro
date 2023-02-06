@@ -30,9 +30,10 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "Misc/AutomationTest.h"
-#include "UE5Coro/TaskAwaiters.h"
 #include "TestWorld.h"
+#include "UE5Coro/AggregateAwaiters.h"
 #include "UE5Coro/AsyncAwaiters.h"
+#include "UE5Coro/TaskAwaiters.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;
@@ -104,6 +105,23 @@ void DoCreateTest(FAutomationTestBase& Test)
 		TestToCoro->Trigger();
 		CoroToTest->Wait();
 		Test.TestEqual(TEXT("Final state"), State, 1);
+	}
+
+	{
+		FEventRef TestToCoro;
+		FEventRef CoroToTest;
+		World.Run(CORO
+		{
+			co_await Tasks::MoveToTask();
+			TestToCoro->Wait(); // Required initial suspension and wait for Run
+			co_await WhenAll(Tasks::MoveToTask(TEXT("Test1")),
+			                 Tasks::MoveToTask(TEXT("Test2")));
+			CoroToTest->Trigger();
+			IF_CORO_LATENT
+				co_await Async::MoveToGameThread();
+		});
+		TestToCoro->Trigger();
+		Test.TestTrue(TEXT("Triggered"), CoroToTest->Wait());
 	}
 }
 
