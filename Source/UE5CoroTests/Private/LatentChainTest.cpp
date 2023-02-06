@@ -33,6 +33,7 @@
 #include "UE5CoroTestObject.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/AutomationTest.h"
+#include "UE5Coro/AggregateAwaiters.h"
 #include "UE5Coro/LatentAwaiters.h"
 
 using namespace std::placeholders;
@@ -140,6 +141,30 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Initial state"), State, 1);
 		DoubleTick(2, 0);
 		DoubleTick(3, 0);
+	}
+
+	{
+		State = -1;
+		World.Run(CORO
+		{
+#if UE5CORO_CPP20
+			auto Chain1 = Latent::Chain(&UKismetSystemLibrary::Delay, 1);
+			auto Chain2 =
+				Latent::Chain(&UKismetSystemLibrary::DelayUntilNextTick);
+#else
+			auto Chain1 =
+				Latent::ChainEx(&UKismetSystemLibrary::Delay, _1, 1, _2);
+			auto Chain2 = Latent::ChainEx(
+				&UKismetSystemLibrary::DelayUntilNextTick, _1, _2);
+#endif
+			State = 0;
+			State = co_await WhenAny(std::move(Chain1), std::move(Chain2));
+		});
+		World.EndTick();
+		Test.TestEqual(TEXT("Initial state"), State, 0);
+		DoubleTick(1, 0);
+		World.Tick(2);
+		World.Tick(2);
 	}
 }
 }

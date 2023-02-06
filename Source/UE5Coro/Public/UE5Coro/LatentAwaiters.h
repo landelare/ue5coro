@@ -288,14 +288,14 @@ protected:
 	void* State;
 	bool (*Resume)(void*& State, bool bCleanup);
 
-	FLatentAwaiter(FLatentAwaiter&&);
-
 public:
 	explicit FLatentAwaiter(void* State, bool (*Resume)(void*&, bool))
 		: State(State), Resume(Resume) { }
+	FLatentAwaiter(const FLatentAwaiter&) = delete;
+	FLatentAwaiter(FLatentAwaiter&&);
 	~FLatentAwaiter();
 
-	bool ShouldResume() { return (*Resume)(State, false); }
+	bool ShouldResume();
 
 	bool await_ready() { return ShouldResume(); }
 	void await_resume() { }
@@ -315,6 +315,7 @@ class [[nodiscard]] TAsyncLoadAwaiter : public FLatentAwaiter
 public:
 	explicit TAsyncLoadAwaiter(FLatentAwaiter&& Other)
 		: FLatentAwaiter(std::move(Other)) { }
+	TAsyncLoadAwaiter(TAsyncLoadAwaiter&&) = default;
 
 	T await_resume()
 	{

@@ -90,6 +90,14 @@ FLatentAwaiter::~FLatentAwaiter()
 	Resume = nullptr;
 }
 
+bool FLatentAwaiter::ShouldResume()
+{
+	checkf(IsInGameThread(),
+	       TEXT("Latent awaiters may only be used on the game thread"));
+	checkf(State, TEXT("Attempting to poll invalid latent awaiter"));
+	return (*Resume)(State, false);
+}
+
 void FLatentAwaiter::await_suspend(FAsyncHandle Handle)
 {
 	checkf(IsInGameThread(),

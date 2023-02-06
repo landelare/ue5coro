@@ -46,6 +46,7 @@ class [[nodiscard]] UE5CORO_API FLatentChainAwaiter : public FLatentAwaiter
 {
 public:
 	explicit FLatentChainAwaiter(FTwoLives* Done);
+	FLatentChainAwaiter(FLatentChainAwaiter&&) = default;
 	bool await_resume();
 };
 
