@@ -200,16 +200,17 @@ FPackageLoadAwaiter::FPackageLoadAwaiter(
 	EPackageFlags PackageFlags, int32 PIEInstanceID,
 	TAsyncLoadPriority PackagePriority,
 	const FLinkerInstancingContext* InstancingContext)
+	: State(new FState)
 {
-	auto Delegate = FLoadPackageAsyncDelegate::CreateRaw(
-		this, &FPackageLoadAwaiter::Loaded);
+	auto Delegate = FLoadPackageAsyncDelegate::CreateSP(
+		State.ToSharedRef(), &FState::Loaded);
 	LoadPackageAsync(Path, PackageNameToCreate, std::move(Delegate),
 	                 PackageFlags, PIEInstanceID, PackagePriority,
 	                 InstancingContext);
 }
 
-void FPackageLoadAwaiter::Loaded(const FName&, UPackage* Package,
-                                 EAsyncLoadingResult::Type)
+void FPackageLoadAwaiter::FState::Loaded(const FName&, UPackage* Package,
+                                         EAsyncLoadingResult::Type)
 {
 	checkf(IsInGameThread(), TEXT("Internal error"));
 	Result.Reset(Package);
@@ -222,23 +223,31 @@ void FPackageLoadAwaiter::Loaded(const FName&, UPackage* Package,
 	}, Handle);
 }
 
-void FPackageLoadAwaiter::await_suspend(FAsyncHandle InHandle)
+bool FPackageLoadAwaiter::await_ready()
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	Handle = InHandle;
+	checkf(State, TEXT("Attempting to use invalid awaiter"));
+	return State->Result.IsValid();
 }
 
-void FPackageLoadAwaiter::await_suspend(FLatentHandle InHandle)
+template<typename P>
+void FPackageLoadAwaiter::await_suspend(stdcoro::coroutine_handle<P> InHandle)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	InHandle.promise().DetachFromGameThread();
-	Handle = InHandle;
+	checkf(std::holds_alternative<std::monostate>(State->Handle),
+	       TEXT("Attempted second concurrent co_await"));
+
+	if constexpr (std::is_same_v<P, FLatentPromise>)
+		InHandle.promise().DetachFromGameThread();
+	State->Handle = InHandle;
 }
+template UE5CORO_API void FPackageLoadAwaiter::await_suspend(FAsyncHandle);
+template UE5CORO_API void FPackageLoadAwaiter::await_suspend(FLatentHandle);
 
 UPackage* FPackageLoadAwaiter::await_resume()
 {
-	checkf(IsInGameThread(), TEXT("Internal error"));
-	return Result.Get();
+	checkf(IsInGameThread() && State, TEXT("Internal error"));
+	return State->Result.Get();
 }

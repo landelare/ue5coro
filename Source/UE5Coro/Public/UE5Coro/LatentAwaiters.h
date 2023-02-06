@@ -350,10 +350,13 @@ static_assert(sizeof(FLatentAwaiter) ==
 
 class [[nodiscard]] UE5CORO_API FPackageLoadAwaiter
 {
-	FOptionalHandleVariant Handle;
-	TStrongObjectPtr<UPackage> Result; // This might be carried across co_awaits
-
-	void Loaded(const FName&, UPackage*, EAsyncLoadingResult::Type);
+	struct FState
+	{
+		FOptionalHandleVariant Handle;
+		TStrongObjectPtr<UPackage> Result; // This might be carried across co_awaits
+		void Loaded(const FName&, UPackage*, EAsyncLoadingResult::Type);
+	};
+	TSharedPtr<FState, ESPMode::NotThreadSafe> State;
 
 public:
 	explicit FPackageLoadAwaiter(
@@ -361,11 +364,10 @@ public:
 		EPackageFlags PackageFlags, int32 PIEInstanceID,
 		TAsyncLoadPriority PackagePriority,
 		const FLinkerInstancingContext* InstancingContext);
-	UE_NONCOPYABLE(FPackageLoadAwaiter);
 
-	bool await_ready() { return Result.IsValid(); }
-	void await_suspend(FAsyncHandle);
-	void await_suspend(FLatentHandle);
+	bool await_ready();
+	template<typename P>
+	void await_suspend(stdcoro::coroutine_handle<P>);
 	UPackage* await_resume();
 };
 
