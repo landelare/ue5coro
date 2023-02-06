@@ -46,17 +46,23 @@ class FNewThreadAwaiter;
 
 namespace UE5Coro::Async
 {
-/** Suspends the coroutine and resumes it on the provided named thread. */
+/** Suspends the coroutine and resumes it on the provided named thread.<br>
+ *  The return value of this function is reusable. Repeated co_awaits will keep
+ *	moving back into the provided thread. */
 UE5CORO_API Private::FAsyncAwaiter MoveToThread(ENamedThreads::Type);
 
 /** Convenience function to resume on the game thread.<br>
- *  Equivalent to calling Async::MoveToThread(ENamedThreads::GameThread). */
+ *  Equivalent to calling Async::MoveToThread(ENamedThreads::GameThread).<br>
+ *  As such, its return value is reusable and will keep co_awaiting back into
+ *  the game thread. */
 UE5CORO_API Private::FAsyncAwaiter MoveToGameThread();
 
 /** Starts a new thread with additional control over priority, affinity, etc.
  *  and resumes the coroutine there.<br>
  *  Intended for long-running operations before the next co_await or co_return.
- *  For parameters see the engine function FRunnableThread::Create(). */
+ *  For parameters see the engine function FRunnableThread::Create().<br>
+ *  The return value of this function is reusable. Every co_await will start a
+ *  new thread. */
 UE5CORO_API Private::FNewThreadAwaiter MoveToNewThread(
 	EThreadPriority Priority = TPri_Normal,
 	uint64 Affinity = FPlatformAffinity::GetNoAffinityMask(),
@@ -74,7 +80,6 @@ public:
 	explicit FAsyncAwaiter(ENamedThreads::Type Thread,
 	                       FHandle ResumeAfter = nullptr)
 		: Thread(Thread), ResumeAfter(ResumeAfter) { }
-	FAsyncAwaiter(FAsyncAwaiter&&) = default;
 
 	bool await_ready() { return false; }
 	void await_resume() { }
@@ -157,7 +162,6 @@ public:
 	explicit FNewThreadAwaiter(
 		EThreadPriority Priority, uint64 Affinity, EThreadCreateFlags Flags)
 		: Priority(Priority), Affinity(Affinity), Flags(Flags) { }
-	FNewThreadAwaiter(FNewThreadAwaiter&&) = default;
 
 	bool await_ready() { return false; }
 	void await_resume() { }
