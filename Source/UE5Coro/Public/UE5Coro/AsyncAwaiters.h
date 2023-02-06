@@ -96,13 +96,15 @@ class [[nodiscard]] TFutureAwaiter final
 
 public:
 	explicit TFutureAwaiter(TFuture<T>&& Future)
-		: Future(std::move(Future))
-	{
-		ensureMsgf(this->Future.IsValid(), TEXT("Awaiting invalid future"));
-	}
+		: Future(std::move(Future)) { }
 	UE_NONCOPYABLE(TFutureAwaiter);
 
-	bool await_ready() { return Future.IsReady(); }
+	bool await_ready()
+	{
+		checkf(this->Future.IsValid(),
+		       TEXT("Awaiting invalid/spent future will never resume"));
+		return Future.IsReady();
+	}
 
 	T await_resume()
 	{
@@ -126,6 +128,7 @@ public:
 			if constexpr (std::is_lvalue_reference_v<T>)
 			{
 				static_assert(std::is_pointer_v<decltype(InFuture.Get())>);
+				checkf(!Future.IsValid(), TEXT("Internal error"));
 				Result = InFuture.Get();
 				Handle.promise().Resume();
 			}
@@ -133,6 +136,7 @@ public:
 			{
 				// It's normally dangerous to expose a pointer to a local, but
 				auto Value = InFuture.Get(); // This will be alive while...
+				checkf(!Future.IsValid(), TEXT("Internal error"));
 				Result = &Value;
 				Handle.promise().Resume(); // ...await_resume moves from it here
 			}

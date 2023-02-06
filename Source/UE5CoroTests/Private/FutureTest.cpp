@@ -31,6 +31,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "TestWorld.h"
+#include "UE5Coro/AggregateAwaiters.h"
 #include "UE5Coro/AsyncAwaiters.h"
 
 using namespace UE5Coro;
@@ -106,6 +107,21 @@ void DoTest(FAutomationTestBase& Test)
 		int Two = 2;
 		Promise.SetValue(Two);
 		Test.TestEqual(TEXT("After"), State, 2);
+	}
+
+	{
+		int State = 0;
+		TPromise<int> Promise1;
+		TPromise<int> Promise2;
+		World.Run(CORO
+		{
+			State = co_await WhenAny(Promise1.GetFuture(), Promise2.GetFuture());
+		});
+		Test.TestEqual(TEXT("Before"), State, 0);
+		int One = 1;
+		Promise2.SetValue(One);
+		Test.TestEqual(TEXT("After"), State, 1);
+		Promise1.SetValue(One);
 	}
 }
 } // namespace
