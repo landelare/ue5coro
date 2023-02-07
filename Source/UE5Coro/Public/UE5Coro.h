@@ -34,6 +34,7 @@
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
 #include "UE5Coro/AggregateAwaiters.h"
+#include "UE5Coro/AnimationAwaiters.h"
 #include "UE5Coro/AsyncAwaiters.h"
 #include "UE5Coro/AsyncCoroutine.h"
 #include "UE5Coro/Generator.h"

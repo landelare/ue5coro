@@ -191,6 +191,61 @@ The return value of MoveToTask is copyable, thread-safe, and reusable.
 Latent coroutines will need to `co_await Async::MoveToGameThread();` at some
 later point to return to the game thread and correctly complete.
 
+## Animation
+
+UE5Coro\:\:Anim contains numerous functions to interact with animation montages,
+notifies, etc.
+All of these functions "snapshot" the currently-playing instance of the montage
+when called and ignore every other instance.
+
+If the calling coroutine is suspended while the animation notify happens, its
+notify payload is retrieved and returned as the value of the co_await expression.
+Otherwise if, e.g., you call one of these functions but only co_await the return
+value later, it will immediately continue if the notify has happened in between
+with no payload.
+
+This limitation is due to `FBranchingPointNotifyPayload` in the engine
+containing pointers to UObjects without an accompanying UPROPERTY().
+If you need information from the payload, make sure to read it before the next
+co_await and store values appropriately, e.g., in TStrongObjectPtr local
+variables.
+
+FNames or bInterrupted flags from other functions in this namespace are always
+valid, none of this is a concern if you don't actually use the payload.
+
+```cpp
+using namespace UE5Coro::Anim;
+using namespace UE5Coro::Latent;
+
+// Example 1:
+// Guaranteed-valid payload. No time passes on the game thread between the call
+// and its co_await. If a notify happened before calling the function, this will
+// wait until the next one.
+auto [Name, Payload] = co_await PlayMontageNotifyBegin(MyInstance, MyMontage);
+auto Awaiter = PlayMontageNotifyBegin(MyInstance, MyMontage);
+LengthySubroutine(); // The game thread is not released, notifies cannot happen.
+Tie(Name, Payload) = co_await Awaiter; // Still a guaranteed-valid payload
+co_await NextTick(); // The game thread is released, invalidating Payload
+// Payload is a dangling pointer now!
+
+// Example 2:
+auto Awaiter = PlayMontageNotifyBegin(MyInstance, MyMontage);
+co_await Seconds(1); // Game time passes, a notify may or may not happen here
+auto [Name, Payload] = co_await Awaiter;
+if (Payload)
+{
+    // The notify happened after co_await Awaiter. Payload is valid on this line.
+    co_await NextTick(); // The game thread is released, invalidating Payload
+    // Game time has passed, Payload is a dangling pointer now!
+}
+else
+    ; // The notify happened after PlayMontageNotifyBegin, before co_await Awaiter
+```
+
+The return values of these functions are copyable, game thread only, support one
+concurrent co_await, any number of sequential ones, and it's guaranteed that the
+second and further co_awaits will NOT have a valid payload pointer.
+
 ## HTTP
 
 UE5Coro\:\:Http\:\:ProcessAsync wraps a FHttpRequestRef in an awaiter that

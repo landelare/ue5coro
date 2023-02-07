@@ -29,63 +29,24 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "UE5Coro/UE5CoroCallbackTarget.h"
-#include "UE5Coro/UE5CoroSubsystem.h"
+#include "UE5Coro/AnimationAwaiters.h"
 
-using namespace UE5Coro::Private;
-
-void UUE5CoroCallbackTarget::Activate(int32 InExpectedLink, FTwoLives* InState)
+FAsyncCoroutine UE5CoroAnimationAwaiterCompileTest()
 {
-	check(IsInGameThread());
-	checkf(!State, TEXT("Unexpected double activation"));
-	ExpectedLink = InExpectedLink;
-	State = InState;
-}
-
-void UUE5CoroCallbackTarget::Deactivate()
-{
-	check(IsInGameThread());
-	checkf(State, TEXT("Unexpected deactivation while not active"));
-	// Leave ExpectedLink stale for the check in ExecuteLink
-	if (!State->Release())
-		State = nullptr; // The other side is not interested anymore
-}
-
-int32 UUE5CoroCallbackTarget::GetExpectedLink() const
-{
-	check(IsInGameThread());
-	checkf(State, TEXT("Unexpected linkage query on inactive object"));
-	return ExpectedLink;
-}
-
-void UUE5CoroCallbackTarget::ExecuteLink(int32 Link)
-{
-	check(IsInGameThread());
-	checkf(Link == ExpectedLink, TEXT("Unexpected linkage"));
-	if (State)
-	{
-		State->UserData = 1;
-		State = nullptr;
-	}
-}
-
-ETickableTickType UUE5CoroCallbackTarget::GetTickableTickType() const
-{
-	return IsTemplate() ? ETickableTickType::Never : ETickableTickType::Always;
-}
-
-void UUE5CoroCallbackTarget::Tick(float DeltaTime)
-{
-	if (!State)
-		return;
-
-	// ProcessLatentActions refuses to work on non-BP classes.
-	GetClass()->ClassFlags |= CLASS_CompiledFromBlueprint;
-	GetWorld()->GetLatentActionManager().ProcessLatentActions(this, DeltaTime);
-	GetClass()->ClassFlags &= ~CLASS_CompiledFromBlueprint;
-}
-
-TStatId UUE5CoroCallbackTarget::GetStatId() const
-{
-	RETURN_QUICK_DECLARE_CYCLE_STAT(UUE5CoroCallbackTarget, STATGROUP_Tickables);
+	// Not actual tests (that would require assets), but compiling this function
+	// tests co_await result types and that everything is properly exported.
+	using namespace UE5Coro::Anim;
+	using FAnimTuple = TTuple<FName, const FBranchingPointNotifyPayload*>;
+	// Using {} for the extra strictness
+	[[maybe_unused]] bool val1{co_await MontageBlendingOut(nullptr, nullptr)};
+	[[maybe_unused]] bool val2{co_await MontageEnded(nullptr, nullptr)};
+	co_await NextNotify(nullptr, NAME_None);
+	[[maybe_unused]] FAnimTuple val3{
+		co_await PlayMontageNotifyBegin(nullptr, nullptr)};
+	[[maybe_unused]] const FBranchingPointNotifyPayload* val4{
+		co_await PlayMontageNotifyBegin(nullptr, nullptr, NAME_None)};
+	[[maybe_unused]] FAnimTuple val5{
+		co_await PlayMontageNotifyEnd(nullptr, nullptr)};
+	[[maybe_unused]] const FBranchingPointNotifyPayload* val6{
+		co_await PlayMontageNotifyEnd(nullptr, nullptr, NAME_None)};
 }
