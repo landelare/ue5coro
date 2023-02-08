@@ -137,14 +137,20 @@ void FLatentPromise::Resume()
 	FResumeScope _(this);
 
 	// Return to latent running on the game thread, even if it's an async task.
-	if (IsInGameThread())
+	bool bIsInGameThread = IsInGameThread();
+	if (bIsInGameThread)
 		AttachToGameThread();
 
 	// Was there a deferred deletion request?
 	if (UNLIKELY(LatentState == DeferredDestroy))
+	{
 		// Finish on the game thread: exit reason, destructors, etc.
-		AsyncTask(ENamedThreads::GameThread,
-		          std::bind(&FLatentPromise::ThreadSafeDestroy, this));
+		if (bIsInGameThread)
+			ThreadSafeDestroy();
+		else
+			AsyncTask(ENamedThreads::GameThread,
+			          std::bind(&FLatentPromise::ThreadSafeDestroy, this));
+	}
 	else
 		// If this promise is async running, we're committed to a resumption at
 		// this point (DeferredDestroy arrived since the if above).
