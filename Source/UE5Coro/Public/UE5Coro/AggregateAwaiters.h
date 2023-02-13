@@ -152,21 +152,24 @@ FAsyncCoroutine UE5Coro::Private::FAggregateAwaiter::Consume(
 	// you'll need to fix your usage of WhenAny/WhenAll and move the affected
 	// noncopyable parameter into the call with MoveTemp/std::move/etc.
 
-	co_await std::move(AwaiterCopy);
-
-	UE::TScopeLock _(Data->Lock);
-	if (--Data->Count != 0)
-		co_return;
-	Data->Index = Index; // Mark that this index was the one reaching 0
-	auto Handle = Data->Handle;
-	_.Unlock();
-
-	std::visit([](auto InHandle)
+	ON_SCOPE_EXIT
 	{
-		// Not co_awaited yet with a monostate, await_ready deals with this
-		if constexpr (!std::is_same_v<std::monostate, decltype(InHandle)>)
-			InHandle.promise().Resume();
-	}, Handle);
+		UE::TScopeLock _(Data->Lock);
+		if (--Data->Count != 0)
+			return;
+		Data->Index = Index; // Mark that this index was the one reaching 0
+		auto Handle = Data->Handle;
+		_.Unlock();
+
+		std::visit([](auto InHandle)
+		{
+			// Not co_awaited yet with a monostate, await_ready deals with this
+			if constexpr (!std::is_same_v<std::monostate, decltype(InHandle)>)
+				InHandle.promise().Resume();
+		}, Handle);
+	};
+
+	co_await std::move(AwaiterCopy);
 }
 
 #undef UE5CORO_AWAITABLE
