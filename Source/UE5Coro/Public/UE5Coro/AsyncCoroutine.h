@@ -279,8 +279,8 @@ public:
 	void SetCurrentAwaiter(FLatentAwaiter*);
 
 	FInitialSuspend initial_suspend();
-	stdcoro::suspend_always final_suspend() noexcept { return {}; }
-	void return_void();
+	stdcoro::suspend_always final_suspend() noexcept;
+	void return_void() { }
 
 	template<typename T>
 	decltype(auto) await_transform(T&& Awaitable)

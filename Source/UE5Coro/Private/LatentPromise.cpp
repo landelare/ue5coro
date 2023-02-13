@@ -247,7 +247,7 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	return {FInitialSuspend::Resume};
 }
 
-void FLatentPromise::return_void()
+stdcoro::suspend_always FLatentPromise::final_suspend() noexcept
 {
 	ensureMsgf(IsInGameThread(),
 	           TEXT("Latent coroutines must end on the game thread"));
@@ -260,6 +260,7 @@ void FLatentPromise::return_void()
 		           TEXT("Unexpected coroutine state %d"), State);
 	);
 	LatentState = Done;
+	return {};
 }
 
 FLatentAwaiter TAwaitTransform<FLatentPromise, FAsyncCoroutine>::operator()
