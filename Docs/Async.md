@@ -52,6 +52,16 @@ at the first co_await and drives itself after that point.
 
 This mode is mainly a replacement for "fire and forget" AsyncTasks and timers.
 
+Async mode coroutines _mostly_ run independently, even after major events like
+PIE ending.
+It's the coroutine's responsibility to detect this and act accordingly, e.g., by
+co_returning early.
+An exception to this is co_awaiting a latent awaiter, in which case ownership
+behind the scenes is temporarily passed to the current world's latent action
+manager that **can** destroy the running coroutine.
+This manifests as a co_await not resuming, but instead all local variables'
+destructors in scope are run as if an exception was thrown.
+
 ### Latent mode
 
 If your function (probably a UFUNCTION in this case but this is **not** checked

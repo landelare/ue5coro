@@ -91,6 +91,10 @@ the coroutine.
 In practice, for awaiters in this namespace it will usually happen within 2
 ticks.
 
+Note that while async mode coroutines normally drive and own themselves, if
+they're currently co_awaiting a latent awaiter, the world **can** decide to
+destroy the coroutine, in which case the same stack unwinding happens.
+
 The return values of these functions are movable and some of them support
 multiple concurrent co_awaits, but relying on the latter is not recommended.
 
