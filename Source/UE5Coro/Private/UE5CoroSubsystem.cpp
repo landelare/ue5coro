@@ -30,7 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5Coro/UE5CoroSubsystem.h"
-#include "UE5Coro/UE5CoroCallbackTarget.h"
+#include "UE5Coro/UE5CoroChainCallbackTarget.h"
 
 using namespace UE5Coro::Private;
 
@@ -76,12 +76,13 @@ FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo(FTwoLives* State)
 		.AddUObject(this, &ThisClass::LatentActionsChanged);
 
 	int32 Linkage = NextLinkage++;
-	checkf(!Targets.Contains(Linkage), TEXT("Unexpected linkage collision"));
+	checkf(!ChainCallbackTargets.Contains(Linkage),
+	       TEXT("Unexpected linkage collision"));
 	// Pooling these objects was found to be consistently slower
 	// than making new ones every time.
-	auto* Target = NewObject<UUE5CoroCallbackTarget>(this);
+	auto* Target = NewObject<UUE5CoroChainCallbackTarget>(this);
 	Target->Activate(Linkage, State);
-	Targets.Add(Linkage, Target);
+	ChainCallbackTargets.Add(Linkage, Target);
 	return {Linkage, Linkage, TEXT("ExecuteLink"), Target};
 }
 
@@ -118,10 +119,10 @@ void UUE5CoroSubsystem::LatentActionsChanged(
 	if (Change != ELatentActionChangeType::ActionsRemoved)
 		return;
 
-	if (auto* Target = Cast<UUE5CoroCallbackTarget>(Object);
+	if (auto* Target = Cast<UUE5CoroChainCallbackTarget>(Object);
 		IsValid(Target) && Target->GetOuter() == this)
 	{
-		verify(Targets.Remove(Target->GetExpectedLink()) == 1);
+		verify(ChainCallbackTargets.Remove(Target->GetExpectedLink()) == 1);
 		Target->Deactivate();
 	}
 }

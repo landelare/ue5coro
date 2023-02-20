@@ -29,63 +29,44 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "UE5Coro/UE5CoroCallbackTarget.h"
-#include "UE5Coro/UE5CoroSubsystem.h"
+#pragma once
 
-using namespace UE5Coro::Private;
+#include "CoreMinimal.h"
+#include "UE5Coro/Definitions.h"
+#include "UE5CoroChainCallbackTarget.generated.h"
 
-void UUE5CoroCallbackTarget::Activate(int32 InExpectedLink, FTwoLives* InState)
+namespace UE5Coro::Private
 {
-	check(IsInGameThread());
-	checkf(!State, TEXT("Unexpected double activation"));
-	ExpectedLink = InExpectedLink;
-	State = InState;
+class FTwoLives;
 }
 
-void UUE5CoroCallbackTarget::Deactivate()
+/**
+ * Internal class supporting some async coroutine functionality.<br>
+ * You never need to interact with it directly.
+ */
+UCLASS(Hidden, Within = UE5CoroSubsystem)
+class UE5CORO_API UUE5CoroChainCallbackTarget : public UObject,
+                                                public FTickableGameObject
 {
-	check(IsInGameThread());
-	checkf(State, TEXT("Unexpected deactivation while not active"));
-	// Leave ExpectedLink stale for the check in ExecuteLink
-	if (!State->Release())
-		State = nullptr; // The other side is not interested anymore
-}
+	GENERATED_BODY()
 
-int32 UUE5CoroCallbackTarget::GetExpectedLink() const
-{
-	check(IsInGameThread());
-	checkf(State, TEXT("Unexpected linkage query on inactive object"));
-	return ExpectedLink;
-}
+	int32 ExpectedLink = 0;
+	UE5Coro::Private::FTwoLives* State = nullptr;
 
-void UUE5CoroCallbackTarget::ExecuteLink(int32 Link)
-{
-	check(IsInGameThread());
-	checkf(Link == ExpectedLink, TEXT("Unexpected linkage"));
-	if (State)
-	{
-		State->UserData = 1;
-		State = nullptr;
-	}
-}
+public:
+	void Activate(int32 InExpectedLink, UE5Coro::Private::FTwoLives* InState);
+	void Deactivate();
+	int32 GetExpectedLink() const;
 
-ETickableTickType UUE5CoroCallbackTarget::GetTickableTickType() const
-{
-	return IsTemplate() ? ETickableTickType::Never : ETickableTickType::Always;
-}
+	/** Signals the coroutine suspended with this linkage that it may resume. */
+	UFUNCTION()
+	void ExecuteLink(int32 Link);
 
-void UUE5CoroCallbackTarget::Tick(float DeltaTime)
-{
-	if (!State)
-		return;
-
-	// ProcessLatentActions refuses to work on non-BP classes.
-	GetClass()->ClassFlags |= CLASS_CompiledFromBlueprint;
-	GetWorld()->GetLatentActionManager().ProcessLatentActions(this, DeltaTime);
-	GetClass()->ClassFlags &= ~CLASS_CompiledFromBlueprint;
-}
-
-TStatId UUE5CoroCallbackTarget::GetStatId() const
-{
-	RETURN_QUICK_DECLARE_CYCLE_STAT(UUE5CoroCallbackTarget, STATGROUP_Tickables);
-}
+#pragma region FTickableGameObject overrides
+	virtual ETickableTickType GetTickableTickType() const override;
+	virtual bool IsTickableWhenPaused() const override { return true; }
+	virtual bool IsTickableInEditor() const override { return true; }
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override;
+#pragma endregion
+};

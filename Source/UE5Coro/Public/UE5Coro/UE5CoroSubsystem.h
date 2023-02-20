@@ -63,7 +63,7 @@ class UE5CORO_API UUE5CoroSubsystem final : public UTickableWorldSubsystem
 	GENERATED_BODY()
 
 	UPROPERTY()
-	TMap<int32, class UUE5CoroCallbackTarget*> Targets;
+	TMap<int32, class UUE5CoroChainCallbackTarget*> ChainCallbackTargets;
 	int32 NextLinkage = 0;
 	FDelegateHandle LatentActionsChangedHandle;
 

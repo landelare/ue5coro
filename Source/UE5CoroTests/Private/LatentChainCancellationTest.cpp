@@ -33,7 +33,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/LatentAwaiters.h"
-#include "UE5Coro/UE5CoroCallbackTarget.h"
+#include "UE5Coro/UE5CoroChainCallbackTarget.h"
 
 using namespace std::placeholders;
 using namespace UE5Coro;
@@ -73,8 +73,8 @@ void DoTest(FAutomationTestBase& Test)
 	};
 
 	{
-		TSet<UUE5CoroCallbackTarget*> Targets;
-		for (auto* Target : TObjectRange<UUE5CoroCallbackTarget>())
+		TSet<UUE5CoroChainCallbackTarget*> Targets;
+		for (auto* Target : TObjectRange<UUE5CoroChainCallbackTarget>())
 			Targets.Add(Target);
 
 		World.Run(CORO
@@ -89,8 +89,8 @@ void DoTest(FAutomationTestBase& Test)
 			State = 2;
 		});
 		Test.TestEqual(TEXT("Started"), State, 1);
-		UUE5CoroCallbackTarget* NewTarget = nullptr;
-		for (auto* Target : TObjectRange<UUE5CoroCallbackTarget>())
+		UUE5CoroChainCallbackTarget* NewTarget = nullptr;
+		for (auto* Target : TObjectRange<UUE5CoroChainCallbackTarget>())
 			if (!Targets.Contains(Target))
 			{
 				NewTarget = Target;
