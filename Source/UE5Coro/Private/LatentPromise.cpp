@@ -241,6 +241,11 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	                                                    LatentInfo.UUID))
 		return {FInitialSuspend::Destroy};
 
+	// Also refuse to run if there's no callback target
+	if (!ensureMsgf(IsValid(LatentInfo.CallbackTarget),
+	                TEXT("Not starting latent coroutine with invalid target")))
+		return {FInitialSuspend::Destroy};
+
 	LAM.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, Pending);
 
 	// Let the coroutine start immediately on its calling thread
