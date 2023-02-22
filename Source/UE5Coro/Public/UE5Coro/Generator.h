@@ -171,7 +171,7 @@ protected:
 
 public:
 	FGeneratorPromise() = default;
-	FGeneratorPromise(const FGeneratorPromise&) = delete;
+	UE_NONCOPYABLE(FGeneratorPromise);
 
 	stdcoro::suspend_never initial_suspend() { return {}; }
 	stdcoro::suspend_always final_suspend() noexcept { return {}; }
