@@ -42,8 +42,11 @@ bool FAsyncCoroutine::Wait(uint32 WaitTimeMilliseconds,
                            bool bIgnoreThreadIdleStats)
 {
 	FEventRef Done;
-	OnCompletion().AddLambda([&] { Done->Trigger(); });
-	return Done->Wait(WaitTimeMilliseconds, bIgnoreThreadIdleStats);
+	auto Binding = OnCompletion().AddLambda([&] { Done->Trigger(); });
+	bool bTriggered = Done->Wait(WaitTimeMilliseconds, bIgnoreThreadIdleStats);
+	if (!bTriggered)
+		OnCompletion().Remove(Binding);
+	return bTriggered;
 }
 
 void FAsyncCoroutine::SetDebugName(const TCHAR* Name)
