@@ -36,15 +36,13 @@ using namespace UE5Coro::Private;
 
 namespace
 {
-template<typename H>
-struct TAutoStartResumeRunnable : FRunnable
+struct FAutoStartResumeRunnable : FRunnable
 {
-	H& Promise;
+	FPromise& Promise;
 
-	explicit TAutoStartResumeRunnable(stdcoro::coroutine_handle<H> Handle,
-	                                  EThreadPriority Priority, uint64 Affinity,
-	                                  EThreadCreateFlags Flags)
-		: Promise(Handle.promise())
+	explicit FAutoStartResumeRunnable(FPromise& Promise, EThreadPriority Priority,
+	                                  uint64 Affinity, EThreadCreateFlags Flags)
+		: Promise(Promise)
 	{
 		FRunnableThread::Create(this, TEXT("UE5Coro::Async::MoveToNewThread"),
 		                        0, Priority, Affinity, Flags);
@@ -65,12 +63,12 @@ struct TAutoStartResumeRunnable : FRunnable
 
 FAsyncAwaiter Async::MoveToThread(ENamedThreads::Type Thread)
 {
-	return FAsyncAwaiter(Thread);
+	return FAsyncAwaiter(Thread, nullptr);
 }
 
 FAsyncAwaiter Async::MoveToGameThread()
 {
-	return FAsyncAwaiter(ENamedThreads::GameThread);
+	return FAsyncAwaiter(ENamedThreads::GameThread, nullptr);
 }
 
 FNewThreadAwaiter Async::MoveToNewThread(
@@ -79,13 +77,7 @@ FNewThreadAwaiter Async::MoveToNewThread(
 	return FNewThreadAwaiter(Priority, Affinity, Flags);
 }
 
-void FNewThreadAwaiter::await_suspend(FAsyncHandle Handle)
+void FNewThreadAwaiter::Suspend(FPromise& Promise)
 {
-	new TAutoStartResumeRunnable(Handle, Priority, Affinity, Flags);
-}
-
-void FNewThreadAwaiter::await_suspend(FLatentHandle Handle)
-{
-	Handle.promise().DetachFromGameThread();
-	new TAutoStartResumeRunnable(Handle, Priority, Affinity, Flags);
+	new FAutoStartResumeRunnable(Promise, Priority, Affinity, Flags);
 }

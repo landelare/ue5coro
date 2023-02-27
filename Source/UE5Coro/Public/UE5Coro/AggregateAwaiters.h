@@ -75,13 +75,14 @@ Private::FAllAwaiter WhenAll(T&&...);
 namespace UE5Coro::Private
 {
 class [[nodiscard]] UE5CORO_API FAggregateAwaiter
+	: public TAwaiter<FAggregateAwaiter>
 {
 	struct FData
 	{
 		UE::FSpinLock Lock;
 		int Count;
 		int Index = -1;
-		FOptionalHandleVariant Handle;
+		FPromise* Promise = nullptr;
 
 		explicit FData(int Count) : Count(Count) { }
 	};
@@ -103,8 +104,7 @@ public:
 	}
 
 	bool await_ready();
-	void await_suspend(FAsyncHandle);
-	void await_suspend(FLatentHandle);
+	void Suspend(FPromise&);
 };
 
 class [[nodiscard]] FAnyAwaiter : public FAggregateAwaiter
@@ -158,15 +158,12 @@ FAsyncCoroutine UE5Coro::Private::FAggregateAwaiter::Consume(
 		if (--Data->Count != 0)
 			return;
 		Data->Index = Index; // Mark that this index was the one reaching 0
-		auto Handle = Data->Handle;
+		auto* Promise = Data->Promise;
 		_.Unlock();
 
-		std::visit([](auto InHandle)
-		{
-			// Not co_awaited yet with a monostate, await_ready deals with this
-			if constexpr (!std::is_same_v<std::monostate, decltype(InHandle)>)
-				InHandle.promise().Resume();
-		}, Handle);
+		// Not co_awaited yet if this is nullptr, await_ready deals with this
+		if (Promise != nullptr)
+			Promise->Resume();
 	};
 
 	co_await std::move(AwaiterCopy);

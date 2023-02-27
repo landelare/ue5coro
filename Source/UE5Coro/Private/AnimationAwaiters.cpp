@@ -96,16 +96,11 @@ FAnimAwaiter::~FAnimAwaiter()
 		Target->CancelResume();
 }
 
-template<typename P>
-void FAnimAwaiter::await_suspend(stdcoro::coroutine_handle<P> Handle)
+void FAnimAwaiter::Suspend(FPromise& Promise)
 {
-	if constexpr (std::is_same_v<P, FLatentPromise>)
-		Handle.promise().DetachFromGameThread();
 	bSuspended = true;
-	Target->RequestResume(Handle);
+	Target->RequestResume(Promise);
 }
-template UE5CORO_API void FAnimAwaiter::await_suspend(FAsyncHandle);
-template UE5CORO_API void FAnimAwaiter::await_suspend(FLatentHandle);
 
 template<typename T>
 template<typename TEnd>

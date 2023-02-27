@@ -50,13 +50,6 @@ template<typename> class TFutureAwaiter;
 template<typename> class TTaskAwaiter;
 namespace Test { class FTestHelper; }
 
-using FHandle = stdcoro::coroutine_handle<FPromise>;
-using FAsyncHandle = stdcoro::coroutine_handle<FAsyncPromise>;
-using FLatentHandle = stdcoro::coroutine_handle<FLatentPromise>;
-using FHandleVariant = std::variant<FAsyncHandle, FLatentHandle>;
-using FOptionalHandleVariant = std::variant<std::monostate,
-                                            FAsyncHandle, FLatentHandle>;
-
 template<typename P, typename A>
 struct TAwaitTransform
 {
@@ -84,13 +77,14 @@ struct UE5CORO_API FAsyncCoroutine
 	friend UE5Coro::Private::Test::FTestHelper;
 
 private:
-	UE5Coro::Private::FHandle Handle;
+	UE5Coro::Private::FPromise* Promise;
 
 public:
 	/** This constructor is public to placate the reflection system and BP,
-	 *  do not use directly. */
-	explicit FAsyncCoroutine(UE5Coro::Private::FHandle Handle = nullptr)
-		: Handle(Handle) { }
+	 *  do not use directly.<br>
+	 *  Using default-constructed FAsyncCoroutines is undefined behavior. */
+	explicit FAsyncCoroutine(UE5Coro::Private::FPromise* Promise = nullptr)
+		: Promise(Promise) { }
 
 	/** Returns a delegate broadcasting this coroutine's completion for any
 	 *  reason, including being unsuccessful or canceled.
@@ -133,13 +127,31 @@ concept TAwaitable = requires
 	// FLatentPromise supports more things than FAsyncPromise
 	Private::TAwaitTransform<Private::FLatentPromise,
 	                         std::remove_reference_t<T>>()(std::declval<T>())
-	.await_suspend(std::declval<Private::FLatentHandle>());
+	.await_suspend(std::declval<Private::stdcoro::coroutine_handle<
+		Private::FLatentPromise>>());
 };
 #endif
 }
 
 namespace UE5Coro::Private
 {
+template<typename T>
+struct [[nodiscard]] TAwaiter
+{
+	bool await_ready() { return false; }
+
+	template<typename P>
+	std::enable_if_t<std::is_base_of_v<FPromise, P>>
+	await_suspend(stdcoro::coroutine_handle<P> Handle)
+	{
+		if constexpr (std::is_base_of_v<FLatentPromise, P>)
+			Handle.promise().DetachFromGameThread();
+		static_cast<T*>(this)->Suspend(Handle.promise());
+	}
+
+	void await_resume() { }
+};
+
 template<>
 struct UE5CORO_API TAwaitTransform<FAsyncPromise, FAsyncCoroutine>
 {
@@ -160,10 +172,10 @@ struct FInitialSuspend
 		Destroy,
 	} Action;
 
-	bool await_ready() noexcept { return false; }
-	void await_resume() noexcept { }
+	bool await_ready() { return false; }
+
 	template<typename P>
-	void await_suspend(stdcoro::coroutine_handle<P> Handle) noexcept
+	void await_suspend(stdcoro::coroutine_handle<P> Handle)
 	{
 		switch (Action)
 		{
@@ -171,6 +183,8 @@ struct FInitialSuspend
 			case Destroy: Handle.destroy(); break;
 		}
 	}
+
+	void await_resume() { }
 };
 
 class [[nodiscard]] FPromise
@@ -190,24 +204,15 @@ class [[nodiscard]] FPromise
 
 	TMulticastDelegate<void()> Continuations;
 
-	void Resume();
-	void EndResume();
-
 protected:
 	UE5CORO_API explicit FPromise(const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
 
 	void CheckAlive();
 
-	struct FResumeScope final
-	{
-		FPromise* This;
-		explicit FResumeScope(FPromise* This) : This(This) { This->Resume(); }
-		~FResumeScope() { This->EndResume(); }
-	};
-
 public:
-	UE5CORO_API ~FPromise();
+	UE5CORO_API virtual ~FPromise();
+	virtual void Resume();
 
 	UE5CORO_API TMulticastDelegate<void()>& OnCompletion();
 
@@ -223,7 +228,6 @@ class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
 {
 public:
 	FAsyncPromise() : FPromise(TEXT("Async")) { }
-	void Resume();
 
 	FInitialSuspend initial_suspend() { return {FInitialSuspend::Resume}; }
 	stdcoro::suspend_never final_suspend() noexcept { return {}; }
@@ -265,8 +269,8 @@ public:
 	template<typename... T>
 	explicit FLatentPromise(T&&...);
 
-	~FLatentPromise();
-	void Resume();
+	virtual ~FLatentPromise() override;
+	virtual void Resume() override;
 	void ThreadSafeDestroy();
 
 	ELatentState GetLatentState() const { return LatentState.load(); }

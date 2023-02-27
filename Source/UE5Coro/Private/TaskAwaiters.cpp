@@ -37,3 +37,8 @@ FTaskAwaiter UE5Coro::Tasks::MoveToTask(const TCHAR* DebugName)
 {
 	return FTaskAwaiter(DebugName);
 }
+
+void FTaskAwaiter::Suspend(FPromise& Promise)
+{
+	UE::Tasks::Launch(DebugName, [&Promise] { Promise.Resume(); });
+}

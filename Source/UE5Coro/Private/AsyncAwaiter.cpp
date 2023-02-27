@@ -35,18 +35,18 @@ using namespace UE5Coro::Private;
 
 namespace
 {
-template<typename T, typename H = stdcoro::coroutine_handle<T>>
-struct FResumeTask
+class FResumeTask
 {
 	ENamedThreads::Type Thread;
-	H Handle;
+	FPromise& Promise;
 
-	explicit FResumeTask(ENamedThreads::Type Thread, H Handle)
-		: Thread(Thread), Handle(Handle) { }
+public:
+	explicit FResumeTask(ENamedThreads::Type Thread, FPromise& Promise)
+		: Thread(Thread), Promise(Promise) { }
 
 	void DoTask(ENamedThreads::Type, FGraphEvent*)
 	{
-		Handle.promise().Resume();
+		Promise.Resume();
 	}
 
 	ENamedThreads::Type GetDesiredThread() const
@@ -65,19 +65,14 @@ struct FResumeTask
 		return ESubsequentsMode::FireAndForget;
 	}
 };
-
-using FAsyncResume = FResumeTask<FAsyncPromise>;
-using FLatentResume = FResumeTask<FLatentPromise>;
 }
 
-void FAsyncAwaiter::await_suspend(FAsyncHandle Handle)
+void FAsyncAwaiter::Suspend(FPromise& Promise)
 {
-	// Easy mode, nothing else can decide to delete the coroutine
-	auto* Task = TGraphTask<FAsyncResume>::CreateTask()
-	                                      .ConstructAndHold(Thread, Handle);
-
+	auto* Task = TGraphTask<FResumeTask>::CreateTask()
+	                                     .ConstructAndHold(Thread, Promise);
 	if (ResumeAfter)
-		ResumeAfter.promise().OnCompletion().AddLambda([Task]
+		ResumeAfter->OnCompletion().AddLambda([Task]
 		{
 			Task->Unlock();
 		});
@@ -85,25 +80,13 @@ void FAsyncAwaiter::await_suspend(FAsyncHandle Handle)
 		Task->Unlock();
 }
 
-void FAsyncAwaiter::await_suspend(FLatentHandle Handle)
+#if UE5CORO_DEBUG
+void FAsyncAwaiter::Suspend(FLatentPromise& Promise)
 {
-	// Hard mode, the coroutine is owned by the latent action manager on the GT.
-	auto& Promise = Handle.promise();
-	checkCode(
-		auto CurrentState = Promise.GetLatentState();
-		checkf(CurrentState < FLatentPromise::Canceled,
-		       TEXT("Unexpected latent coroutine state %d"), CurrentState);
-	);
-	Promise.DetachFromGameThread();
-
-	auto* Task = TGraphTask<FLatentResume>::CreateTask()
-	                                       .ConstructAndHold(Thread, Handle);
-
-	if (ResumeAfter)
-		ResumeAfter.promise().OnCompletion().AddLambda([Task]
-		{
-			Task->Unlock();
-		});
-	else
-		Task->Unlock();
+	// Extra checks on a latent promise
+	auto CurrentState = Promise.GetLatentState();
+	checkf(CurrentState < FLatentPromise::Canceled, // not done yet
+	       TEXT("Unexpected latent coroutine state %d"), CurrentState);
+	Suspend(static_cast<FPromise&>(Promise));
 }
+#endif

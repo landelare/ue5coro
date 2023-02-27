@@ -40,17 +40,18 @@ namespace
 {
 struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 {
-	FAsyncHandle Handle;
+	FAsyncPromise* Promise;
 	FLatentAwaiter* Awaiter;
 
-	FPendingAsyncCoroutine(FAsyncHandle Handle, FLatentAwaiter* Awaiter)
-		: Handle(Handle), Awaiter(Awaiter) { }
+	FPendingAsyncCoroutine(FAsyncPromise& Promise, FLatentAwaiter* Awaiter)
+		: Promise(&Promise), Awaiter(Awaiter) { }
 	UE_NONCOPYABLE(FPendingAsyncCoroutine);
 
 	virtual ~FPendingAsyncCoroutine() override
 	{
-		if (Handle)
-			Handle.destroy();
+		if (Promise)
+			stdcoro::coroutine_handle<FAsyncPromise>::from_promise(*Promise)
+			                                         .destroy();
 	}
 
 	virtual void UpdateOperation(FLatentResponse& Response) override
@@ -60,19 +61,11 @@ struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 
 		Response.DoneIf(true);
 
-		// Ownership moves back to the task graph tasks
-		auto Original = Handle;
-		Handle = nullptr;
-		Original.promise().Resume();
+		// Ownership moves back to the coroutine itself
+		checkf(Promise, TEXT("Internal error"));
+		std::exchange(Promise, nullptr)->Resume();
 	}
 };
-}
-
-void FLatentCancellation::await_suspend(FLatentHandle Handle)
-{
-	ensureMsgf(IsInGameThread(),
-	           TEXT("Latent awaiters may only be used on the game thread"));
-	Handle.promise().LatentCancel();
 }
 
 FLatentAwaiter::FLatentAwaiter(FLatentAwaiter&& Other)
@@ -98,24 +91,23 @@ bool FLatentAwaiter::ShouldResume()
 	return (*Resume)(State, false);
 }
 
-void FLatentAwaiter::await_suspend(FAsyncHandle Handle)
+void FLatentAwaiter::Suspend(FAsyncPromise& Promise)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
 
 	// Prepare a latent action on the subsystem and transfer ownership to that
 	auto* Sys = GWorld->GetSubsystem<UUE5CoroSubsystem>();
-	auto* Latent = new FPendingAsyncCoroutine(Handle, this);
+	auto* Latent = new FPendingAsyncCoroutine(Promise, this);
 	auto LatentInfo = Sys->MakeLatentInfo();
 	GWorld->GetLatentActionManager().AddNewAction(
 		LatentInfo.CallbackTarget, LatentInfo.UUID, Latent);
 }
 
-void FLatentAwaiter::await_suspend(FLatentHandle Handle)
+void FLatentAwaiter::Suspend(FLatentPromise& Promise)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	auto& Promise = Handle.promise();
 	checkCode(
 		auto CurrentState = Promise.GetLatentState();
 		checkf(CurrentState == FLatentPromise::LatentRunning,

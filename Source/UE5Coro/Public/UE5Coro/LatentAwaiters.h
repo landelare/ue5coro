@@ -275,19 +275,29 @@ UE5CORO_API Private::TAsyncQueryAwaiter<FOverlapResult> AsyncOverlapByProfile(
 
 namespace UE5Coro::Private
 {
-class [[nodiscard]] UE5CORO_API FLatentCancellation final
+class [[nodiscard]] UE5CORO_API FLatentCancellation final // not TAwaiter
 {
 public:
 	bool await_ready() { return false; }
-	void await_resume() { }
-	void await_suspend(FLatentHandle);
 
-	// co_awaiting this in async mode is meaningless, co_return instead.
-	void await_suspend(FAsyncHandle) = delete;
+	template<typename P>
+	// co_awaiting this in async mode is meaningless, use co_return instead.
+	std::enable_if_t<std::is_base_of_v<FLatentPromise, P>>
+	await_suspend(stdcoro::coroutine_handle<P> Handle)
+	{
+		ensureMsgf(IsInGameThread(), TEXT("Latent coroutines may only be "
+		                                  "canceled on the game thread"));
+		Handle.promise().LatentCancel();
+	}
+
+	void await_resume() { }
 };
 
-class [[nodiscard]] UE5CORO_API FLatentAwaiter
+class [[nodiscard]] UE5CORO_API FLatentAwaiter // not TAwaiter
 {
+	void Suspend(FAsyncPromise&);
+	void Suspend(FLatentPromise&);
+
 protected:
 	void* State;
 	bool (*Resume)(void*& State, bool bCleanup);
@@ -302,9 +312,15 @@ public:
 	bool ShouldResume();
 
 	bool await_ready() { return ShouldResume(); }
+
+	template<typename P>
+	std::enable_if_t<std::is_base_of_v<FPromise, P>>
+	await_suspend(stdcoro::coroutine_handle<P> Handle)
+	{
+		Suspend(Handle.promise());
+	}
+
 	void await_resume() { }
-	void await_suspend(FAsyncHandle);
-	void await_suspend(FLatentHandle);
 };
 
 namespace AsyncLoad
@@ -353,10 +369,11 @@ static_assert(sizeof(FLatentAwaiter) ==
               sizeof(TAsyncLoadAwaiter<TArray<UObject*>, 0>));
 
 class [[nodiscard]] UE5CORO_API FPackageLoadAwaiter
+	: public TAwaiter<FPackageLoadAwaiter>
 {
 	struct FState
 	{
-		FOptionalHandleVariant Handle;
+		FPromise* Promise = nullptr;
 		TStrongObjectPtr<UPackage> Result; // This might be carried across co_awaits
 		void Loaded(const FName&, UPackage*, EAsyncLoadingResult::Type);
 	};
@@ -370,13 +387,13 @@ public:
 		const FLinkerInstancingContext* InstancingContext);
 
 	bool await_ready();
-	template<typename P>
-	void await_suspend(stdcoro::coroutine_handle<P>);
+	void Suspend(FPromise&);
 	UPackage* await_resume();
 };
 
 template<typename T>
-class [[nodiscard]] TAsyncQueryAwaiter
+class [[nodiscard]] UE5CORO_API TAsyncQueryAwaiter
+	: public TAwaiter<TAsyncQueryAwaiter<T>>
 {
 	class TImpl;
 	TSharedPtr<TImpl, ESPMode::NotThreadSafe> Impl;
@@ -384,13 +401,12 @@ class [[nodiscard]] TAsyncQueryAwaiter
 public:
 	template<typename... P, typename... A>
 	explicit TAsyncQueryAwaiter(UWorld*, FTraceHandle (UWorld::*)(P...), A...);
-	UE5CORO_API ~TAsyncQueryAwaiter();
+	 ~TAsyncQueryAwaiter();
 
-	UE5CORO_API bool await_ready();
-	UE5CORO_API void await_suspend(FAsyncHandle);
-	UE5CORO_API void await_suspend(FLatentHandle);
-	UE5CORO_API const TArray<T>& await_resume() &;
-	UE5CORO_API TArray<T> await_resume() &&;
+	bool await_ready();
+	void Suspend(FPromise&);
+	const TArray<T>& await_resume() &;
+	TArray<T> await_resume() &&;
 };
 }
 

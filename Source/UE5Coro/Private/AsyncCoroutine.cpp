@@ -35,7 +35,8 @@ using namespace UE5Coro::Private;
 
 TMulticastDelegate<void()>& FAsyncCoroutine::OnCompletion()
 {
-	return Handle.promise().OnCompletion();
+	checkf(Promise, TEXT("Attempting to use an invalid FAsyncCoroutine"));
+	return Promise->OnCompletion();
 }
 
 bool FAsyncCoroutine::Wait(uint32 WaitTimeMilliseconds,

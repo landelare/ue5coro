@@ -35,8 +35,6 @@
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
 
-namespace UE5Coro::Private
-{
 namespace
 {
 template<typename T>
@@ -45,25 +43,15 @@ using TQueryDelegate = std::conditional_t<std::is_same_v<T, FHitResult>,
 template<typename T>
 using TQueryDatum = std::conditional_t<std::is_same_v<T, FHitResult>,
 	FTraceDatum, FOverlapDatum>;
+}
 
-template<typename T>
-void SuspendCore(T Handle, FOptionalHandleVariant* Variant)
+namespace UE5Coro::Private
 {
-	checkf(IsInGameThread(),
-	       TEXT("Async queries may only be awaited on the game thread."));
-	checkf(std::holds_alternative<std::monostate>(*Variant),
-	       TEXT("Attempted second concurrent co_await"));
-	if constexpr (std::is_same_v<T, FLatentHandle>)
-		Handle.promise().DetachFromGameThread();
-	*Variant = Handle;
-}
-}
-
 template<typename T>
 class TAsyncQueryAwaiter<T>::TImpl
 {
 public:
-	FOptionalHandleVariant Handle;
+	FPromise* Promise = nullptr;
 	std::optional<TArray<T>> Result;
 
 	void ReceiveResult(const FTraceHandle&, TQueryDatum<T>& Datum)
@@ -74,12 +62,9 @@ public:
 		else
 			Result = std::move(Datum.OutOverlaps);
 
-		// If the coroutine is suspended (Handle is valid), resume it now
-		std::visit([](auto InHandle)
-		{
-			if constexpr (!std::is_same_v<decltype(InHandle), std::monostate>)
-				InHandle.promise().Resume();
-		}, Handle);
+		// If the coroutine is suspended (Promise is valid), resume it now
+		if (Promise)
+			Promise->Resume();
 	}
 };
 
@@ -109,15 +94,12 @@ bool TAsyncQueryAwaiter<T>::await_ready()
 }
 
 template<typename T>
-void TAsyncQueryAwaiter<T>::await_suspend(FAsyncHandle Handle)
+void TAsyncQueryAwaiter<T>::Suspend(FPromise& Promise)
 {
-	SuspendCore(Handle, &Impl->Handle);
-}
-
-template<typename T>
-void TAsyncQueryAwaiter<T>::await_suspend(FLatentHandle Handle)
-{
-	SuspendCore(Handle, &Impl->Handle);
+	checkf(IsInGameThread(),
+	       TEXT("Async queries may only be awaited on the game thread."));
+	checkf(!Impl->Promise, TEXT("Attempted second concurrent co_await"));
+	Impl->Promise = &Promise;
 }
 
 template<typename T>
@@ -134,8 +116,8 @@ TArray<T> TAsyncQueryAwaiter<T>::await_resume() &&
 	return std::move(Impl->Result).value();
 }
 
-template class TAsyncQueryAwaiter<FHitResult>;
-template class TAsyncQueryAwaiter<FOverlapResult>;
+template class UE5CORO_API TAsyncQueryAwaiter<FHitResult>;
+template class UE5CORO_API TAsyncQueryAwaiter<FOverlapResult>;
 }
 
 TAsyncQueryAwaiter<FHitResult> Latent::AsyncLineTraceByChannel(

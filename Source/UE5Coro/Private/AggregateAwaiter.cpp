@@ -44,35 +44,22 @@ bool FAggregateAwaiter::await_ready()
 {
 	checkf(Data, TEXT("Attempting to await moved-from aggregate awaiter"));
 	Data->Lock.Lock();
-	checkf(std::holds_alternative<std::monostate>(Data->Handle),
-	       TEXT("Attempting to reuse aggregate awaiter"));
+	checkf(!Data->Promise, TEXT("Attempting to reuse aggregate awaiter"));
 
-	// Unlock if ready and resume immediately,
-	// otherwise carry the lock to await_suspend
+	// Unlock if ready and resume immediately by returning true,
+	// otherwise carry the lock to await_suspend/Suspend
 	bool bReady = Data->Count <= 0;
 	if (bReady)
 		Data->Lock.Unlock();
 	return bReady;
 }
 
-void FAggregateAwaiter::await_suspend(FAsyncHandle Handle)
+void FAggregateAwaiter::Suspend(FPromise& Promise)
 {
 	checkf(!Data->Lock.TryLock(), TEXT("Internal error"));
-	checkf(std::holds_alternative<std::monostate>(Data->Handle),
-	       TEXT("Attempting to reuse aggregate awaiter"));
+	checkf(!Data->Promise, TEXT("Attempting to reuse aggregate awaiter"));
 
-	Data->Handle = Handle;
-	Data->Lock.Unlock();
-}
-
-void FAggregateAwaiter::await_suspend(FLatentHandle Handle)
-{
-	checkf(!Data->Lock.TryLock(), TEXT("Internal error"));
-	checkf(std::holds_alternative<std::monostate>(Data->Handle),
-	       TEXT("Attempting to reuse aggregate awaiter"));
-
-	Handle.promise().DetachFromGameThread();
-	Data->Handle = Handle;
+	Data->Promise = &Promise;
 	Data->Lock.Unlock();
 }
 }

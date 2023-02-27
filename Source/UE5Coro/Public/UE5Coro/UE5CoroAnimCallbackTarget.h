@@ -48,7 +48,7 @@ class UE5CORO_API UUE5CoroAnimCallbackTarget : public UObject,
 	GENERATED_BODY()
 
 	TWeakObjectPtr<UAnimInstance> WeakInstance;
-	UE5Coro::Private::FOptionalHandleVariant Handle;
+	UE5Coro::Private::FPromise* Promise = nullptr;
 	// UPlayMontageCallbackProxy uses this value as the default
 	int32 MontageIDFilter = INDEX_NONE;
 	std::optional<FName> NotifyFilter; // "None" is a valid name for a notify
@@ -64,7 +64,7 @@ public:
 	void ListenForNotify(UAnimInstance*, UAnimMontage*, FName);
 	void ListenForPlayMontageNotify(UAnimInstance*, UAnimMontage*,
 	                                std::optional<FName>, bool);
-	void RequestResume(UE5Coro::Private::FHandleVariant);
+	void RequestResume(UE5Coro::Private::FPromise&);
 	void CancelResume();
 
 #pragma region Callbacks

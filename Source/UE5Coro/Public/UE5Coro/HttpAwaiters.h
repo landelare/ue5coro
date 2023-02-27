@@ -53,14 +53,14 @@ UE5CORO_API Private::FHttpAwaiter ProcessAsync(FHttpRequestRef);
 
 namespace UE5Coro::Private
 {
-class [[nodiscard]] UE5CORO_API FHttpAwaiter
+class [[nodiscard]] UE5CORO_API FHttpAwaiter : public TAwaiter<FHttpAwaiter>
 {
 	struct [[nodiscard]] UE5CORO_API FState
 	{
 		const ENamedThreads::Type Thread;
 		const FHttpRequestRef Request;
 		UE::FSpinLock Lock;
-		FHandleVariant Handle;
+		FPromise* Promise = nullptr;
 		bool bSuspended = false;
 		// end Lock
 		std::optional<TTuple<FHttpResponsePtr, bool>> Result;
@@ -75,9 +75,7 @@ public:
 	explicit FHttpAwaiter(FHttpRequestRef&& Request);
 
 	bool await_ready();
-	template<typename P>
-	void await_suspend(stdcoro::coroutine_handle<P>);
-
+	void Suspend(FPromise&);
 	TTuple<FHttpResponsePtr, bool> await_resume();
 };
 }

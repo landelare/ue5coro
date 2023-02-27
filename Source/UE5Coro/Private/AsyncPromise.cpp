@@ -33,15 +33,9 @@
 
 using namespace UE5Coro::Private;
 
-void FAsyncPromise::Resume()
-{
-	FResumeScope _(this);
-	FAsyncHandle::from_promise(*this).resume();
-}
-
 FAsyncAwaiter TAwaitTransform<FAsyncPromise, FAsyncCoroutine>::operator()
 	(FAsyncCoroutine Other)
 {
 	auto Thread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
-	return FAsyncAwaiter(Thread, Other.Handle);
+	return FAsyncAwaiter(Thread, Other.Promise);
 }

@@ -139,7 +139,7 @@ UE5CORO_API Private::FAnimAwaiterPayload PlayMontageNotifyEnd(
 
 namespace UE5Coro::Private
 {
-class [[nodiscard]] FAnimAwaiter
+class [[nodiscard]] FAnimAwaiter : public TAwaiter<FAnimAwaiter>
 {
 protected:
 	TStrongObjectPtr<UUE5CoroAnimCallbackTarget> Target;
@@ -149,8 +149,7 @@ protected:
 	~FAnimAwaiter();
 
 public:
-	template<typename P>
-	UE5CORO_API void await_suspend(stdcoro::coroutine_handle<P>);
+	UE5CORO_API void Suspend(FPromise&);
 };
 
 template<typename T>

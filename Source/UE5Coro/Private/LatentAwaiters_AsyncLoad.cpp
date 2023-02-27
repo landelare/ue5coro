@@ -213,14 +213,12 @@ void FPackageLoadAwaiter::FState::Loaded(const FName&, UPackage* Package,
                                          EAsyncLoadingResult::Type)
 {
 	checkf(IsInGameThread(), TEXT("Internal error"));
-	Result.Reset(Package);
-	std::visit([](auto InHandle)
-	{
-		// monostate indicates that the load finished between AsyncLoadPackage()
-		// and co_await
-		if constexpr (!std::is_same_v<decltype(InHandle), std::monostate>)
-			InHandle.promise().Resume();
-	}, Handle);
+	Result.Reset(Package); // Store the result
+
+	// Promise being nullptr indicates that the load finished between
+	// AsyncLoadPackage() and co_await
+	if (Promise)
+		Promise->Resume();
 }
 
 bool FPackageLoadAwaiter::await_ready()
@@ -231,20 +229,14 @@ bool FPackageLoadAwaiter::await_ready()
 	return State->Result.IsValid();
 }
 
-template<typename P>
-void FPackageLoadAwaiter::await_suspend(stdcoro::coroutine_handle<P> InHandle)
+void FPackageLoadAwaiter::Suspend(FPromise& Promise)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	checkf(std::holds_alternative<std::monostate>(State->Handle),
-	       TEXT("Attempted second concurrent co_await"));
+	checkf(!State->Promise, TEXT("Attempted second concurrent co_await"));
 
-	if constexpr (std::is_same_v<P, FLatentPromise>)
-		InHandle.promise().DetachFromGameThread();
-	State->Handle = InHandle;
+	State->Promise = &Promise;
 }
-template UE5CORO_API void FPackageLoadAwaiter::await_suspend(FAsyncHandle);
-template UE5CORO_API void FPackageLoadAwaiter::await_suspend(FLatentHandle);
 
 UPackage* FPackageLoadAwaiter::await_resume()
 {

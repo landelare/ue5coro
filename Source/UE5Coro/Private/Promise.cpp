@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5Coro/AsyncCoroutine.h"
+#include "Misc/ScopeExit.h"
 
 using namespace UE5Coro::Private;
 
@@ -71,17 +72,17 @@ void FPromise::Resume()
 	checkf(ResumeStack.Num() == 0 || ResumeStack.Last() != this,
 	       TEXT("Internal error"));
 	ResumeStack.Push(this);
+	ON_SCOPE_EXIT
+	{
+		// Coroutine resumption might result in `this` having been freed already
+		// and not being considered `Alive`.
+		// This is technically undefined behavior.
+		checkf(ResumeStack.Last() == this, TEXT("Internal error"));
+		ResumeStack.Pop();
+	};
 #endif
-}
 
-void FPromise::EndResume()
-{
-	// Coroutine resumption might result in `this` having been freed already and
-	// not being considered `Alive`. This is technically undefined behavior.
-#if UE5CORO_DEBUG
-	checkf(ResumeStack.Last() == this, TEXT("Internal error"));
-	ResumeStack.Pop();
-#endif
+	stdcoro::coroutine_handle<FPromise>::from_promise(*this).resume();
 }
 
 void FPromise::unhandled_exception()
@@ -101,5 +102,5 @@ TMulticastDelegate<void()>& FPromise::OnCompletion()
 
 FAsyncCoroutine FPromise::get_return_object()
 {
-	return FAsyncCoroutine(FHandle::from_promise(*this));
+	return FAsyncCoroutine(this);
 }

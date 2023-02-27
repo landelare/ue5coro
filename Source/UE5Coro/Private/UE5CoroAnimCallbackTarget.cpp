@@ -52,16 +52,11 @@ template class TPrivateSpy<&UAnimInstance::ExternalNotifyHandlers>;
 void UUE5CoroAnimCallbackTarget::TryResume()
 {
 	checkf(IsInGameThread(), TEXT("Internal error"));
-	std::visit([this](auto InHandle)
+	if (Promise) // Is there anything suspended?
 	{
-		// monostate indicates that there's nothing suspended
-		if constexpr (!std::is_same_v<decltype(InHandle), std::monostate>)
-		{
-			Handle = std::monostate(); // Only resume once
-			WeakInstance = nullptr;
-			InHandle.promise().Resume();
-		}
-	}, Handle);
+		WeakInstance = nullptr; // Stop watching the instance
+		std::exchange(Promise, nullptr)->Resume(); // Resume exactly once
+	}
 }
 
 void UUE5CoroAnimCallbackTarget::ListenForMontageEvent(UAnimInstance* Instance,
@@ -112,21 +107,20 @@ void UUE5CoroAnimCallbackTarget::ListenForPlayMontageNotify(
 		.AddDynamic(this, &ThisClass::MontageCallbackNameAndPayload);
 }
 
-void UUE5CoroAnimCallbackTarget::RequestResume(FHandleVariant InHandle)
+void UUE5CoroAnimCallbackTarget::RequestResume(FPromise& InPromise)
 {
-	checkf(std::holds_alternative<std::monostate>(Handle),
-	       TEXT("Attempted second concurrent co_await"));
+	checkf(!Promise, TEXT("Attempted second concurrent co_await"));
 	// await_ready should've prevented suspension if there's already a result
 	checkf(IsInGameThread() && std::holds_alternative<std::monostate>(Result),
 	       TEXT("Internal error"));
-	std::visit([this](auto H) { Handle = H; }, InHandle);
+	Promise = &InPromise;
 }
 
 void UUE5CoroAnimCallbackTarget::CancelResume()
 {
 	checkf(IsInGameThread(), TEXT("Internal error"));
-	// Handle can be monostate already if this is a deferred destruction
-	Handle = std::monostate();
+	// Promise can be nullptr already if this is a deferred destruction
+	Promise = nullptr;
 }
 
 void UUE5CoroAnimCallbackTarget::MontageCallbackBool(UAnimMontage* Montage,

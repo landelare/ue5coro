@@ -47,9 +47,9 @@ class [[nodiscard]] FPendingLatentCoroutine : public FPendingLatentAction
 	FLatentAwaiter* CurrentAwaiter = nullptr;
 
 public:
-	explicit FPendingLatentCoroutine(FLatentHandle Handle,
+	explicit FPendingLatentCoroutine(FLatentPromise& Promise,
 	                                 FLatentActionInfo LatentInfo)
-		: Promise(Handle.promise()), LatentInfo(LatentInfo) { }
+		: Promise(Promise), LatentInfo(LatentInfo) { }
 
 	UE_NONCOPYABLE(FPendingLatentCoroutine);
 
@@ -108,8 +108,7 @@ void FLatentPromise::CreateLatentAction(FLatentActionInfo&& LatentInfo)
 	// The static_assert on coroutine_traits prevents this
 	checkf(!PendingLatentCoroutine, TEXT("Internal error"));
 
-	PendingLatentCoroutine = new FPendingLatentCoroutine(
-		FLatentHandle::from_promise(*this), std::move(LatentInfo));
+	PendingLatentCoroutine = new FPendingLatentCoroutine(*this, LatentInfo);
 }
 
 void FLatentPromise::Init()
@@ -134,8 +133,6 @@ FLatentPromise::~FLatentPromise()
 
 void FLatentPromise::Resume()
 {
-	FResumeScope _(this);
-
 	// Return to latent running on the game thread, even if it's an async task.
 	bool bIsInGameThread = IsInGameThread();
 	if (bIsInGameThread)
@@ -162,7 +159,7 @@ void FLatentPromise::Resume()
 		// the coroutine will either co_await or return_void.
 
 		// Therefore, this can safely run on any thread now.
-		FLatentHandle::from_promise(*this).resume();
+		FPromise::Resume();
 }
 
 void FLatentPromise::ThreadSafeDestroy()
@@ -174,7 +171,7 @@ void FLatentPromise::ThreadSafeDestroy()
 
 	checkf(IsInGameThread(),
 	       TEXT("Unexpected latent coroutine destruction off the game thread"));
-	auto Handle = FLatentHandle::from_promise(*this);
+	auto Handle = stdcoro::coroutine_handle<FLatentPromise>::from_promise(*this);
 
 	GLatentExitReason = ExitReason;
 	Handle.destroy(); // Counts as delete this;
@@ -197,6 +194,13 @@ void FLatentPromise::AttachToGameThread()
 
 void FLatentPromise::DetachFromGameThread()
 {
+	// Calling this method "pins" the promise and coroutine state, deferring any
+	// destruction requests from the latent action manager.
+	// This is useful for threading or callback-based awaiters to ensure that
+	// there will be a valid promise and coroutine state to return to.
+	// FLatentAwaiters use a dedicated code path and do not call this, as they
+	// support destruction while being co_awaited.
+
 	if (auto Old = LatentRunning;
 		LatentState.compare_exchange_strong(Old, AsyncRunning) ||
 		Old == AsyncRunning || Old == DeferredDestroy)

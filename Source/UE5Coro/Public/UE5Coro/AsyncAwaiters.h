@@ -72,24 +72,23 @@ UE5CORO_API Private::FNewThreadAwaiter MoveToNewThread(
 namespace UE5Coro::Private
 {
 class [[nodiscard]] UE5CORO_API FAsyncAwaiter final
+	: public TAwaiter<FAsyncAwaiter>
 {
 	ENamedThreads::Type Thread;
-	FHandle ResumeAfter;
+	FPromise* ResumeAfter;
 
 public:
-	explicit FAsyncAwaiter(ENamedThreads::Type Thread,
-	                       FHandle ResumeAfter = nullptr)
+	explicit FAsyncAwaiter(ENamedThreads::Type Thread, FPromise* ResumeAfter)
 		: Thread(Thread), ResumeAfter(ResumeAfter) { }
 
-	bool await_ready() { return false; }
-	void await_resume() { }
-
-	void await_suspend(FAsyncHandle Handle);
-	void await_suspend(FLatentHandle Handle);
+	void Suspend(FPromise&);
+#if UE5CORO_DEBUG
+	void Suspend(FLatentPromise&);
+#endif
 };
 
 template<typename T>
-class [[nodiscard]] TFutureAwaiter final
+class [[nodiscard]] TFutureAwaiter final : public TAwaiter<TFutureAwaiter<T>>
 {
 	TFuture<T> Future;
 	std::remove_reference_t<T>* Result = nullptr; // Dangerous!
@@ -106,23 +105,11 @@ public:
 		return Future.IsReady();
 	}
 
-	T await_resume()
-	{
-		if constexpr (std::is_lvalue_reference_v<T>)
-			return *Result;
-		else if constexpr (!std::is_void_v<T>)
-			return std::move(*Result);
-	}
-
-	template<typename P>
-	void await_suspend(stdcoro::coroutine_handle<P> Handle)
+	void Suspend(FPromise& Promise)
 	{
 		checkf(!Result, TEXT("Attempting to reuse spent TFutureAwaiter"));
 
-		if constexpr (std::is_same_v<P, FLatentPromise>)
-			Handle.promise().DetachFromGameThread();
-
-		Future.Then([this, Handle](auto InFuture)
+		Future.Then([this, &Promise](auto InFuture)
 		{
 			// TFuture<T&> will pass T* for Value, TFuture<void> an int
 			if constexpr (std::is_lvalue_reference_v<T>)
@@ -130,7 +117,7 @@ public:
 				static_assert(std::is_pointer_v<decltype(InFuture.Get())>);
 				checkf(!Future.IsValid(), TEXT("Internal error"));
 				Result = InFuture.Get();
-				Handle.promise().Resume();
+				Promise.Resume();
 			}
 			else
 			{
@@ -138,9 +125,17 @@ public:
 				auto Value = InFuture.Get(); // This will be alive while...
 				checkf(!Future.IsValid(), TEXT("Internal error"));
 				Result = &Value;
-				Handle.promise().Resume(); // ...await_resume moves from it here
+				Promise.Resume(); // ...await_resume moves from it here
 			}
 		});
+	}
+
+	T await_resume()
+	{
+		if constexpr (std::is_lvalue_reference_v<T>)
+			return *Result;
+		else if constexpr (!std::is_void_v<T>)
+			return std::move(*Result);
 	}
 };
 
@@ -157,6 +152,7 @@ struct TAwaitTransform<P, TFuture<T>>
 };
 
 class [[nodiscard]] UE5CORO_API FNewThreadAwaiter
+	: public TAwaiter<FNewThreadAwaiter>
 {
 	EThreadPriority Priority;
 	uint64 Affinity;
@@ -167,10 +163,6 @@ public:
 		EThreadPriority Priority, uint64 Affinity, EThreadCreateFlags Flags)
 		: Priority(Priority), Affinity(Affinity), Flags(Flags) { }
 
-	bool await_ready() { return false; }
-	void await_resume() { }
-
-	void await_suspend(FAsyncHandle);
-	void await_suspend(FLatentHandle);
+	void Suspend(FPromise&);
 };
 }

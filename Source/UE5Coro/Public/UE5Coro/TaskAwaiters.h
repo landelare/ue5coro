@@ -51,49 +51,37 @@ UE5CORO_API Private::FTaskAwaiter MoveToTask(const TCHAR* DebugName = nullptr);
 
 namespace UE5Coro::Private
 {
-class [[nodiscard]] FTaskAwaiter
+class [[nodiscard]] UE5CORO_API FTaskAwaiter : public TAwaiter<FTaskAwaiter>
 {
-protected:
 	const TCHAR* DebugName;
 
 public:
 	explicit FTaskAwaiter(const TCHAR* DebugName) : DebugName(DebugName) { }
 
-	bool await_ready() { return false; }
-	void await_resume() { }
-
-	template<typename P>
-	void await_suspend(stdcoro::coroutine_handle<P> Handle)
-	{
-		if constexpr (std::is_same_v<P, FLatentPromise>)
-			Handle.promise().DetachFromGameThread();
-		UE::Tasks::Launch(DebugName, [Handle] { Handle.promise().Resume(); });
-	}
+	void Suspend(FPromise& Promise);
 };
 
 template<typename T>
-class [[nodiscard]] TTaskAwaiter : public FTaskAwaiter
+class [[nodiscard]] TTaskAwaiter : public TAwaiter<TTaskAwaiter<T>>
 {
+	const TCHAR* DebugName;
 	UE::Tasks::TTask<T> Task;
 
 public:
 	explicit TTaskAwaiter(UE::Tasks::TTask<T> Task, const TCHAR* DebugName)
-		: FTaskAwaiter(DebugName), Task(Task) { }
+		: DebugName(DebugName), Task(Task) { }
 
 	bool await_ready() { return Task.IsCompleted(); }
+
+	void Suspend(FPromise& Promise)
+	{
+		UE::Tasks::Launch(DebugName, [&Promise] { Promise.Resume(); }, Task);
+	}
+
 	auto await_resume()
 	{
 		if constexpr (!std::is_void_v<T>)
 			return Task.GetResult();
-	}
-
-	template<typename P>
-	void await_suspend(stdcoro::coroutine_handle<P> Handle)
-	{
-		if constexpr (std::is_same_v<P, FLatentPromise>)
-			Handle.promise().DetachFromGameThread();
-		UE::Tasks::Launch(DebugName, [Handle] { Handle.promise().Resume(); },
-		                  Task);
 	}
 };
 

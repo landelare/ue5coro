@@ -73,22 +73,13 @@ bool FHttpAwaiter::await_ready()
 	}
 }
 
-template<typename P>
-void FHttpAwaiter::await_suspend(stdcoro::coroutine_handle<P> InHandle)
+void FHttpAwaiter::Suspend(FPromise& Promise)
 {
-	// Even if the entire co_await starts and ends on the game thread we need
-	// to take temporary ownership in case the latent action manager decides to
-	// delete the latent action.
-	if constexpr (std::is_same_v<P, FLatentPromise>)
-		InHandle.promise().DetachFromGameThread();
-
 	// This should be locked from await_ready
 	checkf(!State->Lock.TryLock(), TEXT("Internal error"));
-	State->Handle = InHandle;
+	State->Promise = &Promise;
 	State->Lock.Unlock();
 }
-template UE5CORO_API void FHttpAwaiter::await_suspend(FAsyncHandle);
-template UE5CORO_API void FHttpAwaiter::await_suspend(FLatentHandle);
 
 void FHttpAwaiter::FState::Resume()
 {
@@ -97,15 +88,9 @@ void FHttpAwaiter::FState::Resume()
 	// leave bSuspended true to prevent any further suspensions (not co_awaits)
 
 	if (Thread == ENamedThreads::GameThread)
-		std::visit([](auto InHandle)
-		{
-			InHandle.promise().Resume();
-		}, Handle);
+		Promise->Resume();
 	else
-		std::visit([Thread = Thread](auto InHandle)
-		{
-			AsyncTask(Thread, [InHandle] { InHandle.promise().Resume(); });
-		}, Handle);
+		AsyncTask(Thread, [Promise = Promise] { Promise->Resume(); });
 }
 
 void FHttpAwaiter::FState::RequestComplete(FHttpRequestPtr,
