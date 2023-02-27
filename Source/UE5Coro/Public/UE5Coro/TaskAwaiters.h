@@ -56,14 +56,6 @@ class [[nodiscard]] FTaskAwaiter
 protected:
 	const TCHAR* DebugName;
 
-	template<typename P>
-	decltype(auto) SuspendBase(stdcoro::coroutine_handle<P> Handle)
-	{
-		if constexpr (std::is_same_v<P, FLatentPromise>)
-			Handle.promise().DetachFromGameThread();
-		return [Handle] { Handle.promise().Resume(); };
-	}
-
 public:
 	explicit FTaskAwaiter(const TCHAR* DebugName) : DebugName(DebugName) { }
 
@@ -73,7 +65,9 @@ public:
 	template<typename P>
 	void await_suspend(stdcoro::coroutine_handle<P> Handle)
 	{
-		UE::Tasks::Launch(DebugName, SuspendBase(Handle));
+		if constexpr (std::is_same_v<P, FLatentPromise>)
+			Handle.promise().DetachFromGameThread();
+		UE::Tasks::Launch(DebugName, [Handle] { Handle.promise().Resume(); });
 	}
 };
 
@@ -96,7 +90,10 @@ public:
 	template<typename P>
 	void await_suspend(stdcoro::coroutine_handle<P> Handle)
 	{
-		UE::Tasks::Launch(DebugName, SuspendBase(Handle), Task);
+		if constexpr (std::is_same_v<P, FLatentPromise>)
+			Handle.promise().DetachFromGameThread();
+		UE::Tasks::Launch(DebugName, [Handle] { Handle.promise().Resume(); },
+		                  Task);
 	}
 };
 
