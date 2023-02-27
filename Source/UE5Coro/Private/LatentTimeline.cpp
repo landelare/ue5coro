@@ -59,12 +59,12 @@ FAsyncCoroutine CommonTimeline(double From, double To, double Length,
 	for (;;)
 	{
 		// Make sure the last call is exactly at Length
-		double Alpha = FMath::Min((GWorld->*GetTime)() - Start, Length);
+		double Time = FMath::Min((GWorld->*GetTime)() - Start, Length);
 		// If the world is paused, only evaluate the function if asked.
 		if (bRunWhenPaused || !GWorld->IsPaused())
 		{
-			Fn(FMath::Lerp(From, To, Alpha));
-			if (Alpha == Length) // This hard == will work due to Min()
+			Fn(FMath::Lerp(From, To, Time / Length));
+			if (Time == Length) // This hard == will work due to Min()
 				co_return;
 		}
 		co_await NextTick();
