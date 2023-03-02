@@ -29,6 +29,7 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <exception>
 #include "LatentActions.h"
 #include "LatentExitReason.h"
 #include "UE5Coro/AsyncAwaiters.h"
@@ -42,14 +43,16 @@ namespace
 {
 class [[nodiscard]] FPendingLatentCoroutine : public FPendingLatentAction
 {
-	FLatentPromise& Promise;
+	// The coroutine may move to other threads, but this object only interacts
+	// with it on the game thread.
+	FLatentPromise* Promise;
 	FLatentActionInfo LatentInfo;
 	FLatentAwaiter* CurrentAwaiter = nullptr;
 
 public:
 	explicit FPendingLatentCoroutine(FLatentPromise& Promise,
 	                                 FLatentActionInfo LatentInfo)
-		: Promise(Promise), LatentInfo(LatentInfo) { }
+		: Promise(&Promise), LatentInfo(LatentInfo) { }
 
 	UE_NONCOPYABLE(FPendingLatentCoroutine);
 
@@ -57,20 +60,55 @@ public:
 	{
 		checkf(IsInGameThread(),
 		       TEXT("Unexpected latent action off the game thread"));
-		Promise.ThreadSafeDestroy();
+		if (LIKELY(Promise))
+			Promise->ThreadSafeDestroy();
 	}
+
+#if !PLATFORM_EXCEPTIONS_DISABLED
+	/** Called in ~FLatentPromise if it was automatically called due to an
+	 *  uncaught exception, to prevent a second destruction from the LAM. */
+	void Detach()
+	{
+		if (IsInGameThread())
+		{
+			checkf(Promise, TEXT("Internal error"));
+			Promise = nullptr;
+		}
+		else
+		{
+			// Promise (the pointer) is not thread safe, so perform everything
+			// on the game thread and block this thread until it's done.
+			// Performance is not a concern, this only happens with an uncaught
+			// exception to begin with.
+			FEventRef Done;
+			AsyncTask(ENamedThreads::GameThread, [&]
+			{
+				Detach();
+				Done->Trigger();
+			});
+			Done->Wait();
+		}
+	}
+#endif
 
 	virtual void UpdateOperation(FLatentResponse& Response) override
 	{
+		checkf(IsInGameThread(), TEXT("Internal error"));
+		if (UNLIKELY(!Promise))
+		{
+			Response.DoneIf(true);
+			return;
+		}
+
 		if (CurrentAwaiter && CurrentAwaiter->ShouldResume())
 		{
 			CurrentAwaiter = nullptr;
 			// This might set the awaiter for next time
-			Promise.Resume();
+			Promise->Resume();
 		}
 
 		// Did the coroutine finish?
-		auto State = Promise.GetLatentState();
+		auto State = Promise->GetLatentState();
 		if (State >= FLatentPromise::Canceled)
 			Response.DoneIf(true);
 		if (State == FLatentPromise::Done)
@@ -80,12 +118,16 @@ public:
 
 	virtual void NotifyActionAborted() override
 	{
-		Promise.SetExitReason(ELatentExitReason::ActionAborted);
+		checkf(IsInGameThread(), TEXT("Internal error"));
+		if (LIKELY(Promise))
+			Promise->SetExitReason(ELatentExitReason::ActionAborted);
 	}
 
 	virtual void NotifyObjectDestroyed() override
 	{
-		Promise.SetExitReason(ELatentExitReason::ObjectDestroyed);
+		checkf(IsInGameThread(), TEXT("Internal error"));
+		if (LIKELY(Promise))
+			Promise->SetExitReason(ELatentExitReason::ObjectDestroyed);
 	}
 
 	const FLatentActionInfo& GetLatentInfo() const { return LatentInfo; }
@@ -129,6 +171,11 @@ FLatentPromise::~FLatentPromise()
 	checkf(IsInGameThread(),
 	       TEXT("Unexpected latent coroutine destruction off the game thread"));
 	GLatentExitReason = ELatentExitReason::Normal;
+#if !PLATFORM_EXCEPTIONS_DISABLED
+	if (UNLIKELY(std::uncaught_exceptions()))
+		// Destroyed early. Prevent the normal destruction from the world's LAM.
+		static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine)->Detach();
+#endif
 }
 
 void FLatentPromise::Resume()

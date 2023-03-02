@@ -124,6 +124,11 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Latent unexpected exception"), false);
 	}
 
+	// Check if FLatentPromise detached correctly
+	World.Tick();
+	World.Tick();
+	World.Tick();
+
 	return true;
 }
 
