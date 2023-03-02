@@ -37,5 +37,5 @@ FAsyncAwaiter TAwaitTransform<FAsyncPromise, FAsyncCoroutine>::operator()
 	(FAsyncCoroutine Other)
 {
 	auto Thread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
-	return FAsyncAwaiter(Thread, Other.Promise);
+	return FAsyncAwaiter(Thread, Other);
 }

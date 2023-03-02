@@ -63,12 +63,12 @@ struct FAutoStartResumeRunnable : FRunnable
 
 FAsyncAwaiter Async::MoveToThread(ENamedThreads::Type Thread)
 {
-	return FAsyncAwaiter(Thread, nullptr);
+	return FAsyncAwaiter(Thread, {});
 }
 
 FAsyncAwaiter Async::MoveToGameThread()
 {
-	return FAsyncAwaiter(ENamedThreads::GameThread, nullptr);
+	return FAsyncAwaiter(ENamedThreads::GameThread, {});
 }
 
 FNewThreadAwaiter Async::MoveToNewThread(

@@ -71,8 +71,8 @@ void FAsyncAwaiter::Suspend(FPromise& Promise)
 {
 	auto* Task = TGraphTask<FResumeTask>::CreateTask()
 	                                     .ConstructAndHold(Thread, Promise);
-	if (ResumeAfter)
-		ResumeAfter->OnCompletion().AddLambda([Task]
+	if (ResumeAfter.has_value())
+		ResumeAfter.value().OnCompletion().AddLambda([Task]
 		{
 			Task->Unlock();
 		});

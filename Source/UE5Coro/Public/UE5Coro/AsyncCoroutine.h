@@ -36,6 +36,7 @@
 #include <atomic>
 #include <variant>
 #include "Engine/LatentActionManager.h"
+#include "Misc/SpinLock.h"
 #include "AsyncCoroutine.generated.h"
 
 namespace UE5Coro::Private
@@ -46,6 +47,7 @@ class FAsyncPromise;
 class FLatentAwaiter;
 class FLatentPromise;
 class FPromise;
+class FPromiseExtras;
 template<typename> class TFutureAwaiter;
 template<typename> class TTaskAwaiter;
 namespace Test { class FTestHelper; }
@@ -72,25 +74,23 @@ USTRUCT(BlueprintInternalUseOnly, Meta=(HiddenByDefault))
 struct UE5CORO_API FAsyncCoroutine
 {
 	GENERATED_BODY()
-	template<typename, typename>
-	friend struct UE5Coro::Private::TAwaitTransform;
-	friend UE5Coro::Private::Test::FTestHelper;
 
 private:
-	UE5Coro::Private::FPromise* Promise;
+	std::shared_ptr<UE5Coro::Private::FPromiseExtras> Extras;
 
 public:
 	/** This constructor is public to placate the reflection system and BP,
 	 *  do not use directly.<br>
 	 *  Using default-constructed FAsyncCoroutines is undefined behavior. */
-	explicit FAsyncCoroutine(UE5Coro::Private::FPromise* Promise = nullptr)
-		: Promise(Promise) { }
+	explicit FAsyncCoroutine(
+	    std::shared_ptr<UE5Coro::Private::FPromiseExtras> Extras = {})
+	    : Extras(std::move(Extras)) { }
 
 	/** Returns a delegate broadcasting this coroutine's completion for any
 	 *  reason, including being unsuccessful or canceled.
 	 *  This will be Broadcast() on the same thread where the coroutine is
 	 *	destroyed. */
-	TMulticastDelegate<void()>& OnCompletion();
+	TMulticastDelegate<void()>&	OnCompletion();
 
 	/** Blocks until the coroutine completes for any reason, including being
 	 *  unsuccessful or canceled.
@@ -187,34 +187,43 @@ struct FInitialSuspend
 	void await_resume() { }
 };
 
+/** Fields of FPromise that may be alive after the coroutine is done. */
+class [[nodiscard]] FPromiseExtras
+{
+public:
+#if UE5CORO_DEBUG
+	int DebugID = -1;
+	const TCHAR* DebugPromiseType = nullptr;
+	const TCHAR* DebugName = nullptr;
+#endif
+
+	UE::FSpinLock Lock;
+	bool bAlive = true;
+	TMulticastDelegate<void()> Continuations;
+
+	FPromiseExtras() = default;
+	UE_NONCOPYABLE(FPromiseExtras);
+};
+
 class [[nodiscard]] FPromise
 {
 #if UE5CORO_DEBUG
 	static std::atomic<int> LastDebugID;
 	static thread_local TArray<FPromise*> ResumeStack;
 
-	static constexpr uint32 Expected = U'♪' << 16 | U'♫';
-	uint32 Alive = Expected;
-	int DebugID;
-
-	const TCHAR* DebugPromiseType;
-	const TCHAR* DebugName = nullptr;
 	friend void FAsyncCoroutine::SetDebugName(const TCHAR*);
 #endif
 
-	TMulticastDelegate<void()> Continuations;
+	std::shared_ptr<FPromiseExtras> Extras;
 
 protected:
 	UE5CORO_API explicit FPromise(const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
 
-	void CheckAlive();
-
 public:
-	UE5CORO_API virtual ~FPromise();
+	void CheckAlive() const;
+	UE5CORO_API virtual ~FPromise(); // Virtual for warning suppression only
 	virtual void Resume();
-
-	UE5CORO_API TMulticastDelegate<void()>& OnCompletion();
 
 	UE5CORO_API FAsyncCoroutine get_return_object();
 	UE5CORO_API void unhandled_exception();

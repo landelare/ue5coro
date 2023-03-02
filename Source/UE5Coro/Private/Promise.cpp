@@ -41,26 +41,32 @@ thread_local TArray<FPromise*> FPromise::ResumeStack;
 #endif
 
 FPromise::FPromise(const TCHAR* PromiseType)
-#if UE5CORO_DEBUG
-	: DebugID(++LastDebugID), DebugPromiseType(PromiseType)
-#endif
+	: Extras(new FPromiseExtras)
 {
+#if UE5CORO_DEBUG
+	Extras->DebugID = ++LastDebugID;
+	Extras->DebugPromiseType = PromiseType;
+#endif
 }
 
 FPromise::~FPromise()
 {
+	// If something else is accessing the delegate, block until it's done
+	UE::TScopeLock _(Extras->Lock);
 #if UE5CORO_DEBUG
-	checkf(Alive == Expected, TEXT("Double coroutine destruction"));
-	Alive = 0;
+	checkf(Extras->bAlive, TEXT("Double coroutine destruction"));
 #endif
+	Extras->bAlive = false;
+	auto Continuations = std::move(Extras->Continuations);
+	_.Unlock();
 	Continuations.Broadcast();
 }
 
-void FPromise::CheckAlive()
+void FPromise::CheckAlive() const
 {
 #if UE5CORO_DEBUG
-	// Best effort but ultimately unreliable check for stale objects
-	checkf(Alive == Expected,
+	UE::TScopeLock _(Extras->Lock);
+	checkf(Extras->bAlive,
 	       TEXT("Attempted to access or await a destroyed coroutine"));
 #endif
 }
@@ -94,13 +100,7 @@ void FPromise::unhandled_exception()
 #endif
 }
 
-TMulticastDelegate<void()>& FPromise::OnCompletion()
-{
-	CheckAlive();
-	return Continuations;
-}
-
 FAsyncCoroutine FPromise::get_return_object()
 {
-	return FAsyncCoroutine(this);
+	return FAsyncCoroutine(Extras);
 }

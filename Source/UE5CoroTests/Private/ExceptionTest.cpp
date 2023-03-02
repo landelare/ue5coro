@@ -32,6 +32,7 @@
 #include <exception>
 #include "TestWorld.h"
 #include "Misc/AutomationTest.h"
+#include "UE5CoroTestObject.h"
 #include "UE5Coro/AsyncAwaiters.h"
 #include "UE5Coro/Generator.h"
 
@@ -61,6 +62,8 @@ public:
 
 bool FExceptionTest::RunTest(const FString& Parameters)
 {
+	FTestWorld World; // This is not used but it needs to exist in this scope
+
 	try
 	{
 		auto Fn = []() -> TGenerator<int>
@@ -84,18 +87,12 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 
 	try
 	{
-		int State = 0;
 		auto Fn = [&]() -> FAsyncCoroutine
 		{
-			State = 1;
-			co_await stdcoro::suspend_always();
+			co_await stdcoro::suspend_never();
 			throw FTestException("async");
 		};
 		auto Coro = Fn();
-		TestEqual(TEXT("Async init value"), State, 1);
-		// Cannot use "natural" UE resumption on the task graph
-		// because it's not exception safe
-		FTestHelper::ForceResume(Coro);
 		TestTrue(TEXT("Async unreachable code"), false);
 	}
 	catch (const FTestException& Ex)
@@ -107,21 +104,15 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Async unexpected exception"), false);
 	}
 
-	FTestWorld World;
 	try
 	{
-		int State = 0;
 		auto Fn = [&](FLatentActionInfo) -> FAsyncCoroutine
 		{
-			State = 1;
-			co_await stdcoro::suspend_always();
+			co_await stdcoro::suspend_never();
 			throw FTestException("latent");
 		};
-		auto Coro = World.Run(Fn);
-		TestEqual(TEXT("Latent init value"), State, 1);
-		// Cannot use "natural" UE resumption from the latent action manager
-		// because it's not exception safe
-		FTestHelper::ForceResume(Coro);
+		auto Coro = Fn(
+		    FLatentActionInfo(0, 0, nullptr, NewObject<UUE5CoroTestObject>()));
 		TestTrue(TEXT("Latent unreachable code"), false);
 	}
 	catch (const FTestException& Ex)

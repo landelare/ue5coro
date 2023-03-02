@@ -110,8 +110,3 @@ void FTestHelper::PumpGameThread(FTestWorld& World,
 	while (!ExitCondition())
 		World.Tick();
 }
-
-void FTestHelper::ForceResume(FAsyncCoroutine& Coroutine)
-{
-	Coroutine.Promise->Resume();
-}

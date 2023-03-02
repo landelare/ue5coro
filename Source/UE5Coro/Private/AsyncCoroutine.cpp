@@ -35,8 +35,9 @@ using namespace UE5Coro::Private;
 
 TMulticastDelegate<void()>& FAsyncCoroutine::OnCompletion()
 {
-	checkf(Promise, TEXT("Attempting to use an invalid FAsyncCoroutine"));
-	return Promise->OnCompletion();
+	UE::TScopeLock _(Extras->Lock);
+	checkf(Extras->bAlive, TEXT("Attempting to use an invalid FAsyncCoroutine"));
+	return Extras->Continuations;
 }
 
 bool FAsyncCoroutine::Wait(uint32 WaitTimeMilliseconds,
@@ -55,6 +56,6 @@ void FAsyncCoroutine::SetDebugName(const TCHAR* Name)
 #if UE5CORO_DEBUG
 	if (ensureMsgf(FPromise::ResumeStack.Num() > 0,
 	               TEXT("Attempting to set a debug name outside a coroutine")))
-		FPromise::ResumeStack.Last()->DebugName = Name;
+		FPromise::ResumeStack.Last()->Extras->DebugName = Name;
 #endif
 }

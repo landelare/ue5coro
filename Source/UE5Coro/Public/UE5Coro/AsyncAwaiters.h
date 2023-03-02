@@ -33,6 +33,7 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
+#include <optional>
 #include "Async/TaskGraphInterfaces.h"
 #include "UE5Coro/AsyncCoroutine.h"
 
@@ -75,11 +76,12 @@ class [[nodiscard]] UE5CORO_API FAsyncAwaiter final
 	: public TAwaiter<FAsyncAwaiter>
 {
 	ENamedThreads::Type Thread;
-	FPromise* ResumeAfter;
+	std::optional<FAsyncCoroutine> ResumeAfter;
 
 public:
-	explicit FAsyncAwaiter(ENamedThreads::Type Thread, FPromise* ResumeAfter)
-		: Thread(Thread), ResumeAfter(ResumeAfter) { }
+	explicit FAsyncAwaiter(ENamedThreads::Type Thread,
+	                       std::optional<FAsyncCoroutine> ResumeAfter)
+		: Thread(Thread), ResumeAfter(std::move(ResumeAfter)) { }
 
 	void Suspend(FPromise&);
 #if UE5CORO_DEBUG
