@@ -340,8 +340,24 @@ struct UE5Coro::Private::stdcoro::coroutine_traits<UE5Coro::TCoroutine<T>, Args.
 	                                           UE5Coro::Private::FAsyncPromise>>;
 };
 
+template<typename T, typename... Args>
+struct UE5Coro::Private::stdcoro::coroutine_traits<const UE5Coro::TCoroutine<T>,
+                                                   Args...>
+{
+	using promise_type = typename coroutine_traits<UE5Coro::TCoroutine<T>,
+	                                               Args...>::promise_type;
+};
+
 template<typename... Args>
 struct UE5Coro::Private::stdcoro::coroutine_traits<FAsyncCoroutine, Args...>
+{
+	using promise_type = typename coroutine_traits<UE5Coro::TCoroutine<>,
+	                                               Args...>::promise_type;
+};
+
+template<typename... Args>
+struct UE5Coro::Private::stdcoro::coroutine_traits<const FAsyncCoroutine,
+                                                   Args...>
 {
 	using promise_type = typename coroutine_traits<UE5Coro::TCoroutine<>,
 	                                               Args...>::promise_type;
