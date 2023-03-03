@@ -40,12 +40,13 @@ std::atomic<int> FPromise::LastDebugID = -1; // -1 = no coroutines yet
 thread_local TArray<FPromise*> FPromise::ResumeStack;
 #endif
 
-FPromise::FPromise(const TCHAR* PromiseType)
-	: Extras(new FPromiseExtras)
+FPromise::FPromise(std::shared_ptr<FPromiseExtras> Extras,
+                   const TCHAR* PromiseType)
+	: Extras(std::move(Extras))
 {
 #if UE5CORO_DEBUG
-	Extras->DebugID = ++LastDebugID;
-	Extras->DebugPromiseType = PromiseType;
+	this->Extras->DebugID = ++LastDebugID;
+	this->Extras->DebugPromiseType = PromiseType;
 #endif
 }
 

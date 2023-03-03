@@ -151,6 +151,12 @@ public:
 	UE_NONCOPYABLE(FPromiseExtras);
 };
 
+template<typename T>
+struct [[nodiscard]] TPromiseExtras : FPromiseExtras
+{
+	T ReturnValue;
+};
+
 class [[nodiscard]] FPromise
 {
 #if UE5CORO_DEBUG
@@ -163,7 +169,8 @@ class [[nodiscard]] FPromise
 protected:
 	std::shared_ptr<FPromiseExtras> Extras;
 
-	UE5CORO_API explicit FPromise(const TCHAR* PromiseType);
+	UE5CORO_API explicit FPromise(std::shared_ptr<FPromiseExtras>,
+	                              const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
 
 public:
@@ -182,11 +189,11 @@ class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
 {
 public:
 	template<typename... A>
-	explicit FAsyncPromise(A&&...) : FPromise(TEXT("Async")) { }
+	explicit FAsyncPromise(std::shared_ptr<FPromiseExtras> Extras, A&&...)
+		: FPromise(std::move(Extras), TEXT("Async")) { }
 
 	FInitialSuspend initial_suspend() { return {FInitialSuspend::Resume}; }
 	stdcoro::suspend_never final_suspend() noexcept { return {}; }
-	void return_void() { }
 
 	template<typename T>
 	decltype(auto) await_transform(T&& Awaitable)
@@ -222,7 +229,7 @@ private:
 
 public:
 	template<typename... T>
-	explicit FLatentPromise(T&&...);
+	explicit FLatentPromise(std::shared_ptr<FPromiseExtras>, T&&...);
 
 	virtual ~FLatentPromise() override;
 	virtual void Resume() override;
@@ -239,7 +246,6 @@ public:
 
 	FInitialSuspend initial_suspend();
 	stdcoro::suspend_always final_suspend() noexcept;
-	void return_void() { }
 
 	template<typename T>
 	decltype(auto) await_transform(T&& Awaitable)
@@ -254,17 +260,36 @@ class TCoroutinePromise : public Base
 {
 public:
 	template<typename... A>
-	explicit TCoroutinePromise(A&&... Args) : Base(std::forward<A>(Args)...) { }
+	explicit TCoroutinePromise(A&&... Args)
+		: Base(std::make_shared<TPromiseExtras<T>>(), std::forward<A>(Args)...)
+	{ }
 
-	TCoroutine<T> get_return_object()
+	void return_value(T Value)
 	{
-		return TCoroutine<T>(this->Extras);
+		auto* ExtrasT = static_cast<TPromiseExtras<T>*>(this->Extras.get());
+		UE::TScopeLock _(ExtrasT->Lock);
+		check(ExtrasT->bAlive);
+		ExtrasT->ReturnValue = std::move(Value);
 	}
+
+	TCoroutine<T> get_return_object() { return TCoroutine<T>(this->Extras); }
+};
+
+template<typename Base>
+class TCoroutinePromise<void, Base> : public Base
+{
+public:
+	template<typename... A>
+	explicit TCoroutinePromise(A&&... Args)
+		: Base(std::make_shared<FPromiseExtras>(), std::forward<A>(Args)...) { }
+	void return_void() { }
+	TCoroutine<> get_return_object() { return TCoroutine<>(this->Extras); }
 };
 
 template<typename... T>
-FLatentPromise::FLatentPromise(T&&... Args)
-	: FPromise(TEXT("Latent"))
+FLatentPromise::FLatentPromise(std::shared_ptr<FPromiseExtras> Extras,
+                               T&&... Args)
+	: FPromise(std::move(Extras), TEXT("Latent"))
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent coroutines may only be started on the game thread"));
