@@ -179,5 +179,7 @@ static_assert(sizeof(FAsyncCoroutine) == sizeof(UE5Coro::TCoroutine<>));
 
 #if CPP
 #include "UE5Coro/AsyncCoroutine.h"
+#ifndef UE5CORO_SUPPRESS_COROUTINE_INL
 #include "UE5Coro/Coroutine.inl"
+#endif
 #endif

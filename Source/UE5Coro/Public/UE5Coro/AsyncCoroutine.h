@@ -39,6 +39,7 @@
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
 #include <functional>
+#define UE5CORO_SUPPRESS_COROUTINE_INL
 #include "UE5Coro/Coroutine.h"
 #include "Misc/SpinLock.h"
 
@@ -378,3 +379,5 @@ struct UE5Coro::Private::stdcoro::coroutine_traits<const FAsyncCoroutine,
 	using promise_type = typename coroutine_traits<UE5Coro::TCoroutine<>,
 	                                               Args...>::promise_type;
 };
+
+#include "UE5Coro/Coroutine.inl"
