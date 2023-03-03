@@ -2,21 +2,18 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 	<!-- Promises. Looking at them works better from Resume() instead of __coro_frame_ptr. -->
 	<Type Name="UE5Coro::Private::FPromise">
-		<DisplayString>FPromise {*Extras}</DisplayString>
+		<DisplayString>FPromise {*Extras._Ptr}</DisplayString>
 		<Expand>
-			<ExpandedItem>*Extras</ExpandedItem>
+			<ExpandedItem>*Extras._Ptr</ExpandedItem>
 		</Expand>
 	</Type>
 	<Type Name="UE5Coro::Private::FPromiseExtras">
-		<DisplayString Condition="bAlive">{{{DebugPromiseType,sub}, Alive, ID={DebugID}, Name={DebugName,sub}, Continuations={Continuations.InvocationList.ArrayNum}}}</DisplayString>
-		<DisplayString Condition="!bAlive">{{{DebugPromiseType,sub}, ***DEAD***, ID={DebugID}, Name={DebugName,sub}, Continuations={Continuations.InvocationList.ArrayNum}}}</DisplayString>
+		<DisplayString>{{{DebugPromiseType,sub}, ID={DebugID}, Name={DebugName,sub}}}</DisplayString>
 		<Expand>
 			<Item Name="[Promise type]" Optional="true">DebugPromiseType,sub</Item>
 			<Item Name="[Debug ID]" Optional="true">DebugID</Item>
-			<Item Name="[Alive?]" Optional="true">bAlive</Item>
 			<Item Name="[Sync resume stack]" Optional="true">UE5Coro::Private::FPromise::ResumeStack</Item>
 			<Item Name="DebugName" Optional="true">DebugName,su</Item>
-			<Item Name="Continuations">Continuations</Item>
 		</Expand>
 	</Type>
 </AutoVisualizer>

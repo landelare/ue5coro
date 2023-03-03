@@ -33,6 +33,7 @@
 
 #include "CoreMinimal.h"
 #include <memory>
+#include "CoroutinePrivate.inl"
 #include "Coroutine.generated.h"
 
 namespace UE5Coro
@@ -48,12 +49,6 @@ namespace UE5Coro
  */
 template<typename T = void>
 class TCoroutine;
-
-namespace Private
-{
-class FPromiseExtras;
-template<typename, typename> class TCoroutinePromise;
-}
 
 /** Common functionality for TCoroutines of all return types. */
 template<>
@@ -73,6 +68,8 @@ public:
 	 *  reason, including being unsuccessful or canceled.
 	 *  This will be Broadcast() on the same thread where the coroutine is
 	 *	destroyed. */
+	[[deprecated("This method only works if the coroutine is not complete yet. "
+	             "Use ContinueWith instead.")]]
 	TMulticastDelegate<void()>& OnCompletion();
 
 	/** Blocks until the coroutine completes for any reason, including being
@@ -82,6 +79,30 @@ public:
 	 *  @return True if the coroutine completed, false on timeout. */
 	bool Wait(uint32 WaitTimeMilliseconds = MAX_uint32,
 	          bool bIgnoreThreadIdleStats = false) const;
+
+	/** Calls the provided functor when this coroutine is complete, including
+	 *  unsuccessful completions such as being canceled.<br>
+	 *  If the coroutine is already complete, it will be called immediately,
+	 *  otherwise it will be called on the same thread where the coroutine
+	 *  completes. */
+	template<typename F>
+	std::enable_if_t<std::is_invocable_v<F>> ContinueWith(F Continuation);
+
+	/** Like ContinueWith, but the provided functor will only be called if the
+	 *  object is still alive at the time of coroutine completion.<br>
+	 *  The first parameter may be UObject*, TSharedPtr, or std::shared_ptr. */
+	template<typename U, typename F>
+	std::enable_if_t<Private::TWeak<U>::value && std::is_invocable_v<F>>
+	ContinueWithWeak(U Ptr, F Continuation);
+
+	/** Convenience overload that also passes the object as the first argument
+	 *  for, e.g., UObject/Slate member function pointers or static methods with
+	 *  a world context.<br>
+	 *  The first parameter may be UObject*, TSharedPtr, or std::shared_ptr.<br>
+	 *  Example usage: ContinueWithWeak(this, &ThisClass::Method) */
+	template<typename U, typename F>
+	std::enable_if_t<std::is_invocable_v<F, typename Private::TWeak<U>::ptr>>
+	ContinueWithWeak(U Ptr, F Continuation);
 
 	/** Sets a debug name for the currently-executing coroutine.
 	 *  Only valid to call from within a coroutine returning TCoroutine. */
@@ -103,6 +124,33 @@ public:
 	 *  Depending on T, this will often invalidate further GetResult and
 	 *  ContinueWith calls across all copies that refer to the same coroutine. */
 	T&& MoveResult();
+
+	/** Calls the provided functor with this coroutine's result when it's
+	 *  complete, including unsuccessful completions such as being canceled.<br>
+	 *  If the coroutine is already complete, it will be called immediately,
+	 *  otherwise it will be called on the same thread where the coroutine
+	 *  completes. */
+	template<typename F>
+	std::enable_if_t<std::is_invocable_v<F> || std::is_invocable_v<F, T>>
+	ContinueWith(F Continuation);
+
+	/** Like ContinueWith, but the provided functor will only be called if the
+	 *  object is still alive at the time of coroutine completion.<br>
+	 *  The first parameter may be UObject*, TSharedPtr, or std::shared_ptr. */
+	template<typename U, typename F>
+	std::enable_if_t<Private::TWeak<U>::value &&
+	                 (std::is_invocable_v<F> || std::is_invocable_v<F, T>)>
+	ContinueWithWeak(U Ptr, F Continuation);
+
+	/** Convenience overload that also passes the object as the first argument
+	 *  for, e.g., UObject/Slate member function pointers or static methods with
+	 *  a world context.<br>
+	 *  The first parameter may be UObject*, TSharedPtr, or std::shared_ptr.<br>
+	 *  Example usage: ContinueWithWeak(this, &ThisClass::Method) */
+	template<typename U, typename F>
+	std::enable_if_t<std::is_invocable_v<F, typename Private::TWeak<U>::ptr> ||
+	                 std::is_invocable_v<F, typename Private::TWeak<U>::ptr, T>>
+	ContinueWithWeak(U Ptr, F Continuation);
 };
 
 static_assert(sizeof(TCoroutine<int>) == sizeof(TCoroutine<>));

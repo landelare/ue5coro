@@ -37,19 +37,17 @@ using namespace UE5Coro::Private;
 TMulticastDelegate<void()>& TCoroutine<>::OnCompletion()
 {
 	UE::TScopeLock _(Extras->Lock);
-	checkf(Extras->bAlive, TEXT("Attempting to use an invalid TCoroutine"));
-	return Extras->Continuations;
+	checkf(!Extras->IsComplete(),
+	       TEXT("Attempting to use a complete/invalid TCoroutine"));
+	return Extras->Continuations_DEPRECATED;
+	// It's unsafe to return the delegate with the lock unlocked,
+	// but this is the old, deprecated behavior
 }
 
 bool TCoroutine<>::Wait(uint32 WaitTimeMilliseconds,
                         bool bIgnoreThreadIdleStats) const
 {
-	FEventRef Done;
-	auto Binding = OnCompletion().AddLambda([&] { Done->Trigger(); });
-	bool bTriggered = Done->Wait(WaitTimeMilliseconds, bIgnoreThreadIdleStats);
-	if (!bTriggered)
-		OnCompletion().Remove(Binding);
-	return bTriggered;
+	return Extras->Completed->Wait(WaitTimeMilliseconds, bIgnoreThreadIdleStats);
 }
 
 void TCoroutine<>::SetDebugName(const TCHAR* Name)

@@ -38,6 +38,7 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
+#include <functional>
 #include "UE5Coro/Coroutine.h"
 #include "Misc/SpinLock.h"
 
@@ -134,7 +135,7 @@ struct FInitialSuspend
 };
 
 /** Fields of FPromise that may be alive after the coroutine is done. */
-class [[nodiscard]] FPromiseExtras
+class [[nodiscard]] UE5CORO_API FPromiseExtras
 {
 public:
 #if UE5CORO_DEBUG
@@ -143,12 +144,17 @@ public:
 	const TCHAR* DebugName = nullptr;
 #endif
 
+	FEventRef Completed{EEventMode::ManualReset};
 	UE::FSpinLock Lock;
-	bool bAlive = true;
-	TMulticastDelegate<void()> Continuations;
+	TMulticastDelegate<void()> Continuations_DEPRECATED;
+	std::function<void()> OnCompleted = [] { };
 
 	FPromiseExtras() = default;
+	virtual ~FPromiseExtras() = default; // Virtual for warning suppression only
 	UE_NONCOPYABLE(FPromiseExtras);
+
+	bool IsComplete() const;
+	virtual void Complete();
 };
 
 template<typename T>
@@ -158,6 +164,14 @@ struct [[nodiscard]] TPromiseExtras : FPromiseExtras
 	std::atomic<bool> bMoveUsed = false;
 #endif
 	T ReturnValue;
+	std::function<void(const T&)> OnCompletedT = [](const T&) { };
+
+	virtual void Complete() override
+	{
+		FPromiseExtras::Complete();
+		OnCompletedT(ReturnValue);
+		OnCompletedT = nullptr;
+	}
 };
 
 class [[nodiscard]] FPromise
@@ -177,7 +191,6 @@ protected:
 	UE_NONCOPYABLE(FPromise);
 
 public:
-	void CheckAlive() const;
 	UE5CORO_API virtual ~FPromise(); // Virtual for warning suppression only
 	UE5CORO_API virtual void Resume();
 
@@ -271,7 +284,7 @@ public:
 	{
 		auto* ExtrasT = static_cast<TPromiseExtras<T>*>(this->Extras.get());
 		UE::TScopeLock _(ExtrasT->Lock);
-		check(ExtrasT->bAlive);
+		check(!ExtrasT->IsComplete()); // Completion is after a value is returned
 		ExtrasT->ReturnValue = std::move(Value);
 	}
 

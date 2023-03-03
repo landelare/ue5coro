@@ -53,4 +53,112 @@ T&& TCoroutine<T>::MoveResult()
 #endif
 	return std::move(ExtrasT->ReturnValue);
 }
+
+template<typename F>
+std::enable_if_t<std::is_invocable_v<F>> TCoroutine<>::ContinueWith(F Continuation)
+{
+	UE::TScopeLock _(Extras->Lock);
+	if (Extras->IsComplete())
+	{
+		_.Unlock();
+		Continuation();
+	}
+	else
+		Extras->OnCompleted = [Parent = std::move(Extras->OnCompleted),
+		                       Fn = std::move(Continuation)]
+		{
+			Parent();
+			Fn();
+		};
+}
+
+template<typename U, typename F>
+std::enable_if_t<Private::TWeak<U>::value && std::is_invocable_v<F>>
+TCoroutine<>::ContinueWithWeak(U Ptr, F Continuation)
+{
+	ContinueWith([Weak = typename Private::TWeak<U>::weak(std::move(Ptr)),
+	              Fn = std::move(Continuation)]
+	{
+		auto Strong = Private::TWeak<U>::Strengthen(Weak);
+		if (Private::TWeak<U>::Get(Strong))
+			Fn();
+	});
+}
+
+template<typename U, typename F>
+std::enable_if_t<std::is_invocable_v<F, typename Private::TWeak<U>::ptr>>
+TCoroutine<>::ContinueWithWeak(U Ptr, F Continuation)
+{
+	ContinueWith([Weak = typename Private::TWeak<U>::weak(std::move(Ptr)),
+	              Fn = std::move(Continuation)]
+	{
+		auto Strong = Private::TWeak<U>::Strengthen(Weak);
+		if (auto* Raw = Private::TWeak<U>::Get(Strong))
+			std::invoke(Fn, Raw);
+	});
+}
+
+template<typename T>
+template<typename F>
+std::enable_if_t<std::is_invocable_v<F> || std::is_invocable_v<F, T>>
+TCoroutine<T>::ContinueWith(F Continuation)
+{
+	// Handle functors that can't take (T) with the void specialization.
+	// This can't be an overload, it would be considered ambiguous.
+	if constexpr (!std::is_invocable_v<F, T>)
+		TCoroutine<>::ContinueWith(std::move(Continuation));
+	else
+	{
+		auto* ExtrasT = static_cast<Private::TPromiseExtras<T>*>(Extras.get());
+		UE::TScopeLock _(ExtrasT->Lock);
+		if (ExtrasT->IsComplete())
+		{
+			_.Unlock();
+			std::invoke(Continuation, ExtrasT->ReturnValue);
+		}
+		else
+			ExtrasT->OnCompletedT = [Parent = std::move(ExtrasT->OnCompletedT),
+			                         Fn = std::move(Continuation)](const T& Result)
+			{
+				Parent(Result);
+				std::invoke(Fn, Result);
+			};
+	}
+}
+
+template<typename T>
+template<typename U, typename F>
+std::enable_if_t<Private::TWeak<U>::value &&
+                 (std::is_invocable_v<F> || std::is_invocable_v<F, T>)>
+TCoroutine<T>::ContinueWithWeak(U Ptr, F Continuation)
+{
+	if constexpr (!std::is_invocable_v<F, T>)
+		TCoroutine<>::ContinueWithWeak(std::move(Ptr), std::move(Continuation));
+	else
+		ContinueWith([Weak = typename Private::TWeak<U>::weak(std::move(Ptr)),
+		              Fn = std::move(Continuation)](const T& Result)
+		{
+			auto Strong = Private::TWeak<U>::Strengthen(Weak);
+			if (Private::TWeak<U>::Get(Strong))
+			    std::invoke(Fn, Result);
+		});
+}
+
+template<typename T>
+template<typename U, typename F>
+std::enable_if_t<std::is_invocable_v<F, typename Private::TWeak<U>::ptr> ||
+                 std::is_invocable_v<F, typename Private::TWeak<U>::ptr, T>>
+TCoroutine<T>::ContinueWithWeak(U Ptr, F Continuation)
+{
+	if constexpr (!std::is_invocable_v<F, typename Private::TWeak<U>::ptr, T>)
+		TCoroutine<>::ContinueWithWeak(std::move(Ptr), std::move(Continuation));
+	else
+		ContinueWith([Weak = typename Private::TWeak<U>::weak(std::move(Ptr)),
+		              Fn = std::move(Continuation)](const T& Result)
+		{
+			auto Strong = Private::TWeak<U>::Strengthen(Weak);
+			if (auto* Raw = Private::TWeak<U>::Get(Strong))
+				std::invoke(Fn, Raw, Result);
+		});
+}
 }

@@ -40,6 +40,21 @@ std::atomic<int> FPromise::LastDebugID = -1; // -1 = no coroutines yet
 thread_local TArray<FPromise*> FPromise::ResumeStack;
 #endif
 
+bool FPromiseExtras::IsComplete() const
+{
+	return Completed->Wait(0, true);
+}
+
+void FPromiseExtras::Complete()
+{
+	// This should be called with the mutex already held
+	checkf(!Lock.TryLock(), TEXT("Internal error"));
+	checkf(!IsComplete(), TEXT("Internal error"));
+	Completed->Trigger();
+	OnCompleted();
+	OnCompleted = nullptr;
+}
+
 FPromise::FPromise(std::shared_ptr<FPromiseExtras> Extras,
                    const TCHAR* PromiseType)
 	: Extras(std::move(Extras))
@@ -54,30 +69,21 @@ FPromise::~FPromise()
 {
 	// If something else is accessing the delegate, block until it's done
 	UE::TScopeLock _(Extras->Lock);
-#if UE5CORO_DEBUG
-	checkf(Extras->bAlive, TEXT("Double coroutine destruction"));
-#endif
-	Extras->bAlive = false;
-	auto Continuations = std::move(Extras->Continuations);
+	checkf(!Extras->IsComplete(),
+	       TEXT("Unexpected late/double coroutine destruction"));
+	auto Continuations = std::move(Extras->Continuations_DEPRECATED);
+	Extras->Complete();
 	_.Unlock();
 	Continuations.Broadcast();
 }
 
-void FPromise::CheckAlive() const
-{
-#if UE5CORO_DEBUG
-	UE::TScopeLock _(Extras->Lock);
-	checkf(Extras->bAlive,
-	       TEXT("Attempted to access or await a destroyed coroutine"));
-#endif
-}
-
 void FPromise::Resume()
 {
-	CheckAlive();
 #if UE5CORO_DEBUG
 	checkf(ResumeStack.Num() == 0 || ResumeStack.Last() != this,
 	       TEXT("Internal error"));
+	checkf(!Extras->IsComplete(),
+	       TEXT("Attempting to resume completed coroutine"));
 	ResumeStack.Push(this);
 	ON_SCOPE_EXIT
 	{
