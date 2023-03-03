@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -29,34 +29,28 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "UE5Coro/AsyncCoroutine.h"
+#pragma once
 
-using namespace UE5Coro;
-using namespace UE5Coro::Private;
-
-TMulticastDelegate<void()>& TCoroutine<>::OnCompletion()
+namespace UE5Coro
 {
-	UE::TScopeLock _(Extras->Lock);
-	checkf(Extras->bAlive, TEXT("Attempting to use an invalid TCoroutine"));
-	return Extras->Continuations;
+template<typename T>
+const T& TCoroutine<T>::GetResult() const
+{
+	Wait();
+	auto* ExtrasT = static_cast<Private::TPromiseExtras<T>*>(Extras.get());
+	return ExtrasT->ReturnValue;
 }
 
-bool TCoroutine<>::Wait(uint32 WaitTimeMilliseconds,
-                        bool bIgnoreThreadIdleStats) const
+template<typename T>
+T&& TCoroutine<T>::MoveResult()
 {
-	FEventRef Done;
-	auto Binding = OnCompletion().AddLambda([&] { Done->Trigger(); });
-	bool bTriggered = Done->Wait(WaitTimeMilliseconds, bIgnoreThreadIdleStats);
-	if (!bTriggered)
-		OnCompletion().Remove(Binding);
-	return bTriggered;
-}
-
-void TCoroutine<>::SetDebugName(const TCHAR* Name)
-{
+	Wait();
+	auto* ExtrasT = static_cast<Private::TPromiseExtras<T>*>(Extras.get());
 #if UE5CORO_DEBUG
-	if (ensureMsgf(FPromise::ResumeStack.Num() > 0,
-	               TEXT("Attempting to set a debug name outside a coroutine")))
-		FPromise::ResumeStack.Last()->Extras->DebugName = Name;
+	[[maybe_unused]] bool bOld = false;
+	ensureMsgf(ExtrasT->bMoveUsed.compare_exchange_strong(bOld, true),
+	           TEXT("MoveResult called multiple times on the same value"));
 #endif
+	return std::move(ExtrasT->ReturnValue);
+}
 }

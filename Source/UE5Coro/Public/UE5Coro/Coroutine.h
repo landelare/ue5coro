@@ -81,7 +81,7 @@ public:
 	 *  that's blocking.
 	 *  @return True if the coroutine completed, false on timeout. */
 	bool Wait(uint32 WaitTimeMilliseconds = MAX_uint32,
-	          bool bIgnoreThreadIdleStats = false);
+	          bool bIgnoreThreadIdleStats = false) const;
 
 	/** Sets a debug name for the currently-executing coroutine.
 	 *  Only valid to call from within a coroutine returning TCoroutine. */
@@ -94,6 +94,15 @@ class TCoroutine : public TCoroutine<>
 {
 protected:
 	using TCoroutine<>::TCoroutine;
+
+public:
+	/** Waits for the coroutine to finish, then gets its result. */
+	const T& GetResult() const;
+
+	/** Waits for the coroutine to finish, then gets its result as an rvalue.<br>
+	 *  Depending on T, this will often invalidate further GetResult and
+	 *  ContinueWith calls across all copies that refer to the same coroutine. */
+	T&& MoveResult();
 };
 
 static_assert(sizeof(TCoroutine<int>) == sizeof(TCoroutine<>));
@@ -122,4 +131,5 @@ static_assert(sizeof(FAsyncCoroutine) == sizeof(UE5Coro::TCoroutine<>));
 
 #if CPP
 #include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/Coroutine.inl"
 #endif

@@ -154,6 +154,9 @@ public:
 template<typename T>
 struct [[nodiscard]] TPromiseExtras : FPromiseExtras
 {
+#if UE5CORO_DEBUG
+	std::atomic<bool> bMoveUsed = false;
+#endif
 	T ReturnValue;
 };
 
