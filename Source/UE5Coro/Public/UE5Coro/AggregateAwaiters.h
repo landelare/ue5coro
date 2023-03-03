@@ -89,7 +89,7 @@ class [[nodiscard]] UE5CORO_API FAggregateAwaiter
 	std::shared_ptr<FData> Data;
 
 	template<typename T>
-	static FAsyncCoroutine Consume(std::shared_ptr<FData>, int, T&&);
+	static TCoroutine<> Consume(std::shared_ptr<FData>, int, T&&);
 
 protected:
 	int GetResumerIndex() const;
@@ -145,7 +145,7 @@ UE5Coro::Private::FAllAwaiter UE5Coro::WhenAll(T&&... Args)
 }
 
 template<typename T>
-FAsyncCoroutine UE5Coro::Private::FAggregateAwaiter::Consume(
+UE5Coro::TCoroutine<> UE5Coro::Private::FAggregateAwaiter::Consume(
 	std::shared_ptr<FData> Data, int Index, T&& Awaiter)
 {
 	auto AwaiterCopy = std::forward<T>(Awaiter); // If this line doesn't compile,

@@ -59,7 +59,7 @@ bool FLatentCallbackTest::RunTest(const FString& Parameters)
 	int State;
 	{
 		FTestWorld World;
-		World.Run([&](FLatentActionInfo) -> FAsyncCoroutine
+		World.Run([&](FLatentActionInfo) -> TCoroutine<>
 		{
 			ON_SCOPE_EXIT { State = 2; };
 			State = 1;

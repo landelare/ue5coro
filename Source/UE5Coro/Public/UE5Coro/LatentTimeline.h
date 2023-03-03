@@ -39,25 +39,25 @@
 namespace UE5Coro::Latent
 {
 /** Repeatedly calls the provided function with linearly-interpolated values. */
-UE5CORO_API FAsyncCoroutine Timeline(double From, double To, double Length,
-                                     std::function<void(double)> Fn,
-                                     bool bRunWhenPaused = false);
+UE5CORO_API TCoroutine<> Timeline(double From, double To, double Length,
+                                  std::function<void(double)> Fn,
+                                  bool bRunWhenPaused = false);
 
 /** Repeatedly calls the provided function with linearly-interpolated values.<br>
  *  This is affected by time dilation only, NOT pause. */
-UE5CORO_API FAsyncCoroutine UnpausedTimeline(double From, double To, double Length,
-                                             std::function<void(double)> Fn,
-                                             bool bRunWhenPaused = true);
+UE5CORO_API TCoroutine<> UnpausedTimeline(double From, double To, double Length,
+                                          std::function<void(double)> Fn,
+                                          bool bRunWhenPaused = true);
 
 /** Repeatedly calls the provided function with linearly-interpolated values.<br>
  *  This is not affected by pause or time dilation. */
-UE5CORO_API FAsyncCoroutine RealTimeline(double From, double To, double Length,
-                                         std::function<void(double)> Fn,
-                                         bool bRunWhenPaused = true);
+UE5CORO_API TCoroutine<> RealTimeline(double From, double To, double Length,
+                                      std::function<void(double)> Fn,
+                                      bool bRunWhenPaused = true);
 
 /** Repeatedly calls the provided function with linearly-interpolated values.<br>
  *  This is affected by pause only, NOT time dilation. */
-UE5CORO_API FAsyncCoroutine AudioTimeline(double From, double To, double Length,
-                                          std::function<void(double)> Fn,
-                                          bool bRunWhenPaused = false);
+UE5CORO_API TCoroutine<> AudioTimeline(double From, double To, double Length,
+                                       std::function<void(double)> Fn,
+                                       bool bRunWhenPaused = false);
 }

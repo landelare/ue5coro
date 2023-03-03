@@ -31,13 +31,15 @@
 
 #pragma once
 
+/******************************************************************************
+ *          This file only contains private implementation details.           *
+ *             #include "UE5Coro/Coroutine.h" for the public API.             *
+ ******************************************************************************/
+
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
-#include <atomic>
-#include <variant>
-#include "Engine/LatentActionManager.h"
+#include "UE5Coro/Coroutine.h"
 #include "Misc/SpinLock.h"
-#include "AsyncCoroutine.generated.h"
 
 namespace UE5Coro::Private
 {
@@ -61,66 +63,10 @@ struct TAwaitTransform
 };
 }
 
-// This type has to be a USTRUCT in the global namespace to support latent
-// UFUNCTIONs without wrappers.
-
-/**
- * Asynchronous coroutine. Return this type from a function and it will be able to
- * co_await various awaiters without blocking the calling thread.<br>
- * These objects do not represent ownership of the coroutine and do not need to
- * be stored.
- */
-USTRUCT(BlueprintInternalUseOnly, Meta=(HiddenByDefault))
-struct UE5CORO_API FAsyncCoroutine
-{
-	GENERATED_BODY()
-
-private:
-	std::shared_ptr<UE5Coro::Private::FPromiseExtras> Extras;
-
-public:
-	/** This constructor is public to placate the reflection system and BP,
-	 *  do not use directly.<br>
-	 *  Using default-constructed FAsyncCoroutines is undefined behavior. */
-	explicit FAsyncCoroutine(
-	    std::shared_ptr<UE5Coro::Private::FPromiseExtras> Extras = {})
-	    : Extras(std::move(Extras)) { }
-
-	/** Returns a delegate broadcasting this coroutine's completion for any
-	 *  reason, including being unsuccessful or canceled.
-	 *  This will be Broadcast() on the same thread where the coroutine is
-	 *	destroyed. */
-	TMulticastDelegate<void()>&	OnCompletion();
-
-	/** Blocks until the coroutine completes for any reason, including being
-	 *  unsuccessful or canceled.
-	 *  This could result in a deadlock if the coroutine wants to use the thread
-	 *  that's blocking.
-	 *  @return True if the coroutine completed, false on timeout. */
-	bool Wait(uint32 WaitTimeMilliseconds = MAX_uint32,
-	          bool bIgnoreThreadIdleStats = false);
-
-	/** Sets a debug name for the currently-executing coroutine.
-	 *  Only valid to call from within a coroutine returning FAsyncCoroutine. */
-	static void SetDebugName(const TCHAR* Name);
-};
-
-template<typename... Args>
-struct UE5Coro::Private::stdcoro::coroutine_traits<FAsyncCoroutine, Args...>
-{
-	static constexpr int LatentInfoCount =
-		(0 + ... + std::is_convertible_v<Args, FLatentActionInfo>);
-	static_assert(LatentInfoCount <= 1,
-		"Multiple FLatentActionInfo parameters found in coroutine");
-	using promise_type = std::conditional_t<LatentInfoCount,
-	                                        UE5Coro::Private::FLatentPromise,
-	                                        UE5Coro::Private::FAsyncPromise>;
-};
-
 namespace UE5Coro
 {
 #if UE5CORO_CPP20
-/** Things that can be co_awaited in a FAsyncCoroutine. */
+/** Things that can be co_awaited in a TCoroutine. */
 template<typename T>
 concept TAwaitable = requires
 {
@@ -211,21 +157,20 @@ class [[nodiscard]] FPromise
 	static std::atomic<int> LastDebugID;
 	static thread_local TArray<FPromise*> ResumeStack;
 
-	friend void FAsyncCoroutine::SetDebugName(const TCHAR*);
+	friend void TCoroutine<>::SetDebugName(const TCHAR*);
 #endif
 
+protected:
 	std::shared_ptr<FPromiseExtras> Extras;
 
-protected:
 	UE5CORO_API explicit FPromise(const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
 
 public:
 	void CheckAlive() const;
 	UE5CORO_API virtual ~FPromise(); // Virtual for warning suppression only
-	virtual void Resume();
+	UE5CORO_API virtual void Resume();
 
-	UE5CORO_API FAsyncCoroutine get_return_object();
 	UE5CORO_API void unhandled_exception();
 
 	// co_yield is not allowed in async coroutines
@@ -236,7 +181,8 @@ public:
 class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
 {
 public:
-	FAsyncPromise() : FPromise(TEXT("Async")) { }
+	template<typename... A>
+	explicit FAsyncPromise(A&&...) : FPromise(TEXT("Async")) { }
 
 	FInitialSuspend initial_suspend() { return {FInitialSuspend::Resume}; }
 	stdcoro::suspend_never final_suspend() noexcept { return {}; }
@@ -303,6 +249,19 @@ public:
 	}
 };
 
+template<typename T, typename Base>
+class TCoroutinePromise : public Base
+{
+public:
+	template<typename... A>
+	explicit TCoroutinePromise(A&&... Args) : Base(std::forward<A>(Args)...) { }
+
+	TCoroutine<T> get_return_object()
+	{
+		return TCoroutine<T>(this->Extras);
+	}
+};
+
 template<typename... T>
 FLatentPromise::FLatentPromise(T&&... Args)
 	: FPromise(TEXT("Latent"))
@@ -343,3 +302,22 @@ void FLatentPromise::Init(T& First, A&... Args)
 		Init(Args...);
 }
 }
+
+template<typename T, typename... Args>
+struct UE5Coro::Private::stdcoro::coroutine_traits<UE5Coro::TCoroutine<T>, Args...>
+{
+	static constexpr int LatentInfoCount =
+		(0 + ... + std::is_convertible_v<Args, FLatentActionInfo>);
+	static_assert(LatentInfoCount <= 1,
+	              "Multiple FLatentActionInfo parameters found in coroutine");
+	using promise_type = UE5Coro::Private::TCoroutinePromise<
+	    T, std::conditional_t<LatentInfoCount, UE5Coro::Private::FLatentPromise,
+	                                           UE5Coro::Private::FAsyncPromise>>;
+};
+
+template<typename... Args>
+struct UE5Coro::Private::stdcoro::coroutine_traits<FAsyncCoroutine, Args...>
+{
+	using promise_type = typename coroutine_traits<UE5Coro::TCoroutine<>,
+	                                               Args...>::promise_type;
+};

@@ -99,8 +99,3 @@ void FPromise::unhandled_exception()
 	throw;
 #endif
 }
-
-FAsyncCoroutine FPromise::get_return_object()
-{
-	return FAsyncCoroutine(Extras);
-}

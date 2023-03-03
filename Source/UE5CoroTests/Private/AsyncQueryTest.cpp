@@ -52,7 +52,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncQueryTestLatent, "UE5Coro.AsyncQuery.Late
 template<>
 struct stdcoro::coroutine_traits<void, FAutomationTestBase&>
 {
-	using promise_type = UE5Coro::Private::FAsyncPromise;
+	using promise_type = UE5Coro::Private::TCoroutinePromise<void, FAsyncPromise>;
 };
 #endif
 

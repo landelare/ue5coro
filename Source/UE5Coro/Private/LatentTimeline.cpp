@@ -42,9 +42,9 @@ namespace
 // a FLatentActionManager, otherwise this would keep running even after the
 // world is gone.
 template<auto GetTime>
-FAsyncCoroutine CommonTimeline(double From, double To, double Length,
-                               std::function<void(double)> Fn,
-                               bool bRunWhenPaused, FLatentActionInfo)
+TCoroutine<> CommonTimeline(double From, double To, double Length,
+                            std::function<void(double)> Fn,
+                            bool bRunWhenPaused, FLatentActionInfo)
 {
 #if ENABLE_NAN_DIAGNOSTIC
 	if (FMath::IsNaN(From) || FMath::IsNaN(To) || FMath::IsNaN(Length))
@@ -72,36 +72,36 @@ FAsyncCoroutine CommonTimeline(double From, double To, double Length,
 }
 }
 
-FAsyncCoroutine Latent::Timeline(double From, double To, double Length,
-                                 std::function<void(double)> Fn,
-                                 bool bRunWhenPaused)
+TCoroutine<> Latent::Timeline(double From, double To, double Length,
+                              std::function<void(double)> Fn,
+                              bool bRunWhenPaused)
 {
 	auto Info = GWorld->GetSubsystem<UUE5CoroSubsystem>()->MakeLatentInfo();
 	return CommonTimeline<&UWorld::GetTimeSeconds>(
 		From, To, Length, std::move(Fn), bRunWhenPaused, Info);
 }
 
-FAsyncCoroutine Latent::UnpausedTimeline(double From, double To, double Length,
-                                         std::function<void(double)> Fn,
-                                         bool bRunWhenPaused)
+TCoroutine<> Latent::UnpausedTimeline(double From, double To, double Length,
+                                      std::function<void(double)> Fn,
+                                      bool bRunWhenPaused)
 {
 	auto Info = GWorld->GetSubsystem<UUE5CoroSubsystem>()->MakeLatentInfo();
 	return CommonTimeline<&UWorld::GetUnpausedTimeSeconds>(
 		From, To, Length, std::move(Fn), bRunWhenPaused, Info);
 }
 
-FAsyncCoroutine Latent::RealTimeline(double From, double To, double Length,
-                                     std::function<void(double)> Fn,
-                                     bool bRunWhenPaused)
+TCoroutine<> Latent::RealTimeline(double From, double To, double Length,
+                                  std::function<void(double)> Fn,
+                                  bool bRunWhenPaused)
 {
 	auto Info = GWorld->GetSubsystem<UUE5CoroSubsystem>()->MakeLatentInfo();
 	return CommonTimeline<&UWorld::GetRealTimeSeconds>(
 		From, To, Length, std::move(Fn), bRunWhenPaused, Info);
 }
 
-FAsyncCoroutine Latent::AudioTimeline(double From, double To, double Length,
-                                      std::function<void(double)> Fn,
-                                      bool bRunWhenPaused)
+TCoroutine<> Latent::AudioTimeline(double From, double To, double Length,
+                                   std::function<void(double)> Fn,
+                                   bool bRunWhenPaused)
 {
 	auto Info = GWorld->GetSubsystem<UUE5CoroSubsystem>()->MakeLatentInfo();
 	return CommonTimeline<&UWorld::GetAudioTimeSeconds>(

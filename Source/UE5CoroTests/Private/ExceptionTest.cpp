@@ -87,7 +87,7 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 
 	try
 	{
-		auto Fn = [&]() -> FAsyncCoroutine
+		auto Fn = [&]() -> TCoroutine<>
 		{
 			co_await stdcoro::suspend_never();
 			throw FTestException("async");
@@ -106,7 +106,7 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 
 	try
 	{
-		auto Fn = [&](FLatentActionInfo) -> FAsyncCoroutine
+		auto Fn = [&](FLatentActionInfo) -> TCoroutine<>
 		{
 			co_await stdcoro::suspend_never();
 			throw FTestException("latent");

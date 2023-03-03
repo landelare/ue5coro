@@ -31,17 +31,17 @@
 
 #include "UE5Coro/AsyncCoroutine.h"
 
+using namespace UE5Coro;
 using namespace UE5Coro::Private;
 
-TMulticastDelegate<void()>& FAsyncCoroutine::OnCompletion()
+TMulticastDelegate<void()>& TCoroutine<>::OnCompletion()
 {
 	UE::TScopeLock _(Extras->Lock);
-	checkf(Extras->bAlive, TEXT("Attempting to use an invalid FAsyncCoroutine"));
+	checkf(Extras->bAlive, TEXT("Attempting to use an invalid TCoroutine"));
 	return Extras->Continuations;
 }
 
-bool FAsyncCoroutine::Wait(uint32 WaitTimeMilliseconds,
-                           bool bIgnoreThreadIdleStats)
+bool TCoroutine<>::Wait(uint32 WaitTimeMilliseconds, bool bIgnoreThreadIdleStats)
 {
 	FEventRef Done;
 	auto Binding = OnCompletion().AddLambda([&] { Done->Trigger(); });
@@ -51,7 +51,7 @@ bool FAsyncCoroutine::Wait(uint32 WaitTimeMilliseconds,
 	return bTriggered;
 }
 
-void FAsyncCoroutine::SetDebugName(const TCHAR* Name)
+void TCoroutine<>::SetDebugName(const TCHAR* Name)
 {
 #if UE5CORO_DEBUG
 	if (ensureMsgf(FPromise::ResumeStack.Num() > 0,

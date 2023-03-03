@@ -31,7 +31,9 @@
 
 #include "UE5Coro/AnimationAwaiters.h"
 
-FAsyncCoroutine UE5CoroAnimationAwaiterCompileTest()
+using namespace UE5Coro;
+
+TCoroutine<> UE5CoroAnimationAwaiterCompileTest()
 {
 	// Not actual tests (that would require assets), but compiling this function
 	// tests co_await result types and that everything is properly exported.

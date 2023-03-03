@@ -36,7 +36,7 @@
 #include "UE5Coro/AggregateAwaiters.h"
 #include "UE5Coro/AnimationAwaiters.h"
 #include "UE5Coro/AsyncAwaiters.h"
-#include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/Coroutine.h"
 #include "UE5Coro/Generator.h"
 #include "UE5Coro/HttpAwaiters.h"
 #include "UE5Coro/LatentAwaiters.h"

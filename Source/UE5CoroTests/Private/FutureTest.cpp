@@ -53,7 +53,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFutureLatent, "UE5Coro.Future.Latent",
 template<>
 struct stdcoro::coroutine_traits<void, FAutomationTestBase&>
 {
-	using promise_type = UE5Coro::Private::FAsyncPromise;
+	using promise_type = UE5Coro::Private::TCoroutinePromise<void, FAsyncPromise>;
 };
 #endif
 
