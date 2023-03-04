@@ -38,6 +38,7 @@
 #include "UE5Coro/UE5CoroSubsystem.h"
 
 #define CORO [&](T...) -> FAsyncCoroutine
+#define CORO_R(Type) [&](T...) -> TCoroutine<Type>
 #define IF_CORO_LATENT if constexpr (sizeof...(T) == 1)
 
 namespace UE5Coro::Private::Test
