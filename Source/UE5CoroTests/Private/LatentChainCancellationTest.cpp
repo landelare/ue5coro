@@ -80,7 +80,7 @@ void DoTest(FAutomationTestBase& Test)
 		World.Run(CORO
 		{
 			State = 1;
-#if UE5CORO_CPP20
+#if UE5CORO_PRIVATE_LATENT_CHAIN_IS_OK
 			ExpectFail(co_await Latent::Chain(&UKismetSystemLibrary::Delay, 1));
 #else
 			ExpectFail(co_await Latent::ChainEx(&UKismetSystemLibrary::Delay,

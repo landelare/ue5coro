@@ -78,7 +78,7 @@ void DoTest(FAutomationTestBase& Test)
 		World.Run(CORO
 		{
 			State = 1;
-#if UE5CORO_CPP20
+#if UE5CORO_PRIVATE_LATENT_CHAIN_IS_OK
 			ExpectSuccess(co_await Latent::Chain(
 				&UKismetSystemLibrary::DelayUntilNextTick));
 #else
@@ -103,7 +103,7 @@ void DoTest(FAutomationTestBase& Test)
 			ExpectSuccess(co_await Latent::ChainEx(
 				&UKismetSystemLibrary::Delay, _1, 1, _2));
 			State = 2;
-#if UE5CORO_CPP20
+#if UE5CORO_PRIVATE_LATENT_CHAIN_IS_OK
 			ExpectSuccess(co_await Latent::Chain(&UKismetSystemLibrary::Delay,
 				1));
 #else
@@ -126,7 +126,7 @@ void DoTest(FAutomationTestBase& Test)
 			State = 1;
 			auto* Obj = NewObject<UUE5CoroTestObject>();
 			TStrongObjectPtr<UObject> KeepAlive(Obj);
-#if UE5CORO_CPP20
+#if UE5CORO_PRIVATE_LATENT_CHAIN_IS_OK
 			ExpectSuccess(co_await Latent::Chain(&UUE5CoroTestObject::Latent,
 				Obj));
 #else
@@ -147,7 +147,8 @@ void DoTest(FAutomationTestBase& Test)
 		State = -1;
 		World.Run(CORO
 		{
-#if UE5CORO_CPP20
+#if UE5CORO_PRIVATE_LATENT_CHAIN_IS_OK
+			// The next line passes 0 instead of 1 on older versions of MSVC
 			auto Chain1 = Latent::Chain(&UKismetSystemLibrary::Delay, 1);
 			auto Chain2 =
 				Latent::Chain(&UKismetSystemLibrary::DelayUntilNextTick);

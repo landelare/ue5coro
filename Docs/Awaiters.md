@@ -151,6 +151,14 @@ They work exactly like they do in
 The return values of these functions are movable, game thread only, and support
 multiple concurrent co_awaits.
 
+<sup>
+There are known issues with Latent::Chain on older versions of MSVC (VS2019)
+that result in incorrectly-compiled code.
+Calling Chain will issue compile-time warnings if this is detected.
+VS2022 and Clang seem to be unaffected and are recommended for C++20 overall.
+ChainEx may be used as a workaround if you cannot update.
+</sup>
+
 #### Debugging/implementation notes
 
 In popular debuggers (Visual Studio 2022 and JetBrains Rider 2022.1 tested)

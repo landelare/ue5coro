@@ -34,6 +34,7 @@
 #include "UE5Coro/CoroutineAwaiters.h"
 
 using namespace UE5Coro;
+using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentReturnTest, "UE5Coro.Return.Latent",
@@ -45,6 +46,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncReturnTest, "UE5Coro.Return.Async",
                                  EAutomationTestFlags::ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
+
+#if defined(_MSC_VER) && _MSC_VER >= 1930
+// MSVC workaround - DoTest is not a coroutine but it won't compile without this
+template<>
+struct stdcoro::coroutine_traits<void, FAutomationTestBase&>
+{
+	using promise_type =
+	    UE5Coro::Private::TCoroutinePromise<void, FAsyncPromise>;
+};
+#endif
 
 namespace
 {

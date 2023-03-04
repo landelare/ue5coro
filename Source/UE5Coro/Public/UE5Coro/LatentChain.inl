@@ -132,7 +132,19 @@ struct FLatentChain<bWorld, bInfo, Type, Types...>
 namespace UE5Coro::Latent
 {
 #if UE5CORO_CPP20
+
+#if defined(_MSC_VER) && _MSC_VER < 1930
+#define UE5CORO_PRIVATE_LATENT_CHAIN_IS_OK 0
+#define UE5CORO_PRIVATE_LATENT_CHAIN_BUG_MSG \
+[[deprecated("Old versions of MSVC are known to have codegen issues with Chain. " \
+"Consider updating to something less broken, or using ChainEx as a workaround.")]]
+#else
+#define UE5CORO_PRIVATE_LATENT_CHAIN_IS_OK 1
+#define UE5CORO_PRIVATE_LATENT_CHAIN_BUG_MSG
+#endif
+
 template<typename... FnParams>
+UE5CORO_PRIVATE_LATENT_CHAIN_BUG_MSG
 Private::FLatentChainAwaiter Chain(auto (*Function)(FnParams...), auto&&... Args)
 {
 	auto [LatentInfo, Done] = Private::MakeLatentInfo();
@@ -144,6 +156,7 @@ Private::FLatentChainAwaiter Chain(auto (*Function)(FnParams...), auto&&... Args
 }
 
 template<std::derived_from<UObject> Class, typename... FnParams>
+UE5CORO_PRIVATE_LATENT_CHAIN_BUG_MSG
 Private::FLatentChainAwaiter Chain(auto (Class::*Function)(FnParams...),
                                    Class* Object, auto&&... Args)
 {
@@ -154,6 +167,9 @@ Private::FLatentChainAwaiter Chain(auto (Class::*Function)(FnParams...),
 		std::forward<decltype(Args)>(Args)...);
 	return Private::FLatentChainAwaiter(Done);
 }
+#else
+// C++17: not available
+#define UE5CORO_PRIVATE_LATENT_CHAIN_IS_OK 0
 #endif
 
 template<typename F, typename... A>
