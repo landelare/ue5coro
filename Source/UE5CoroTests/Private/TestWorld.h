@@ -35,6 +35,7 @@
 #include "UE5Coro/Definitions.h"
 #include <functional>
 #include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/UE5CoroSubsystem.h"
 
 #define CORO [&](T...) -> FAsyncCoroutine
 #define IF_CORO_LATENT if constexpr (sizeof...(T) == 1)
@@ -56,8 +57,28 @@ public:
 
 	void Tick(float DeltaSeconds = 0.125);
 	void EndTick();
-	FAsyncCoroutine Run(std::function<FAsyncCoroutine()>);
-	FAsyncCoroutine Run(std::function<FAsyncCoroutine(FLatentActionInfo)>);
+
+	template<typename T>
+	std::invoke_result_t<T> Run(T Fn)
+	{
+		// Extend the lifetime of Fn's lambda captures until it's complete
+		auto* Copy = new T(std::move(Fn));
+		auto Coro = (*Copy)();
+		Coro.ContinueWith([=] { delete Copy; });
+		return Coro;
+	}
+
+	template<typename T>
+	std::invoke_result_t<T, FLatentActionInfo> Run(T Fn)
+	{
+		auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
+		auto LatentInfo = Sys->MakeLatentInfo();
+
+		auto* Copy = new T(std::move(Fn));
+		auto Coro = (*Copy)(LatentInfo);
+		Coro.ContinueWith([=] { delete Copy; });
+		return Coro;
+	}
 };
 
 class FTestHelper

@@ -82,28 +82,6 @@ void FTestWorld::EndTick()
 	++GFrameCounter;
 }
 
-FAsyncCoroutine FTestWorld::Run(std::function<FAsyncCoroutine()> Fn)
-{
-	auto* Copy = new std::function(std::move(Fn));
-	auto Coro = (*Copy)();
-	// This assumes that the coroutine will suspend at least once
-	Coro.OnCompletion().AddLambda([=] { delete Copy; });
-	return Coro;
-}
-
-FAsyncCoroutine FTestWorld::Run(
-	std::function<FAsyncCoroutine(FLatentActionInfo)> Fn)
-{
-	auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
-	auto LatentInfo = Sys->MakeLatentInfo();
-
-	auto* Copy = new std::function(std::move(Fn));
-	auto Coro = (*Copy)(std::move(LatentInfo));
-	// This assumes that the coroutine will suspend at least once
-	Coro.OnCompletion().AddLambda([=] { delete Copy; });
-	return Coro;
-}
-
 void FTestHelper::PumpGameThread(FTestWorld& World,
                                  std::function<bool()> ExitCondition)
 {
