@@ -1,31 +1,51 @@
 # Async coroutines
 
-Returning `FAsyncCoroutine` (unfortunately not namespaced due to UHT limitations)
-from a function makes it coroutine-enabled and lets you co_await various
-awaiters provided by this library, found in various namespaces within UE5Coro
-such as UE5Coro\:\:Async or UE5Coro\:\:Latent.
+Returning `UE5Coro::TCoroutine<T>` from a function makes it coroutine-enabled
+and lets you co_await various awaiters provided by this library,
+found in various namespaces within UE5Coro such as UE5Coro\:\:Async or
+UE5Coro\:\:Latent.
 Any async coroutine can use any awaiter, but some awaiters are limited to the
 game thread.
 
-FAsyncCoroutine is a minimal (usually `sizeof(void*)` depending on your
-platform's implementation of std::coroutine_handle) struct that can access the
-underlying coroutine, but it doesn't own it.
-These objects are cheap to pass by value and safe to discard or keep around for
-longer than needed, but interacting with a freed coroutine through them is
-undefined behavior.
-Coroutines get deleted when or shortly after they finish.
+`TCoroutine<T>` co_returns T, `TCoroutine<>` co_returns void.
+`TCoroutine<>` and `TCoroutine<void>` are perfectly equivalent.
+All typed TCoroutines implicitly convert to TCoroutine<>, giving you a common
+return-type-erased view to a coroutine that may or may not have a return type.
 
-Accessing or manipulating the underlying std::coroutine_handle directly is not
+TCoroutine is thread safe and O(1) copyable (it's a shared pointer inside).
+Copies of a TCoroutine refer to the same coroutine as the original.
+TCoroutine&lt;T&gt; has all the functionality of TCoroutine<>, plus additional
+methods and overloads for the return type.
+
+A non-void coroutine return type must be at least _DefaultConstructible_,
+_MoveAssignable_, and _Destructible_.
+Full functionality also requires _CopyConstructible_.
+It's possible that a coroutine completes without providing a return value.
+In this case, reading the return value provides T().
+
+`FAsyncCoroutine` in the global namespace is a `USTRUCT` wrapper for
+TCoroutine<>, to be used when reflection support is required, e.g., for latent
+UFUNCTIONs.
+It implicitly converts from/to TCoroutine<>.
+Return values from co_return are not supported due to engine limitations, but
+"out" reference parameters still work for BP.
+
+FAsyncCoroutine (but not TCoroutine<>) can be default constructed due to yet
+more engine limitations.
+Prefer using TCoroutine<> when reflection/BP support is not needed.
+Interacting with a default-constructed FAsyncCoroutine or a TCoroutine<> that
+was converted from one is undefined behavior.
+Obtaining the coroutine's underlying `std::coroutine_handle` directly is not
 supported and is extremely likely to break.
 
 ## Debugging
 
-FAsyncCoroutine::SetDebugName() applies a debug name to the currently-running
+TCoroutine<>::SetDebugName() applies a debug name to the currently-running
 coroutine's promise object, which is otherwise an implementation detail.
 This has no effect at runtime (and does nothing in Shipping), but it's useful
 for debug viewing these objects.
 
-You might want to macro `FAsyncCoroutine::SetDebugName(TEXT(__FUNCTION__))`.
+You might want to macro `TCoroutine<>::SetDebugName(TEXT(__FUNCTION__))`.
 
 Looking at these or promise objects in general as part of `__coro_frame_ptr`
 seems to be unreliable in practice, moving one level up in the call stack to
@@ -145,12 +165,18 @@ FAsyncCoroutine AMyActor::GuaranteedSlowLoad(FLatentActionInfo)
 
 ### Other coroutines
 
-`FAsyncCoroutine`s themselves are awaitable, co_awaiting them will resume the
+`TCoroutine`s themselves are awaitable, co_awaiting them will resume the
 caller when the callee coroutine finishes for any reason, **including**
 `UE5Coro::Latent::Cancel()`.
+
+The return type of co_awaiting TCoroutine&lt;T&gt; is T.
+If the coroutine completed without co_returning a value, the result will be T().
+
 Async coroutines try to resume on a similar thread as they were on when co_await
 was issued (game thread to game thread, render thread to render thread, etc.),
 latent coroutines resume on the next tick after the callee ended.
+co_awaiting a coroutine that's already complete will not release the current
+thread and will continue running with the result obtained synchronously.
 
 ## Coroutines and UObject lifetimes
 
@@ -208,7 +234,7 @@ and co_await _not_ resuming the coroutine does not apply if you're not latent:
 ```cpp
 using namespace UE5Coro;
 
-FAsyncCoroutine UMyExampleClass::DontDoThisAtHome(UObject* Dangerous)
+TCoroutine<> UMyExampleClass::DontDoThisAtHome(UObject* Dangerous)
 {
     checkf(IsInGameThread(), TEXT("This example needs to start on the GT"));
 

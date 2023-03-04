@@ -1,6 +1,6 @@
 # UE5Coro
 
-This library implements C\+\+
+This plugin implements C\+\+
 [coroutines](https://en.cppreference.com/w/cpp/language/coroutines) for
 Unreal Engine 5 with a focus on gameplay logic and BP integration.
 
@@ -41,6 +41,10 @@ edit TargetRules.cs in the engine instead so that this flag is true by default.
 
 ## Features
 
+`#include "UE5Coro.h"` gives you every functionality that this plugin provides.
+You may opt to IWYU the various smaller headers, but no guidance is given as to
+which feature requires which header.
+
 Click these links for the detailed description of the main features provided
 by this plugin, or keep reading for a quick overview.
 
@@ -55,15 +59,16 @@ coroutines.
 
 ### Async coroutines
 
-Return `FAsyncCoroutine` from a function (regular or UFUNCTION) to make it
-coroutine enabled and support co_await inside.
+Return `UE5Coro::TCoroutine<>` from a function to make it coroutine enabled and
+support co_await inside.
+UFUNCTIONs need to use the `FAsyncCoroutine` wrapper.
 
 Having a `FLatentActionInfo` parameter makes the coroutine implement a BP latent
 action.
-You do not need to do anything with the parameter, just have it and the plugin
+You do not need to do anything with this parameter, just have it and the plugin
 will register it with the latent action manager.
-World context objects are also supported and automatically processed, it's
-recommended to have them as the first parameter.
+World context objects are also supported and automatically processed.
+It's recommended to have them as the first parameter.
 Don't forget the necessary UFUNCTION metadata to make this a latent node in BP!
 
 ```cpp
@@ -76,10 +81,13 @@ FAsyncCoroutine AExampleActor::Latent(FLatentActionInfo LatentInfo)
 }
 ```
 
+The returned struct has no use in BP and is automatically hidden:
+![AExampleActor::Latent as a BP node](Docs/latent_node.png)
+
 You're not limited to BP latent actions, or UCLASS members:
 
 ```cpp
-FAsyncCoroutine MyGlobalHelperFunction()
+UE5Coro::TCoroutine<> MyGlobalHelperFunction()
 {
     co_await UE5Coro::Latent::Seconds(1.0);
     OneSecondLater();
@@ -91,12 +99,12 @@ Or even regular functions:
 ```cpp
 void Example(int Value)
 {
-    auto Lambda = [Value]() -> FAsyncCoroutine
+    auto Lambda = [Value]() -> UE5Coro::TCoroutine<int>
     {
         co_await UE5Coro::Tasks::MoveToTask();
-        PerformExpensiveTask(Value);
+        co_return PerformExpensiveTask(Value);
     };
-    Lambda();
+    int ExpensiveResult = Lambda().GetResult();
 }
 ```
 
