@@ -29,7 +29,7 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/Coroutine.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
@@ -48,6 +48,11 @@ bool TCoroutine<>::Wait(uint32 WaitTimeMilliseconds,
                         bool bIgnoreThreadIdleStats) const
 {
 	return Extras->Completed->Wait(WaitTimeMilliseconds, bIgnoreThreadIdleStats);
+}
+
+bool TCoroutine<>::IsDone() const
+{
+	return Wait(0, true);
 }
 
 void TCoroutine<>::SetDebugName(const TCHAR* Name)

@@ -80,6 +80,9 @@ public:
 	bool Wait(uint32 WaitTimeMilliseconds = MAX_uint32,
 	          bool bIgnoreThreadIdleStats = false) const;
 
+	/** Returns if the coroutine has run to completion or faulted. */
+	[[nodiscard]] bool IsDone() const;
+
 	/** Calls the provided functor when this coroutine is complete, including
 	 *  unsuccessful completions such as being canceled.<br>
 	 *  If the coroutine is already complete, it will be called immediately,
