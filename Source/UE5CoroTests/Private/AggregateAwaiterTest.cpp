@@ -33,8 +33,7 @@
 #include "TestWorld.h"
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/AggregateAwaiters.h"
-#include "UE5Coro/AsyncAwaiters.h"
-#include "UE5Coro/LatentAwaiters.h"
+#include "UE5Coro/CoroutineAwaiters.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;

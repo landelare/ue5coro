@@ -100,18 +100,6 @@ struct [[nodiscard]] TAwaiter
 	void await_resume() { }
 };
 
-template<>
-struct UE5CORO_API TAwaitTransform<FAsyncPromise, FAsyncCoroutine>
-{
-	FAsyncAwaiter operator()(FAsyncCoroutine);
-};
-
-template<>
-struct UE5CORO_API TAwaitTransform<FLatentPromise, FAsyncCoroutine>
-{
-	FLatentAwaiter operator()(FAsyncCoroutine);
-};
-
 struct FInitialSuspend
 {
 	enum EAction

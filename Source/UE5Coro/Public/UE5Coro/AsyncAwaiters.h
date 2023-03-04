@@ -72,17 +72,19 @@ UE5CORO_API Private::FNewThreadAwaiter MoveToNewThread(
 
 namespace UE5Coro::Private
 {
-class [[nodiscard]] UE5CORO_API FAsyncAwaiter final
-	: public TAwaiter<FAsyncAwaiter>
+class [[nodiscard]] UE5CORO_API FAsyncAwaiter : public TAwaiter<FAsyncAwaiter>
 {
 	ENamedThreads::Type Thread;
-	std::optional<FAsyncCoroutine> ResumeAfter;
+
+protected:
+	std::optional<TCoroutine<>> ResumeAfter;
 
 public:
 	explicit FAsyncAwaiter(ENamedThreads::Type Thread,
-	                       std::optional<FAsyncCoroutine> ResumeAfter)
+	                       std::optional<TCoroutine<>> ResumeAfter)
 		: Thread(Thread), ResumeAfter(std::move(ResumeAfter)) { }
 
+	bool await_ready();
 	void Suspend(FPromise&);
 #if UE5CORO_DEBUG
 	void Suspend(FLatentPromise&);

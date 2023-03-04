@@ -67,15 +67,19 @@ public:
 };
 }
 
+bool FAsyncAwaiter::await_ready()
+{
+	if (ResumeAfter.has_value())
+		return ResumeAfter.value().IsDone();
+	return false;
+}
+
 void FAsyncAwaiter::Suspend(FPromise& Promise)
 {
 	auto* Task = TGraphTask<FResumeTask>::CreateTask()
 	                                     .ConstructAndHold(Thread, Promise);
 	if (ResumeAfter.has_value())
-		ResumeAfter.value().OnCompletion().AddLambda([Task]
-		{
-			Task->Unlock();
-		});
+		ResumeAfter.value().ContinueWith([Task] { Task->Unlock(); });
 	else
 		Task->Unlock();
 }

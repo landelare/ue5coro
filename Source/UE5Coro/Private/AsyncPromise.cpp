@@ -35,10 +35,3 @@ using namespace UE5Coro::Private;
 
 // This will generate and export FAsyncPromise's vtable on MSVC
 template FAsyncPromise::FAsyncPromise(std::shared_ptr<FPromiseExtras>);
-
-FAsyncAwaiter TAwaitTransform<FAsyncPromise, FAsyncCoroutine>::operator()
-	(FAsyncCoroutine Other)
-{
-	auto Thread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
-	return FAsyncAwaiter(Thread, Other);
-}

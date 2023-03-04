@@ -35,7 +35,6 @@
 #include "UE5Coro/AsyncAwaiters.h"
 #include "UE5Coro/AsyncCoroutine.h"
 #include "UE5Coro/LatentAwaiters.h"
-#include "UE5Coro/UE5CoroSubsystem.h"
 
 using namespace UE5Coro::Private;
 
@@ -317,13 +316,4 @@ stdcoro::suspend_always FLatentPromise::final_suspend() noexcept
 	);
 	LatentState = Done;
 	return {};
-}
-
-FLatentAwaiter TAwaitTransform<FLatentPromise, FAsyncCoroutine>::operator()
-	(FAsyncCoroutine Other)
-{
-	auto* Done = new FTwoLives; // FLatentAwaiter will do the second Release
-	// Not using the subsystem, there's no FLatentActionInfo
-	Other.OnCompletion().AddLambda([Done] { Done->Release(); });
-	return FLatentAwaiter(Done, &FTwoLives::ShouldResume);
 }
