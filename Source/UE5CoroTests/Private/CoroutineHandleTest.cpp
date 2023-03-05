@@ -31,6 +31,7 @@
 
 #include "TestWorld.h"
 #include "Misc/AutomationTest.h"
+#include "UE5CoroTestObject.h"
 #include "UE5Coro/AsyncAwaiters.h"
 
 using namespace UE5Coro;
@@ -49,6 +50,101 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHandleTestLatent, "UE5Coro.Handle.Latent",
 
 namespace
 {
+template<typename U>
+using TThreadSafeSharedPtr = TSharedPtr<U, ESPMode::ThreadSafe>;
+
+template<template<typename> typename S, typename... T>
+void DoTestSharedPtr(FTestWorld& World, FAutomationTestBase& Test)
+{
+	{
+		S<int> Ptr(new int(0));
+		auto Coro = World.Run(CORO { co_await Latent::NextTick(); });
+		Coro.ContinueWithWeak(Ptr, [](int* Value) { *Value = 1; });
+		World.EndTick();
+		Test.TestEqual(TEXT("Not completed yet"), *Ptr, 0);
+		World.Tick();
+		Test.TestEqual(TEXT("Completed"), *Ptr, 1);
+	}
+
+	{
+		S<int> Ptr(new int(0));
+		bool bContinued = false;
+		auto Coro = World.Run(CORO { co_await Latent::NextTick(); });
+		Coro.ContinueWithWeak(Ptr, [&] { bContinued = true; });
+		World.EndTick();
+		Test.TestFalse(TEXT("Not completed yet"), bContinued);
+		Ptr = nullptr;
+		World.Tick();
+		Test.TestFalse(TEXT("No continuation"), bContinued);
+	}
+
+	struct FBoolSetter
+	{
+		bool* Ptr;
+		void Set() { *Ptr = true; }
+	};
+
+	{
+		bool bContinued = false;
+		S<FBoolSetter> Ptr(new FBoolSetter{&bContinued});
+		auto Coro = World.Run(CORO { co_await Latent::NextTick(); });
+		Coro.ContinueWithWeak(Ptr, &FBoolSetter::Set);
+		World.EndTick();
+		Test.TestFalse(TEXT("Not completed yet"), bContinued);
+		World.Tick();
+		Test.TestTrue(TEXT("Completed"), bContinued);
+	}
+
+	{
+		bool bContinued = false;
+		S<FBoolSetter> Ptr(new FBoolSetter{&bContinued});
+		auto Coro = World.Run(CORO { co_await Latent::NextTick(); });
+		Coro.ContinueWithWeak(Ptr, &FBoolSetter::Set);
+		World.EndTick();
+		Test.TestFalse(TEXT("Not completed yet"), bContinued);
+		Ptr = nullptr;
+		World.Tick();
+		Test.TestFalse(TEXT("No continuation"), bContinued);
+	}
+
+	struct FIntSetter
+	{
+		int* Ptr;
+		void Set(int Value) const { *Ptr = Value; }
+	};
+
+	{
+		int State = 0;
+		S<const FIntSetter> Ptr(new FIntSetter{&State});
+		auto Coro = World.Run(CORO_R(int)
+		{
+			co_await Latent::NextTick();
+			co_return 1;
+		});
+		Coro.ContinueWithWeak(Ptr, &FIntSetter::Set);
+		World.EndTick();
+		Test.TestEqual(TEXT("Not completed yet"), State, 0);
+		World.Tick();
+		Test.TestEqual(TEXT("Completed"), State, 1);
+	}
+
+	{
+		int State = 0;
+		S<FIntSetter> Ptr(new FIntSetter{&State});
+		auto Coro = World.Run(CORO_R(int)
+		{
+			co_await Latent::NextTick();
+			co_return 1;
+		});
+		Coro.ContinueWithWeak(Ptr, &FIntSetter::Set);
+		World.EndTick();
+		Test.TestEqual(TEXT("Not completed yet"), State, 0);
+		Ptr = nullptr;
+		World.Tick();
+		Test.TestEqual(TEXT("No continuation"), State, 0);
+	}
+}
+
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
@@ -80,6 +176,79 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
 	}
+
+	{
+		int Value = 0;
+		World.Run(CORO_R(int) { co_return 1; })
+		     .ContinueWith([&](int InValue) { Value = InValue; });
+		IF_CORO_LATENT
+			World.Tick();
+		Test.TestEqual(TEXT("Value"), Value, 1);
+	}
+
+	{
+		FEventRef TestToCoro, CoroToTest;
+		TStrongObjectPtr Object(NewObject<UUE5CoroTestObject>());
+		auto Coro = World.Run(CORO
+		{
+			co_await Async::MoveToNewThread();
+			TestToCoro->Wait();
+			// Unconditionally move to the GT, ContinueWithWeak is on a UObject
+			co_await Async::MoveToGameThread();
+		});
+		Coro.ContinueWithWeak(Object.Get(), [&] { CoroToTest->Trigger(); });
+		Test.TestFalse(TEXT("Not triggered yet"), CoroToTest->Wait(0));
+		TestToCoro->Trigger();
+		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
+		CoroToTest->Wait();
+		Test.TestTrue(TEXT("Done"), true);
+	}
+
+	{
+		FEventRef TestToCoro, CoroToTest;
+		TStrongObjectPtr Object(NewObject<UUE5CoroTestObject>());
+		Object->Callback = [&] { CoroToTest->Trigger(); };
+		auto Coro = World.Run(CORO
+		{
+			co_await Async::MoveToNewThread();
+			TestToCoro->Wait();
+			// Unconditionally move to the GT, ContinueWithWeak is on a UObject
+			co_await Async::MoveToGameThread();
+		});
+		Coro.ContinueWithWeak(Object.Get(), &UUE5CoroTestObject::RunCallback);
+		Test.TestFalse(TEXT("Not triggered yet"), CoroToTest->Wait(0));
+		TestToCoro->Trigger();
+		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
+		CoroToTest->Wait();
+		Test.TestTrue(TEXT("Done"), true);
+	}
+
+	{
+		FEventRef TestToCoro;
+		std::atomic<bool> bContinued = false;
+		TWeakObjectPtr Object(NewObject<UUE5CoroTestObject>());
+		auto Coro = World.Run(CORO
+		{
+			co_await Async::MoveToNewThread();
+			TestToCoro->Wait();
+			// Unconditionally move to the GT, ContinueWithWeak is on a UObject
+			co_await Async::MoveToGameThread();
+		});
+		Coro.ContinueWithWeak(Object.Get(), [&] { bContinued = true; });
+		Object->MarkAsGarbage();
+		CollectGarbage(RF_NoFlags);
+		Test.TestFalse(TEXT("Object destroyed"), Object.IsValid());
+		Test.TestFalse(TEXT("Coroutine still running"), Coro.IsDone());
+		TestToCoro->Trigger();
+		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
+		// There's a data race with IsDone() when async, wait a little
+		for (int i = 0; i < 10; ++i)
+			World.Tick();
+		Test.TestFalse(TEXT("Continuation not called"), bContinued);
+	}
+
+	DoTestSharedPtr<TThreadSafeSharedPtr, T...>(World, Test);
+	DoTestSharedPtr<std::shared_ptr, T...>(World, Test);
 }
 }
 

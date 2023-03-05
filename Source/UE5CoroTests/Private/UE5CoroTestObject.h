@@ -43,6 +43,13 @@ class UUE5CoroTestObject : public UObject
 	GENERATED_BODY()
 
 public:
+	std::function<void()> Callback;
+	UFUNCTION()
+	void RunCallback()
+	{
+		Callback();
+	}
+
 	UFUNCTION()
 	void Empty()
 	{
