@@ -64,8 +64,8 @@ autonomously or implement a latent UFUNCTION, tied to the latent action manager.
 
 ### Async mode
 
-If your function **does not** have a `FLatentActionInfo` parameter, the
-coroutine is running in "async mode".
+If your function **does not** have a `FLatentActionInfo` or
+`FForceLatentCoroutine` parameter, the coroutine is running in "async mode".
 You still have access to awaiters in the UE5Coro::Latent namespace (locked to
 the game thread) but as far as your callers are concerned, the function returns
 at the first co_await and drives itself after that point.
@@ -85,7 +85,8 @@ destructors in scope are run as if an exception was thrown.
 ### Latent mode
 
 If your function (probably a UFUNCTION in this case but this is **not** checked
-or required) takes `FLatentActionInfo`, the coroutine is running in "latent mode".
+or required) takes `FLatentActionInfo` or `FForceLatentCoroutine`, the coroutine
+is running in "latent mode".
 The world will be fetched from the first UObject* parameter that returns a valid
 pointer from GetWorld() with GWorld used as a last resort fallback.
 

@@ -143,6 +143,14 @@ public:
 };
 }
 
+void FLatentPromise::CreateLatentAction()
+{
+	// We're still scanning for the world, so use what we have right now
+	auto* WorldNow = World ? World : GWorld;
+	auto* Sys = WorldNow->GetSubsystem<UUE5CoroSubsystem>();
+	CreateLatentAction(Sys->MakeLatentInfo());
+}
+
 // This is a separate function so that template Init() doesn't need the type
 void FLatentPromise::CreateLatentAction(FLatentActionInfo&& LatentInfo)
 {

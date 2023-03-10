@@ -226,9 +226,11 @@ private:
 	std::atomic<ELatentState> LatentState = LatentRunning;
 	ELatentExitReason ExitReason = static_cast<ELatentExitReason>(0);
 
+	void CreateLatentAction();
 	void CreateLatentAction(FLatentActionInfo&&);
 	void Init();
 	template<typename... T> void Init(const UObject*, T&...);
+	template<typename... T> void Init(FForceLatentCoroutine, T&...);
 	template<typename... T> void Init(FLatentActionInfo, T&...);
 	template<typename T, typename... A> void Init(T&, A&...);
 
@@ -313,6 +315,16 @@ void FLatentPromise::Init(const UObject* WorldContext, T&... Args)
 }
 
 template<typename... T>
+void FLatentPromise::Init(FForceLatentCoroutine, T&... Args)
+{
+	// The static_assert on coroutine_traits prevents this
+	check(!PendingLatentCoroutine);
+	CreateLatentAction();
+
+	Init(Args...);
+}
+
+template<typename... T>
 void FLatentPromise::Init(FLatentActionInfo LatentInfo, T&... Args)
 {
 	// The static_assert on coroutine_traits prevents this
@@ -338,11 +350,14 @@ struct UE5Coro::Private::stdcoro::coroutine_traits<UE5Coro::TCoroutine<T>, Args.
 {
 	static constexpr int LatentInfoCount =
 		(0 + ... + std::is_convertible_v<Args, FLatentActionInfo>);
-	static_assert(LatentInfoCount <= 1,
-	              "Multiple FLatentActionInfo parameters found in coroutine");
+	static constexpr bool LatentForceCount =
+		(0 + ... + std::is_same_v<Args, FForceLatentCoroutine>);
+	static_assert(LatentInfoCount + LatentForceCount <= 1,
+	              "Multiple latent info/force parameters found in coroutine");
+	static constexpr bool bUseLatent = LatentInfoCount || LatentForceCount;
 	using promise_type = UE5Coro::Private::TCoroutinePromise<
-	    T, std::conditional_t<LatentInfoCount, UE5Coro::Private::FLatentPromise,
-	                                           UE5Coro::Private::FAsyncPromise>>;
+	    T, std::conditional_t<bUseLatent, UE5Coro::Private::FLatentPromise,
+	                                      UE5Coro::Private::FAsyncPromise>>;
 };
 
 template<typename T, typename... Args>

@@ -119,8 +119,8 @@ or explicitly via `co_return;`.
 
 Asynchronous coroutines (in both modes) synchronously return to their callers at
 the first co_await or co_return that they encounter and the rest of the function
-body runs either independently (no LatentInfo) or through the latent action
-manager (with LatentInfo).
+body runs either independently (in async mode) or through the latent action
+manager (in latent mode).
 
 Everything co_awaitable works in every asynchronous coroutine, regardless of its
 BP integration:

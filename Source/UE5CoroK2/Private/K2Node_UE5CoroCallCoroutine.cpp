@@ -88,9 +88,15 @@ void UK2Node_UE5CoroCallCoroutine::PostParameterPinCreated(UEdGraphPin* Pin)
 {
 	Super::PostParameterPinCreated(Pin);
 
-	// Is this an output async coroutine pin?
-	if(auto* Type = Pin->PinType.PinSubCategoryObject.Get();
-		Pin->Direction == EGPD_Output && Type == FAsyncCoroutine::StaticStruct())
+	UObject* Type = Pin->PinType.PinSubCategoryObject.Get();
+
+	// Is this an output FAsyncCoroutine pin?
+	if (Pin->Direction == EGPD_Output && Type == FAsyncCoroutine::StaticStruct())
+		Pin->SafeSetHidden(true);
+
+	// Is this an input FForceLatentCoroutine pin?
+	if (Pin->Direction == EGPD_Input &&
+	    Type == FForceLatentCoroutine::StaticStruct())
 		Pin->SafeSetHidden(true);
 }
 

@@ -180,6 +180,15 @@ struct UE5CORO_API FAsyncCoroutine
 
 static_assert(sizeof(FAsyncCoroutine) == sizeof(UE5Coro::TCoroutine<>));
 
+/** Taking this struct as a parameter in a coroutine will force latent execution
+ *  mode, even if it does not have a FLatentActionInfo parameter.<br>
+ *  It is compatible with UFUNCTIONs and hidden on BP call nodes. */
+USTRUCT(BlueprintInternalUseOnly, Meta = (HiddenByDefault))
+struct UE5CORO_API FForceLatentCoroutine
+{
+    GENERATED_BODY()
+};
+
 #if CPP
 #include "UE5Coro/AsyncCoroutine.h"
 #ifndef UE5CORO_SUPPRESS_COROUTINE_INL
