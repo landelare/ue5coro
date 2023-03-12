@@ -65,6 +65,23 @@ void DoTest(FAutomationTestBase& Test)
 	FTestWorld World;
 
 	{
+		TPromise<int> Promise;
+		Promise.SetValue(1);
+		auto Coro = World.Run(CORO_R(int)
+		{
+			co_return co_await Promise.GetFuture();
+		});
+
+		IF_CORO_LATENT
+		{
+			Test.TestFalse(TEXT("Not polled yet"), Coro.IsDone());
+			World.Tick();
+		}
+		Test.TestTrue(TEXT("Already done"), Coro.IsDone());
+		Test.TestEqual(TEXT("Value"), Coro.GetResult(), 1);
+	}
+
+	{
 		int State = 0;
 		TPromise<void> Promise;
 		World.Run(CORO

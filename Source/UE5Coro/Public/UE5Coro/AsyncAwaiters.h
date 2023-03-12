@@ -104,22 +104,26 @@ public:
 
 	bool await_ready()
 	{
-		checkf(this->Future.IsValid(),
+		checkf(!Result, TEXT("Attempting to reuse spent TFutureAwaiter"));
+		checkf(Future.IsValid(),
 		       TEXT("Awaiting invalid/spent future will never resume"));
 		return Future.IsReady();
 	}
 
 	void Suspend(FPromise& Promise)
 	{
-		checkf(!Result, TEXT("Attempting to reuse spent TFutureAwaiter"));
+		// Extremely rarely, Then will run synchronously because Future
+		// finished after IsReady but before Suspend.
+		// This is OK and will result in the caller coroutine resuming itself.
 
 		Future.Then([this, &Promise](auto InFuture)
 		{
+			checkf(!Future.IsValid(), TEXT("Internal error"));
+
 			// TFuture<T&> will pass T* for Value, TFuture<void> an int
 			if constexpr (std::is_lvalue_reference_v<T>)
 			{
 				static_assert(std::is_pointer_v<decltype(InFuture.Get())>);
-				checkf(!Future.IsValid(), TEXT("Internal error"));
 				Result = InFuture.Get();
 				Promise.Resume();
 			}
@@ -127,7 +131,6 @@ public:
 			{
 				// It's normally dangerous to expose a pointer to a local, but
 				auto Value = InFuture.Get(); // This will be alive while...
-				checkf(!Future.IsValid(), TEXT("Internal error"));
 				Result = &Value;
 				Promise.Resume(); // ...await_resume moves from it here
 			}
@@ -136,10 +139,24 @@ public:
 
 	T await_resume()
 	{
-		if constexpr (std::is_lvalue_reference_v<T>)
-			return *Result;
-		else if constexpr (!std::is_void_v<T>)
-			return std::move(*Result);
+		if (!Result)
+		{
+			// Result being nullptr indicates that await_ready returned true,
+			// Then has not and will not run, and Future is still valid
+			checkf(Future.IsValid(), TEXT("Internal error"));
+			static_assert(std::is_same_v<T, decltype(Future.Get())>);
+			Result = reinterpret_cast<decltype(Result)>(-1); // Mark as spent
+			return Future.Get();
+		}
+		else
+		{
+			// Otherwise, we're being called from Then, and Future is spent
+			checkf(!Future.IsValid(), TEXT("Internal error"));
+			if constexpr (std::is_lvalue_reference_v<T>)
+				return *Result;
+			else if constexpr (!std::is_void_v<T>)
+				return std::move(*Result); // This will move from Then's local
+		}
 	}
 };
 

@@ -80,8 +80,6 @@ FPromise::~FPromise()
 void FPromise::Resume()
 {
 #if UE5CORO_DEBUG
-	checkf(ResumeStack.Num() == 0 || ResumeStack.Last() != this,
-	       TEXT("Internal error"));
 	checkf(!Extras->IsComplete(),
 	       TEXT("Attempting to resume completed coroutine"));
 	ResumeStack.Push(this);
