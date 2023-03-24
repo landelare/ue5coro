@@ -34,6 +34,11 @@
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
 
+const TCoroutine<> TCoroutine<>::CompletedCoroutine = []() -> TCoroutine<>
+{
+	co_return;
+}();
+
 TMulticastDelegate<void()>& TCoroutine<>::OnCompletion()
 {
 	UE::TScopeLock _(Extras->Lock);

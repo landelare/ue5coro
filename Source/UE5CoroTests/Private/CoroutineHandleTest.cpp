@@ -247,6 +247,23 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestFalse(TEXT("Continuation not called"), bContinued);
 	}
 
+	{
+		auto Coro = TCoroutine<>::CompletedCoroutine;
+		Test.TestTrue(TEXT("Completed"), Coro.IsDone());
+
+		auto Ptr = std::make_unique<int>(1); // move-only
+		auto Coro1 = TCoroutine<>::FromResult(std::move(Ptr));
+		auto Coro2 = TCoroutine<>::FromResult(2);
+		auto Coro3 = TCoroutine<int>::FromResult(3);
+		Test.TestTrue(TEXT("Completed 1"), Coro1.IsDone());
+		Test.TestTrue(TEXT("Completed 2"), Coro2.IsDone());
+		Test.TestTrue(TEXT("Completed 3"), Coro3.IsDone());
+		Test.TestNull(TEXT("Moved from"), Ptr.get());
+		Test.TestEqual(TEXT("Moved to"), *Coro1.GetResult(), 1);
+		Test.TestEqual(TEXT("Coro2"), Coro2.GetResult(), 2);
+		Test.TestEqual(TEXT("Coro3"), Coro3.MoveResult(), 3);
+	}
+
 	DoTestSharedPtr<TThreadSafeSharedPtr, T...>(World, Test);
 	DoTestSharedPtr<std::shared_ptr, T...>(World, Test);
 }

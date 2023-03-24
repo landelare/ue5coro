@@ -64,6 +64,14 @@ protected:
 		: Extras(std::move(Extras)) { }
 
 public:
+	/** A coroutine that has already completed with no return value. */
+	static const TCoroutine<> CompletedCoroutine;
+
+	/** A coroutine that has already completed with the provided value. */
+	template<typename V>
+	static auto FromResult(V&& Value)
+		-> TCoroutine<std::remove_cv_t<std::remove_reference_t<V>>>;
+
 	/** Returns a delegate broadcasting this coroutine's completion for any
 	 *  reason, including being unsuccessful or canceled.
 	 *  This will be Broadcast() on the same thread where the coroutine is
@@ -120,6 +128,9 @@ protected:
 	using TCoroutine<>::TCoroutine;
 
 public:
+	/** A coroutine that has already completed with the provided value. */
+	static TCoroutine<T> FromResult(T Value);
+
 	/** Waits for the coroutine to finish, then gets its result. */
 	const T& GetResult() const;
 

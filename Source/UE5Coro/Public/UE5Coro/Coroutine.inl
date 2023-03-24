@@ -33,6 +33,21 @@
 
 namespace UE5Coro
 {
+// Argument deduction on TCoroutine<>
+template<typename V>
+auto TCoroutine<>::FromResult(V&& Value)
+	-> TCoroutine<std::remove_cv_t<std::remove_reference_t<V>>>
+{
+	co_return Value;
+}
+
+// TCoroutine<T> matches T exactly
+template<typename T>
+TCoroutine<T> TCoroutine<T>::FromResult(T Value)
+{
+	co_return Value;
+}
+
 template<typename T>
 const T& TCoroutine<T>::GetResult() const
 {
