@@ -86,9 +86,6 @@ public:
 
 	bool await_ready();
 	void Suspend(FPromise&);
-#if UE5CORO_DEBUG
-	void Suspend(FLatentPromise&);
-#endif
 };
 
 template<typename T>

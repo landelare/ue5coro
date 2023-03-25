@@ -33,5 +33,11 @@
 
 using namespace UE5Coro::Private;
 
-// This will generate and export FAsyncPromise's vtable on MSVC
-template FAsyncPromise::FAsyncPromise(std::shared_ptr<FPromiseExtras>);
+void FAsyncPromise::ThreadSafeDestroy()
+{
+	// There's no parent implementation to call
+
+	// Async coroutines always own themselves and are free threaded
+	auto Handle = stdcoro::coroutine_handle<FAsyncPromise>::from_promise(*this);
+	Handle.destroy(); // counts as delete this;
+}

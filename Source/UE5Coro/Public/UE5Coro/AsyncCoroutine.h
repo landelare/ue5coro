@@ -174,14 +174,18 @@ class [[nodiscard]] UE5CORO_API FPromise
 
 protected:
 	std::shared_ptr<FPromiseExtras> Extras;
+	std::atomic<bool> bCanceled = false;
 	TArray<std::function<void(void*)>> OnCompleted;
 
 	explicit FPromise(std::shared_ptr<FPromiseExtras>, const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
+	virtual ~FPromise(); // Virtual for warning suppression only
 
 public:
-	virtual ~FPromise(); // Virtual for warning suppression only
-	virtual void Resume();
+	/** Request deletion now or very soon. */
+	virtual void ThreadSafeDestroy() = 0;
+	virtual void Resume(bool bBypassCancellationHolds = false);
+	void Cancel();
 	void AddContinuation(std::function<void(void*)>);
 
 	void unhandled_exception();
@@ -197,6 +201,8 @@ public:
 	template<typename... A>
 	explicit FAsyncPromise(std::shared_ptr<FPromiseExtras> InExtras, A&&...)
 		: FPromise(std::move(InExtras), TEXT("Async")) { }
+
+	virtual void ThreadSafeDestroy() override;
 
 	FInitialSuspend initial_suspend() noexcept
 	{
@@ -215,20 +221,14 @@ public:
 
 class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
 {
-public:
-	enum ELatentState
-	{
-		LatentRunning,
-		AsyncRunning,
-		DeferredDestroy,
-		Canceled,
-		Done,
-	};
-
-private:
 	UWorld* World = nullptr;
 	void* PendingLatentCoroutine = nullptr;
-	std::atomic<ELatentState> LatentState = LatentRunning;
+	enum ELatentFlags
+	{
+		LF_Detached = 1,
+		LF_InFinalSuspend = 2,
+	};
+	std::atomic<int> LatentFlags = 0; // int to get the bitwise operators
 	ELatentExitReason ExitReason = static_cast<ELatentExitReason>(0);
 
 	void CreateLatentAction();
@@ -239,18 +239,20 @@ private:
 	template<typename... T> void Init(FLatentActionInfo, T&...);
 	template<typename T, typename... A> void Init(T&, A&...);
 
+protected:
+	virtual ~FLatentPromise() override;
+
 public:
 	template<typename... T>
 	explicit FLatentPromise(std::shared_ptr<FPromiseExtras>, T&&...);
+	virtual void ThreadSafeDestroy() override;
 
-	virtual ~FLatentPromise() override;
-	virtual void Resume() override;
-	void ThreadSafeDestroy();
+	virtual void Resume(bool bBypassCancellationHolds = false) override;
 
-	ELatentState GetLatentState() const { return LatentState.load(); }
-	void AttachToGameThread(); // AsyncRunning -> LatentRunning
-	void DetachFromGameThread(); // LatentRunning -> AsyncRunning
-	void LatentCancel(); // LatentRunning -> Canceled
+	void AttachToGameThread();
+	void DetachFromGameThread();
+
+	void Respond(struct FLatentResponse&, const FLatentActionInfo&) const;
 
 	ELatentExitReason GetExitReason() const { return ExitReason; }
 	void SetExitReason(ELatentExitReason Reason);

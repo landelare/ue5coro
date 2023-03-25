@@ -77,14 +77,3 @@ void FAsyncAwaiter::Suspend(FPromise& Promise)
 	else
 		Task->Unlock();
 }
-
-#if UE5CORO_DEBUG
-void FAsyncAwaiter::Suspend(FLatentPromise& Promise)
-{
-	// Extra checks on a latent promise
-	auto CurrentState = Promise.GetLatentState();
-	checkf(CurrentState < FLatentPromise::Canceled, // not done yet
-	       TEXT("Unexpected latent coroutine state %d"), CurrentState);
-	Suspend(static_cast<FPromise&>(Promise));
-}
-#endif

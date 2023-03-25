@@ -74,7 +74,7 @@ FPromise::~FPromise()
 	Continuations.Broadcast();
 }
 
-void FPromise::Resume()
+void FPromise::Resume(bool bBypassCancellationHolds)
 {
 #if UE5CORO_DEBUG
 	checkf(!Extras->IsComplete(),
@@ -91,7 +91,16 @@ void FPromise::Resume()
 	};
 #endif
 
-	stdcoro::coroutine_handle<FPromise>::from_promise(*this).resume();
+	// Self-destruct instead of resuming if a cancellation was received
+	if (UNLIKELY(bCanceled))
+		ThreadSafeDestroy();
+	else
+		stdcoro::coroutine_handle<FPromise>::from_promise(*this).resume();
+}
+
+void FPromise::Cancel()
+{
+	bCanceled = true;
 }
 
 void FPromise::AddContinuation(std::function<void(void*)> Fn)

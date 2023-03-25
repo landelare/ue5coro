@@ -106,13 +106,5 @@ void FLatentAwaiter::Suspend(FAsyncPromise& Promise)
 
 void FLatentAwaiter::Suspend(FLatentPromise& Promise)
 {
-#if DO_CHECK
-	checkf(IsInGameThread(),
-	       TEXT("Latent awaiters may only be used on the game thread"));
-	auto CurrentState = Promise.GetLatentState();
-	checkf(CurrentState == FLatentPromise::LatentRunning,
-	       TEXT("Unexpected state in latent coroutine %d"), CurrentState);
-#endif
-
 	Promise.SetCurrentAwaiter(this);
 }

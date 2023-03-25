@@ -60,7 +60,11 @@ public:
 		checkf(IsInGameThread(),
 		       TEXT("Unexpected latent action off the game thread"));
 		if (LIKELY(Promise))
-			Promise->ThreadSafeDestroy();
+		{
+			Promise->Cancel();
+			// Process the cancellation right now, there might be no resumption
+			Promise->Resume(true);
+		}
 	}
 
 #if !PLATFORM_EXCEPTIONS_DISABLED
@@ -107,13 +111,7 @@ public:
 			Promise->Resume();
 		}
 
-		// Did the coroutine finish?
-		auto State = Promise->GetLatentState();
-		if (State >= FLatentPromise::Canceled)
-			Response.DoneIf(true);
-		if (State == FLatentPromise::Done)
-			Response.TriggerLink(LatentInfo.ExecutionFunction,
-			                     LatentInfo.Linkage, LatentInfo.CallbackTarget);
+		Promise->Respond(Response, LatentInfo);
 	}
 
 	virtual void NotifyActionAborted() override
@@ -190,49 +188,46 @@ FLatentPromise::~FLatentPromise()
 #endif
 }
 
-void FLatentPromise::Resume()
+void FLatentPromise::Resume(bool bBypassCancellationHolds)
 {
-	// Return to latent running on the game thread, even if it's an async task.
-	bool bIsInGameThread = IsInGameThread();
-	if (bIsInGameThread)
+	// Holding off cancellation will be implemented in a future commit
+	if (UNLIKELY(bBypassCancellationHolds))
+	{
+		// This can only happen from a game thread latent update
+		checkf(IsInGameThread() && bCanceled,
+		       TEXT("Internal error: wrong state for bypass request"));
+
+		// If ownership is borrowed, let the guaranteed future Resume call
+		// handle this
+		if (LatentFlags & LF_Detached)
+			return;
+
+		// Otherwise, proceed with re-attaching and destruction
+	}
+
+	// Return ownership to the game thread and the latent action manager
+	// once the multi-threaded adventure is over
+	if (LatentFlags & LF_Detached && IsInGameThread())
 		AttachToGameThread();
 
-	// Was there a deferred deletion request?
-	if (UNLIKELY(LatentState == DeferredDestroy))
-	{
-		// Finish on the game thread: exit reason, destructors, etc.
-		if (bIsInGameThread)
-			ThreadSafeDestroy();
-		else
-			AsyncTask(ENamedThreads::GameThread,
-			          std::bind(&FLatentPromise::ThreadSafeDestroy, this));
-	}
-	else
-		// If this promise is async running, we're committed to a resumption at
-		// this point (DeferredDestroy arrived since the if above).
-		// Deletion requests will end up in the next call to Resume
-		// since the coroutine must return to the game thread in a future
-		// co_await.
-
-		// If this is the game thread, ~FPendingLatentCoroutine cannot run and
-		// the coroutine will either co_await or return_void.
-
-		// Therefore, this can safely run on any thread now.
-		FPromise::Resume();
+	FPromise::Resume(bBypassCancellationHolds);
 }
 
 void FLatentPromise::ThreadSafeDestroy()
 {
-	// If the coroutine is async running, request destruction from the awaiter.
-	if (auto Old = AsyncRunning;
-	    LatentState.compare_exchange_strong(Old, DeferredDestroy))
+	// There's no parent implementation to call
+
+	// Latent coroutines always end on the game thread
+	if (!IsInGameThread())
+	{
+		AsyncTask(ENamedThreads::GameThread, [this] { ThreadSafeDestroy(); });
 		return;
+	}
 
-	checkf(IsInGameThread(),
-	       TEXT("Unexpected latent coroutine destruction off the game thread"));
-	auto Handle = stdcoro::coroutine_handle<FLatentPromise>::from_promise(*this);
-
+	// Since we're on the game thread now, there's no possibility of a race with
+	// ~FPendingLatentCoroutine requesting another deletion
 	GLatentExitReason = ExitReason;
+	auto Handle = stdcoro::coroutine_handle<FLatentPromise>::from_promise(*this);
 	Handle.destroy(); // Counts as delete this;
 	checkf(GLatentExitReason == ELatentExitReason::Normal,
 	       TEXT("Internal error: latent exit reason not restored"));
@@ -240,15 +235,9 @@ void FLatentPromise::ThreadSafeDestroy()
 
 void FLatentPromise::AttachToGameThread()
 {
-	// This might fail to exchange if State == DeferredDestroy which is OK
-	auto Old = AsyncRunning;
-	LatentState.compare_exchange_strong(Old, LatentRunning);
-#if DO_CHECK
-	auto State = LatentState.load();
-	checkf(State == FLatentPromise::LatentRunning ||
-	       State == FLatentPromise::DeferredDestroy,
-	       TEXT("Unexpected state when returning to game thread"));
-#endif
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: attaching to the GT while not on the GT"));
+	LatentFlags &= ~LF_Detached;
 }
 
 void FLatentPromise::DetachFromGameThread()
@@ -259,23 +248,31 @@ void FLatentPromise::DetachFromGameThread()
 	// there will be a valid promise and coroutine state to return to.
 	// FLatentAwaiters use a dedicated code path and do not call this, as they
 	// support destruction while being co_awaited.
-
-	if (auto Old = LatentRunning;
-	    LatentState.compare_exchange_strong(Old, AsyncRunning) ||
-	    Old == AsyncRunning || Old == DeferredDestroy)
-		; // Done
-	else
-		checkf(false, TEXT("Unexpected latent coroutine state %d"), Old);
+	LatentFlags |= LF_Detached;
 }
 
-void FLatentPromise::LatentCancel()
+void FLatentPromise::Respond(FLatentResponse& Response,
+                             const FLatentActionInfo& LatentInfo) const
 {
-#if DO_CHECK
-	auto CurrentState = LatentState.load();
-	ensureMsgf(CurrentState == FLatentPromise::LatentRunning,
-	           TEXT("Unexpected latent coroutine state %d"), CurrentState);
-#endif
-	LatentState = Canceled;
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: latent action tick off the game thread"));
+	checkf(!Extras->IsComplete(),
+	       TEXT("Internal error: completed promise is still polled"));
+
+	auto Flags = LatentFlags.load();
+	bool bDetached = Flags & LF_Detached;
+	bool bFinalSuspend = Flags & LF_InFinalSuspend;
+
+	// Cancellations are implicitly held until the coroutine re-attaches.
+	// If there's an attached cancellation or final_suspend, the coroutine will
+	// not do anything meaningful and the latent action is over.
+	if (bCanceled && !bDetached || bFinalSuspend)
+		Response.DoneIf(true);
+
+	// The coroutine ran to completion and BP should continue
+	if (bFinalSuspend)
+		Response.TriggerLink(LatentInfo.ExecutionFunction, LatentInfo.Linkage,
+		                     LatentInfo.CallbackTarget);
 }
 
 void FLatentPromise::SetExitReason(ELatentExitReason Reason)
@@ -287,6 +284,10 @@ void FLatentPromise::SetExitReason(ELatentExitReason Reason)
 
 void FLatentPromise::SetCurrentAwaiter(FLatentAwaiter* Awaiter)
 {
+	checkf(IsInGameThread(),
+	       TEXT("Latent awaiters may only be used on the game thread"));
+	// How is a new latent awaiter getting added in these states?
+	checkf(LatentFlags == 0, TEXT("Unexpected state in latent coroutine"));
 	auto* Pending = static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine);
 	Pending->SetCurrentAwaiter(Awaiter);
 }
@@ -318,16 +319,11 @@ FInitialSuspend FLatentPromise::initial_suspend()
 
 stdcoro::suspend_always FLatentPromise::final_suspend() noexcept
 {
-#if DO_CHECK
-	ensureMsgf(IsInGameThread(),
-	           TEXT("Latent coroutines must end on the game thread"));
-	// Only this should be possible if co_returning cleanly on the game thread,
-	// ~FPendingLatentCoroutine is blocked from running and Latent::Cancel()
-	// doesn't resume.
-	auto State = LatentState.load();
-	ensureMsgf(State == LatentRunning, TEXT("Unexpected coroutine state %d"),
-	           State);
-#endif
-	LatentState = Done;
+	// Too late for cancellations now.
+	// Flags are overwritten, i.e., the coroutine is unconditionally reattached.
+	LatentFlags = LF_InFinalSuspend;
+
+	// Due to the free-threaded attachment, there's a potential data race now,
+	// including another thread deleting `this`, so it may not be used anymore
 	return {};
 }

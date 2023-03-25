@@ -289,9 +289,7 @@ public:
 		// co_awaiting this in async mode is meaningless, use co_return instead.
 		-> std::enable_if_t<std::is_base_of_v<FLatentPromise, P>>
 	{
-		ensureMsgf(IsInGameThread(), TEXT("Latent coroutines may only be "
-		                                  "canceled on the game thread"));
-		Handle.promise().LatentCancel();
+		Handle.promise().Cancel();
 	}
 
 	void await_resume() noexcept { }
