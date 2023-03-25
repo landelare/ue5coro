@@ -50,8 +50,11 @@ struct [[nodiscard]] FPendingAsyncCoroutine final : FPendingLatentAction
 	virtual ~FPendingAsyncCoroutine() override
 	{
 		if (Promise)
-			stdcoro::coroutine_handle<FAsyncPromise>::from_promise(*Promise)
-			                                         .destroy();
+		{
+			// This class doesn't own the coroutine (its Latent counterpart does)
+			Promise->Cancel();
+			Promise->Resume(false); // No need to bypass cancellation holds
+		}
 	}
 
 	virtual void UpdateOperation(FLatentResponse& Response) override

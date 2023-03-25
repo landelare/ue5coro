@@ -52,8 +52,9 @@ template<typename> class TAsyncQueryAwaiter;
 namespace UE5Coro::Latent
 {
 /** Stops the latent coroutine immediately WITHOUT firing the latent exec pin.<br>
- *  The coroutine WILL NOT be resumed. This does not count as the coroutine being
- *  aborted. */
+ *  The coroutine WILL NOT be resumed.
+ *  This does not count as the coroutine being aborted.
+ *  @see TCoroutine<>::Cancel to cancel a coroutine from outside. */
 Private::FLatentCancellation Cancel() noexcept;
 
 #pragma region Tick

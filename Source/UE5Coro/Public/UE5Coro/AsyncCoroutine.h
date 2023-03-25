@@ -116,6 +116,7 @@ struct FInitialSuspend
 		switch (Action)
 		{
 			case Resume: Handle.promise().Resume(); break;
+			// This is very early and doesn't yet count as cancellation
 			case Destroy: Handle.destroy(); break;
 		}
 	}

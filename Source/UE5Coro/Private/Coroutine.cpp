@@ -39,6 +39,14 @@ const TCoroutine<> TCoroutine<>::CompletedCoroutine = []() -> TCoroutine<>
 	co_return;
 }();
 
+void TCoroutine<void>::Cancel()
+{
+	UE::TScopeLock _(Extras->Lock);
+	// Holding the lock guarantees that Promise is active in the union
+	if (Extras->Promise)
+		Extras->Promise->Cancel();
+}
+
 TMulticastDelegate<void()>& TCoroutine<>::OnCompletion()
 {
 	UE::TScopeLock _(Extras->Lock);

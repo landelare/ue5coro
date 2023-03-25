@@ -73,6 +73,11 @@ public:
 	static auto FromResult(V&& Value)
 		-> TCoroutine<std::remove_cv_t<std::remove_reference_t<V>>>;
 
+	/** Request the coroutine to stop executing at the next opportunity.<br>
+	 *  This function returns immediately, with the coroutine still running.<br>
+	 *  Has no effect on coroutines that have already completed. */
+	void Cancel();
+
 	/** Returns a delegate broadcasting this coroutine's completion for any
 	 *  reason, including being unsuccessful or canceled.
 	 *  This will be Broadcast() on the same thread where the coroutine is
