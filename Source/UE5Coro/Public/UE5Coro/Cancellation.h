@@ -33,60 +33,33 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
-#include <functional>
-#include "UE5Coro/AsyncCoroutine.h"
-#include "UE5Coro/UE5CoroSubsystem.h"
 
-#define CORO [&](T...) -> FAsyncCoroutine
-#define CORO_R(Type) [&](T...) -> TCoroutine<Type>
-#define IF_CORO_LATENT if constexpr (sizeof...(T) == 1)
-#define IF_NOT_CORO_LATENT if constexpr (sizeof...(T) != 1)
-
-namespace UE5Coro::Private::Test
+namespace UE5Coro
 {
-class FTestWorld
-{
-	UWorld* World;
+namespace Private { class FPromise; }
 
-	UWorld* PrevWorld;
-	decltype(GFrameCounter) OldFrameCounter;
+/**
+ * Guards against user-requested cancellation. For advanced use.<br>
+ * This does NOT affect a latent coroutine destroyed by the latent action
+ * manager.<br><br>
+ * If any number of these objects is in scope within a coroutine returning
+ * TCoroutine, it will delay cancellations and not process them in co_awaits.<br>
+ * The first co_await after the last one of these has gone out of scope will
+ * process the cancellation that was deferred.<br>
+ */
+class [[nodiscard]] UE5CORO_API FCancellationGuard
+{
+#if UE5CORO_DEBUG
+	Private::FPromise* Promise;
+#endif
 
 public:
-	FTestWorld();
-	~FTestWorld();
+	FCancellationGuard();
+	UE_NONCOPYABLE(FCancellationGuard);
+	~FCancellationGuard();
 
-	UWorld* operator->() const { return World; }
-
-	void Tick(float DeltaSeconds = 0.125);
-	void EndTick();
-
-	template<typename T>
-	std::invoke_result_t<T> Run(T Fn)
-	{
-		// Extend the lifetime of Fn's lambda captures until it's complete
-		auto* Copy = new T(std::move(Fn));
-		auto Coro = (*Copy)();
-		Coro.ContinueWith([=] { delete Copy; });
-		return Coro;
-	}
-
-	template<typename T>
-	std::invoke_result_t<T, FLatentActionInfo> Run(T Fn)
-	{
-		auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
-		auto LatentInfo = Sys->MakeLatentInfo();
-
-		auto* Copy = new T(std::move(Fn));
-		auto Coro = (*Copy)(LatentInfo);
-		Coro.ContinueWith([=] { delete Copy; });
-		return Coro;
-	}
-};
-
-class FTestHelper
-{
-public:
-	static void PumpGameThread(FTestWorld& World,
-	                           std::function<bool()> ExitCondition);
+	// These objects only make sense as locals
+	void* operator new(std::size_t) = delete;
+	void* operator new[](std::size_t) = delete;
 };
 }

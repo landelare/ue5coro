@@ -36,6 +36,7 @@
 #include "UE5Coro/AggregateAwaiters.h"
 #include "UE5Coro/AnimationAwaiters.h"
 #include "UE5Coro/AsyncAwaiters.h"
+#include "UE5Coro/Cancellation.h"
 #include "UE5Coro/Coroutine.h"
 #include "UE5Coro/CoroutineAwaiters.h"
 #include "UE5Coro/Generator.h"

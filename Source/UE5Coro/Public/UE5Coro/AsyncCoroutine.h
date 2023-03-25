@@ -164,6 +164,18 @@ struct [[nodiscard]] TPromiseExtras final : FPromiseExtras
 		: FPromiseExtras(Promise) { }
 };
 
+class [[nodiscard]] UE5CORO_API FCancellationTracker
+{
+	std::atomic<bool> bCanceled = false;
+	std::atomic<int> CancellationHolds = 0;
+
+public:
+	void Cancel() { bCanceled = true; }
+	void Hold() { verify(++CancellationHolds >= 0); }
+	void Release() { verify(--CancellationHolds >= 0); }
+	bool ShouldCancel(bool bBypassHolds) const;
+};
+
 #if UE5CORO_DEBUG
 extern std::atomic<int> GLastDebugID;
 #endif
@@ -174,20 +186,26 @@ class [[nodiscard]] UE5CORO_API FPromise
 {
 	friend void TCoroutine<>::SetDebugName(const TCHAR*);
 
+	FCancellationTracker CancellationTracker;
+
 protected:
 	std::shared_ptr<FPromiseExtras> Extras;
-	std::atomic<bool> bCanceled = false;
 	TArray<std::function<void(void*)>> OnCompleted;
 
 	explicit FPromise(std::shared_ptr<FPromiseExtras>, const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
 	virtual ~FPromise(); // Virtual for warning suppression only
+	bool ShouldCancel(bool bBypassHolds = false) const;
 
 public:
+	static FPromise& Current();
+
 	/** Request deletion now or very soon. */
 	virtual void ThreadSafeDestroy() = 0;
-	virtual void Resume(bool bBypassCancellationHolds = false);
 	void Cancel();
+	void HoldCancellation();
+	void ReleaseCancellation();
+	virtual void Resume(bool bBypassCancellationHolds = false);
 	void AddContinuation(std::function<void(void*)>);
 
 	void unhandled_exception();

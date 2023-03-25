@@ -169,11 +169,10 @@ FLatentPromise::~FLatentPromise()
 
 void FLatentPromise::Resume(bool bBypassCancellationHolds)
 {
-	// Holding off cancellation will be implemented in a future commit
 	if (UNLIKELY(bBypassCancellationHolds))
 	{
 		// This can only happen from a game thread latent update
-		checkf(IsInGameThread() && bCanceled,
+		checkf(IsInGameThread() && ShouldCancel(true),
 		       TEXT("Internal error: wrong state for bypass request"));
 
 		// If ownership is borrowed, let the guaranteed future Resume call
@@ -245,7 +244,7 @@ void FLatentPromise::Respond(FLatentResponse& Response,
 	// Cancellations are implicitly held until the coroutine re-attaches.
 	// If there's an attached cancellation or final_suspend, the coroutine will
 	// not do anything meaningful and the latent action is over.
-	if (bCanceled && !bDetached || bFinalSuspend)
+	if (ShouldCancel(false) && !bDetached || bFinalSuspend)
 		Response.DoneIf(true);
 
 	// The coroutine ran to completion and BP should continue

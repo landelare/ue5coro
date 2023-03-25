@@ -29,64 +29,24 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include "CoreMinimal.h"
-#include "UE5Coro/Definitions.h"
-#include <functional>
+#include "UE5Coro/Cancellation.h"
 #include "UE5Coro/AsyncCoroutine.h"
-#include "UE5Coro/UE5CoroSubsystem.h"
 
-#define CORO [&](T...) -> FAsyncCoroutine
-#define CORO_R(Type) [&](T...) -> TCoroutine<Type>
-#define IF_CORO_LATENT if constexpr (sizeof...(T) == 1)
-#define IF_NOT_CORO_LATENT if constexpr (sizeof...(T) != 1)
+using namespace UE5Coro;
+using namespace UE5Coro::Private;
 
-namespace UE5Coro::Private::Test
+FCancellationGuard::FCancellationGuard()
+#if UE5CORO_DEBUG
+	: Promise(&FPromise::Current())
+#endif
 {
-class FTestWorld
+	FPromise::Current().HoldCancellation();
+}
+
+FCancellationGuard::~FCancellationGuard()
 {
-	UWorld* World;
-
-	UWorld* PrevWorld;
-	decltype(GFrameCounter) OldFrameCounter;
-
-public:
-	FTestWorld();
-	~FTestWorld();
-
-	UWorld* operator->() const { return World; }
-
-	void Tick(float DeltaSeconds = 0.125);
-	void EndTick();
-
-	template<typename T>
-	std::invoke_result_t<T> Run(T Fn)
-	{
-		// Extend the lifetime of Fn's lambda captures until it's complete
-		auto* Copy = new T(std::move(Fn));
-		auto Coro = (*Copy)();
-		Coro.ContinueWith([=] { delete Copy; });
-		return Coro;
-	}
-
-	template<typename T>
-	std::invoke_result_t<T, FLatentActionInfo> Run(T Fn)
-	{
-		auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
-		auto LatentInfo = Sys->MakeLatentInfo();
-
-		auto* Copy = new T(std::move(Fn));
-		auto Coro = (*Copy)(LatentInfo);
-		Coro.ContinueWith([=] { delete Copy; });
-		return Coro;
-	}
-};
-
-class FTestHelper
-{
-public:
-	static void PumpGameThread(FTestWorld& World,
-	                           std::function<bool()> ExitCondition);
-};
+#if UE5CORO_DEBUG
+	checkf(Promise == &FPromise::Current(), TEXT("Hold/Release mismatch"));
+#endif
+	FPromise::Current().ReleaseCancellation();
 }

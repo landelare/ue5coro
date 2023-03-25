@@ -32,6 +32,7 @@
 #include "TestWorld.h"
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/AsyncAwaiters.h"
+#include "UE5Coro/Cancellation.h"
 #include "UE5Coro/LatentAwaiters.h"
 
 using namespace UE5Coro;
@@ -104,6 +105,36 @@ void DoTest(FAutomationTestBase& Test)
 		Coro.Cancel();
 		// Also acts as a busy wait for the async test
 		FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
+		Test.TestTrue(TEXT("Canceled"), bDone);
+	}
+
+	{
+		bool bDone = false;
+		bool bContinue = false;
+		auto Coro = World.Run(CORO
+		{
+			ON_SCOPE_EXIT { bDone = true; };
+			// First, run with cancellations blocked
+			{
+				FCancellationGuard _;
+				while (!bContinue)
+					co_await Latent::NextTick();
+			}
+			// Then, allow cancellations
+			for (;;)
+				co_await Latent::NextTick();
+		});
+		Coro.Cancel();
+		for (int i = 0; i < 10; ++i)
+		{
+			World.Tick();
+			Test.TestFalse(TEXT("Still running"), bDone);
+		}
+		bContinue = true;
+		World.Tick();
+		// Async->Latent await needs an extra tick to figure this out
+		IF_NOT_CORO_LATENT
+			World.Tick();
 		Test.TestTrue(TEXT("Canceled"), bDone);
 	}
 }

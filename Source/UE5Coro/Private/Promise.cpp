@@ -37,11 +37,17 @@ using namespace UE5Coro::Private;
 #if UE5CORO_DEBUG
 std::atomic<int> UE5Coro::Private::GLastDebugID = -1; // -1 = no coroutines yet
 #endif
+
 thread_local FPromise* UE5Coro::Private::GCurrentPromise = nullptr;
 
 bool FPromiseExtras::IsComplete() const
 {
 	return Completed->Wait(0, true);
+}
+
+bool FCancellationTracker::ShouldCancel(bool bBypassHolds) const
+{
+	return bCanceled && (bBypassHolds || CancellationHolds == 0);
 }
 
 FPromise::FPromise(std::shared_ptr<FPromiseExtras> InExtras,
@@ -73,6 +79,33 @@ FPromise::~FPromise()
 	Continuations.Broadcast();
 }
 
+bool FPromise::ShouldCancel(bool bBypassHolds) const
+{
+	return CancellationTracker.ShouldCancel(bBypassHolds);
+}
+
+FPromise& FPromise::Current()
+{
+	checkf(GCurrentPromise,
+	       TEXT("This operation is only available from inside a TCoroutine"));
+	return *GCurrentPromise;
+}
+
+void FPromise::Cancel()
+{
+	CancellationTracker.Cancel();
+}
+
+void FPromise::HoldCancellation()
+{
+	CancellationTracker.Hold();
+}
+
+void FPromise::ReleaseCancellation()
+{
+	CancellationTracker.Release();
+}
+
 void FPromise::Resume(bool bBypassCancellationHolds)
 {
 	checkf(!Extras->IsComplete(),
@@ -88,16 +121,13 @@ void FPromise::Resume(bool bBypassCancellationHolds)
 		GCurrentPromise = CallerPromise;
 	};
 
-	// Self-destruct instead of resuming if a cancellation was received
-	if (UNLIKELY(bCanceled))
+	// Self-destruct instead of resuming if a cancellation was received.
+	// As an exception, the latent action manager destroying the latent action
+	// bypasses cancellation holds.
+	if (UNLIKELY(ShouldCancel(bBypassCancellationHolds)))
 		ThreadSafeDestroy();
 	else
 		stdcoro::coroutine_handle<FPromise>::from_promise(*this).resume();
-}
-
-void FPromise::Cancel()
-{
-	bCanceled = true;
 }
 
 void FPromise::AddContinuation(std::function<void(void*)> Fn)
