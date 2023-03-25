@@ -45,16 +45,6 @@ bool FPromiseExtras::IsComplete() const
 	return Completed->Wait(0, true);
 }
 
-void FPromiseExtras::Complete()
-{
-	// This should be called with the mutex already held
-	checkf(!Lock.TryLock(), TEXT("Internal error: completing without lock held"));
-	checkf(!IsComplete(), TEXT("Internal error: double completion"));
-	Completed->Trigger();
-	OnCompleted();
-	OnCompleted = nullptr;
-}
-
 FPromise::FPromise(std::shared_ptr<FPromiseExtras> InExtras,
                    const TCHAR* PromiseType)
 	: Extras(std::move(InExtras))
@@ -67,13 +57,20 @@ FPromise::FPromise(std::shared_ptr<FPromiseExtras> InExtras,
 
 FPromise::~FPromise()
 {
-	// If something else is accessing the delegate, block until it's done
-	UE::TScopeLock _(Extras->Lock);
+	// Expecting the lock to be taken by a derived destructor
+	checkf(!Extras->Lock.TryLock(), TEXT("Internal error: lock not held"));
 	checkf(!Extras->IsComplete(),
 	       TEXT("Unexpected late/double coroutine destruction"));
 	auto Continuations = std::move(Extras->Continuations_DEPRECATED);
-	Extras->Complete();
-	_.Unlock();
+
+	// The coroutine is considered completed NOW
+	Extras->Completed->Trigger();
+	Extras->Lock.Unlock();
+
+	for (auto& Fn : OnCompleted)
+		Fn(Extras->ReturnValuePtr);
+	Extras->ReturnValuePtr = nullptr;
+
 	Continuations.Broadcast();
 }
 
@@ -95,6 +92,15 @@ void FPromise::Resume()
 #endif
 
 	stdcoro::coroutine_handle<FPromise>::from_promise(*this).resume();
+}
+
+void FPromise::AddContinuation(std::function<void(void*)> Fn)
+{
+	// Expecting a non-empty function and the lock to be held by the caller
+	checkf(!Extras->Lock.TryLock(), TEXT("Internal error: lock not held"));
+	checkf(Fn, TEXT("Internal error: adding empty function as continuation"));
+
+	OnCompleted.Add(std::move(Fn));
 }
 
 void FPromise::unhandled_exception()

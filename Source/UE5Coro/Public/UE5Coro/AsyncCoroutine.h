@@ -135,15 +135,20 @@ public:
 
 	FEventRef Completed{EEventMode::ManualReset};
 	UE::FSpinLock Lock;
+	union
+	{
+		FPromise* Promise; // nullptr once destroyed
+		void* ReturnValuePtr; // in the destructor only
+	};
 	TMulticastDelegate<void()> Continuations_DEPRECATED;
-	std::function<void()> OnCompleted = [] { };
 
-	explicit FPromiseExtras() noexcept { }
+	explicit FPromiseExtras(FPromise& Promise) noexcept : Promise(&Promise) { }
 	UE_NONCOPYABLE(FPromiseExtras);
 	virtual ~FPromiseExtras() = default; // Virtual for warning suppression only
 
 	bool IsComplete() const;
-	virtual void Complete();
+	template<typename T, typename F>
+	void ContinueWith(F Fn);
 };
 
 template<typename T>
@@ -153,14 +158,9 @@ struct [[nodiscard]] TPromiseExtras final : FPromiseExtras
 	std::atomic<bool> bMoveUsed = false;
 #endif
 	T ReturnValue{};
-	std::function<void(const T&)> OnCompletedT = [](const T&) { };
 
-	virtual void Complete() override
-	{
-		FPromiseExtras::Complete();
-		OnCompletedT(ReturnValue);
-		OnCompletedT = nullptr;
-	}
+	explicit TPromiseExtras(FPromise& Promise) noexcept
+		: FPromiseExtras(Promise) { }
 };
 
 #if UE5CORO_DEBUG
@@ -174,6 +174,7 @@ class [[nodiscard]] UE5CORO_API FPromise
 
 protected:
 	std::shared_ptr<FPromiseExtras> Extras;
+	TArray<std::function<void(void*)>> OnCompleted;
 
 	explicit FPromise(std::shared_ptr<FPromiseExtras>, const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
@@ -181,6 +182,7 @@ protected:
 public:
 	virtual ~FPromise(); // Virtual for warning suppression only
 	virtual void Resume();
+	void AddContinuation(std::function<void(void*)>);
 
 	void unhandled_exception();
 
@@ -271,9 +273,17 @@ class TCoroutinePromise : public Base
 public:
 	template<typename... A>
 	explicit TCoroutinePromise(A&&... Args)
-		: Base(std::make_shared<TPromiseExtras<T>>(), std::forward<A>(Args)...)
-	{ }
+		: Base(std::make_shared<TPromiseExtras<T>>(*this),
+		       std::forward<A>(Args)...) { }
 	UE_NONCOPYABLE(TCoroutinePromise);
+
+	~TCoroutinePromise()
+	{
+		auto* ExtrasT = static_cast<TPromiseExtras<T>*>(this->Extras.get());
+		ExtrasT->Lock.Lock(); // This will be held until the end of ~FPromise
+		checkf(ExtrasT->Promise, TEXT("Unexpected double promise destruction"));
+		ExtrasT->ReturnValuePtr = &ExtrasT->ReturnValue;
+	}
 
 	void return_value(T Value)
 	{
@@ -295,8 +305,18 @@ class TCoroutinePromise<void, Base> : public Base
 public:
 	template<typename... A>
 	explicit TCoroutinePromise(A&&... Args)
-		: Base(std::make_shared<FPromiseExtras>(), std::forward<A>(Args)...) { }
+		: Base(std::make_shared<FPromiseExtras>(*this), std::forward<A>(Args)...)
+	{ }
 	UE_NONCOPYABLE(TCoroutinePromise);
+
+	~TCoroutinePromise()
+	{
+		// This will be held until the end of ~FPromise
+		this->Extras->Lock.Lock();
+		checkf(this->Extras->Promise,
+		       TEXT("Unexpected double promise destruction"));
+		this->Extras->ReturnValuePtr = nullptr;
+	}
 
 	void return_void() noexcept { }
 
@@ -305,6 +325,31 @@ public:
 		return TCoroutine<>(this->Extras);
 	}
 };
+
+template<typename T, typename F>
+void FPromiseExtras::ContinueWith(F Fn)
+{
+	UE::TScopeLock _(Lock);
+	if (IsComplete()) // Already completed?
+	{
+		_.Unlock();
+		if constexpr (std::is_void_v<T>)
+			Fn();
+		else // T is controlled by TCoroutine<T>, safe to cast
+			Fn(static_cast<const TPromiseExtras<T>*>(this)->ReturnValue);
+		return;
+	}
+
+	checkf(Promise,
+	       TEXT("Internal error: attaching continuation to a complete promise"));
+	Promise->AddContinuation([Fn = std::move(Fn)](void* Data)
+	{
+		if constexpr (std::is_void_v<T>)
+			Fn();
+		else
+			Fn(*static_cast<const T*>(Data));
+	});
+}
 
 template<typename... T>
 FLatentPromise::FLatentPromise(std::shared_ptr<FPromiseExtras> Extras,

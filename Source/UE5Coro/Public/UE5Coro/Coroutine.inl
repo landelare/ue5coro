@@ -73,19 +73,7 @@ template<typename F>
 auto TCoroutine<>::ContinueWith(F Continuation)
 	-> std::enable_if_t<std::is_invocable_v<F>>
 {
-	UE::TScopeLock _(Extras->Lock);
-	if (Extras->IsComplete())
-	{
-		_.Unlock();
-		Continuation();
-	}
-	else
-		Extras->OnCompleted = [Parent = std::move(Extras->OnCompleted),
-		                       Fn = std::move(Continuation)]
-		{
-			Parent();
-			Fn();
-		};
+	Extras->ContinueWith<void>(std::move(Continuation));
 }
 
 template<typename U, typename F>
@@ -124,22 +112,7 @@ auto TCoroutine<T>::ContinueWith(F Continuation)
 	if constexpr (!std::is_invocable_v<F, T>)
 		TCoroutine<>::ContinueWith(std::move(Continuation));
 	else
-	{
-		auto* ExtrasT = static_cast<Private::TPromiseExtras<T>*>(Extras.get());
-		UE::TScopeLock _(ExtrasT->Lock);
-		if (ExtrasT->IsComplete())
-		{
-			_.Unlock();
-			std::invoke(Continuation, ExtrasT->ReturnValue);
-		}
-		else
-			ExtrasT->OnCompletedT = [Parent = std::move(ExtrasT->OnCompletedT),
-			                         Fn = std::move(Continuation)](const T& Result)
-			{
-				Parent(Result);
-				std::invoke(Fn, Result);
-			};
-	}
+		Extras->ContinueWith<T>(std::move(Continuation));
 }
 
 template<typename T>
