@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -38,7 +38,7 @@ using namespace UE5Coro::Private;
 
 namespace
 {
-struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
+struct [[nodiscard]] FPendingAsyncCoroutine final : FPendingLatentAction
 {
 	FAsyncPromise* Promise;
 	FLatentAwaiter* Awaiter;
@@ -62,13 +62,13 @@ struct [[nodiscard]] FPendingAsyncCoroutine : FPendingLatentAction
 		Response.DoneIf(true);
 
 		// Ownership moves back to the coroutine itself
-		checkf(Promise, TEXT("Internal error"));
+		checkf(Promise, TEXT("Internal error: resuming null coroutine"));
 		std::exchange(Promise, nullptr)->Resume();
 	}
 };
 }
 
-FLatentAwaiter::FLatentAwaiter(FLatentAwaiter&& Other)
+FLatentAwaiter::FLatentAwaiter(FLatentAwaiter&& Other) noexcept
 	: State(Other.State), Resume(Other.Resume)
 {
 	Other.State = nullptr;
@@ -100,19 +100,19 @@ void FLatentAwaiter::Suspend(FAsyncPromise& Promise)
 	auto* Sys = GWorld->GetSubsystem<UUE5CoroSubsystem>();
 	auto* Latent = new FPendingAsyncCoroutine(Promise, this);
 	auto LatentInfo = Sys->MakeLatentInfo();
-	GWorld->GetLatentActionManager().AddNewAction(
-		LatentInfo.CallbackTarget, LatentInfo.UUID, Latent);
+	GWorld->GetLatentActionManager().AddNewAction(LatentInfo.CallbackTarget,
+	                                              LatentInfo.UUID, Latent);
 }
 
 void FLatentAwaiter::Suspend(FLatentPromise& Promise)
 {
+#if DO_CHECK
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	checkCode(
-		auto CurrentState = Promise.GetLatentState();
-		checkf(CurrentState == FLatentPromise::LatentRunning,
-		       TEXT("Unexpected state in latent coroutine %d"), CurrentState);
-	);
+	auto CurrentState = Promise.GetLatentState();
+	checkf(CurrentState == FLatentPromise::LatentRunning,
+	       TEXT("Unexpected state in latent coroutine %d"), CurrentState);
+#endif
 
 	Promise.SetCurrentAwaiter(this);
 }

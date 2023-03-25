@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -45,8 +45,8 @@ UE5CORO_API std::tuple<FLatentActionInfo, FTwoLives*> MakeLatentInfo();
 class [[nodiscard]] UE5CORO_API FLatentChainAwaiter : public FLatentAwaiter
 {
 public:
-	explicit FLatentChainAwaiter(FTwoLives* Done);
-	FLatentChainAwaiter(FLatentChainAwaiter&&) = default;
+	explicit FLatentChainAwaiter(FTwoLives* Done) noexcept;
+	FLatentChainAwaiter(FLatentChainAwaiter&&) noexcept = default;
 	bool await_resume();
 };
 
@@ -63,9 +63,9 @@ template<typename T>
 concept TLatentInfo = std::same_as<std::decay_t<T>, FLatentActionInfo>;
 
 template<typename T>
-using TForwardRef = std::conditional_t<std::is_lvalue_reference_v<T>,
-                                       std::reference_wrapper<std::remove_reference_t<T>>,
-                                       T&&>;
+using TForwardRef =
+	std::conditional_t<std::is_lvalue_reference_v<T>,
+                       std::reference_wrapper<std::remove_reference_t<T>>, T&&>;
 
 // Terminator
 template<bool, bool bInfo, typename...>
@@ -75,7 +75,7 @@ struct FLatentChain
 	{
 		static_assert(!bInfo, "Chained function is not latent");
 		static_assert(sizeof...(Args) == 0,
-			"Too many parameters provided for chained call");
+		              "Too many parameters provided for chained call");
 		// This one last forward is needed to forward &&s all the way through
 		std::forward<decltype(Fn)>(Fn)();
 	}
@@ -114,7 +114,7 @@ struct FLatentChain<bWorld, bInfo, Type, Types...>
 	static void Call(auto&&, FLatentActionInfo)
 	{
 		static_assert(false && bWorld, // This needs to depend on a template param
-			"Not enough parameters provided for chained call");
+		              "Not enough parameters provided for chained call");
 	}
 
 	static void Call(auto&& Fn, FLatentActionInfo LatentInfo,

@@ -33,7 +33,6 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
-#include <optional>
 #include "UE5Coro/UE5CoroAnimCallbackTarget.h"
 
 namespace UE5Coro::Private
@@ -93,8 +92,9 @@ UE5CORO_API Private::FAnimAwaiterVoid NextNotify(UAnimInstance* Instance,
  *  this function or (rarely) if the anim instance got destroyed.
  *  Use IsValid(AnimInstance) if you need to handle this separately.
  *  @see FPlayMontageAnimNotifyDelegate */
-UE5CORO_API Private::FAnimAwaiterTuple
-PlayMontageNotifyBegin(UAnimInstance* Instance, UAnimMontage* Montage);
+UE5CORO_API auto PlayMontageNotifyBegin(UAnimInstance* Instance,
+                                        UAnimMontage* Montage)
+	-> Private::FAnimAwaiterTuple;
 
 /** Waits for any PlayMontageNotify or PlayMontageNotifyWindow to end on the
  *  montage's currently-playing instance.<br>
@@ -107,8 +107,9 @@ PlayMontageNotifyBegin(UAnimInstance* Instance, UAnimMontage* Montage);
  *  this function or (rarely) if the anim instance got destroyed.
  *  Use IsValid(AnimInstance) if you need to handle this separately.
  *  @see FPlayMontageAnimNotifyDelegate */
-UE5CORO_API Private::FAnimAwaiterTuple
-PlayMontageNotifyEnd(UAnimInstance* Instance, UAnimMontage* Montage);
+UE5CORO_API auto PlayMontageNotifyEnd(UAnimInstance* Instance,
+                                      UAnimMontage* Montage)
+	-> Private::FAnimAwaiterTuple;
 
 /** Waits for the PlayMontageNotify or PlayMontageNotifyWindow of the given name
  *  to begin on the montage's currently-playing instance.<br>
@@ -120,8 +121,9 @@ PlayMontageNotifyEnd(UAnimInstance* Instance, UAnimMontage* Montage);
  *  this function or (rarely) if the anim instance got destroyed.
  *  Use IsValid(AnimInstance) if you need to handle this separately.
  *  @see FPlayMontageAnimNotifyDelegate */
-UE5CORO_API Private::FAnimAwaiterPayload PlayMontageNotifyBegin(
-	UAnimInstance* Instance, UAnimMontage* Montage, FName NotifyName);
+UE5CORO_API auto PlayMontageNotifyBegin(UAnimInstance* Instance,
+                                        UAnimMontage* Montage, FName NotifyName)
+	-> Private::FAnimAwaiterPayload;
 
 /** Waits for the PlayMontageNotify or PlayMontageNotifyWindow of the given name
  *  to end on the montage's currently-playing instance.<br>
@@ -133,8 +135,9 @@ UE5CORO_API Private::FAnimAwaiterPayload PlayMontageNotifyBegin(
  *  this function or (rarely) if the anim instance got destroyed.
  *  Use IsValid(AnimInstance) if you need to handle this separately.
  *  @see FPlayMontageAnimNotifyDelegate */
-UE5CORO_API Private::FAnimAwaiterPayload PlayMontageNotifyEnd(
-	UAnimInstance* Instance, UAnimMontage* Montage, FName NotifyName);
+UE5CORO_API auto PlayMontageNotifyEnd(UAnimInstance* Instance,
+                                      UAnimMontage* Montage, FName NotifyName)
+	-> Private::FAnimAwaiterPayload;
 }
 
 namespace UE5Coro::Private
@@ -156,6 +159,7 @@ template<typename T>
 class [[nodiscard]] TAnimAwaiter : public FAnimAwaiter
 {
 	friend UUE5CoroAnimCallbackTarget;
+
 	static constexpr enum
 	{
 		Void,
@@ -163,8 +167,9 @@ class [[nodiscard]] TAnimAwaiter : public FAnimAwaiter
 		Payload,
 		NameAndPayload,
 	} Type = std::is_same_v<T, std::monostate> ? Void
-	       : std::is_same_v<T, bool> ? Bool
-	       : std::is_pointer_v<T> ? Payload : NameAndPayload;
+	       : std::is_same_v<T, bool>           ? Bool
+	       : std::is_pointer_v<T>              ? Payload
+	                                           : NameAndPayload;
 
 public:
 	template<typename TEnd>

@@ -158,9 +158,11 @@ bool TAnimAwaiter<T>::await_ready()
 }
 
 template<typename T>
-auto TAnimAwaiter<T>::await_resume() -> std::conditional_t<Type == Void, void, T>
+auto TAnimAwaiter<T>::await_resume()
+	-> std::conditional_t<Type == Void, void, T>
 {
-	checkf(Target, TEXT("Internal error")); // bSuspended can be false
+	// bSuspended can be false
+	checkf(Target, TEXT("Internal error: resuming without a callback target"));
 	bSuspended = false;
 
 	// The only reason we get here without a result is that the anim instance

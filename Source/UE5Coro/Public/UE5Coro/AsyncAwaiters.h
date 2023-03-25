@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -98,8 +98,7 @@ class [[nodiscard]] TFutureAwaiter final : public TAwaiter<TFutureAwaiter<T>>
 	std::remove_reference_t<T>* Result = nullptr; // Dangerous!
 
 public:
-	explicit TFutureAwaiter(TFuture<T>&& Future)
-		: Future(std::move(Future)) { }
+	explicit TFutureAwaiter(TFuture<T>&& Future) : Future(std::move(Future)) { }
 	UE_NONCOPYABLE(TFutureAwaiter);
 
 	bool await_ready()
@@ -118,7 +117,8 @@ public:
 
 		Future.Then([this, &Promise](auto InFuture)
 		{
-			checkf(!Future.IsValid(), TEXT("Internal error"));
+			checkf(!Future.IsValid(),
+			       TEXT("Internal error: future was not consumed"));
 
 			// TFuture<T&> will pass T* for Value, TFuture<void> an int
 			if constexpr (std::is_lvalue_reference_v<T>)
@@ -143,7 +143,7 @@ public:
 		{
 			// Result being nullptr indicates that await_ready returned true,
 			// Then has not and will not run, and Future is still valid
-			checkf(Future.IsValid(), TEXT("Internal error"));
+			checkf(Future.IsValid(), TEXT("Internal error: future was consumed"));
 			static_assert(std::is_same_v<T, decltype(Future.Get())>);
 			Result = reinterpret_cast<decltype(Result)>(-1); // Mark as spent
 			return Future.Get();
@@ -151,7 +151,8 @@ public:
 		else
 		{
 			// Otherwise, we're being called from Then, and Future is spent
-			checkf(!Future.IsValid(), TEXT("Internal error"));
+			checkf(!Future.IsValid(),
+			       TEXT("Internal error: future was not consumed"));
 			if constexpr (std::is_lvalue_reference_v<T>)
 				return *Result;
 			else if constexpr (!std::is_void_v<T>)
@@ -180,8 +181,8 @@ class [[nodiscard]] UE5CORO_API FNewThreadAwaiter
 	EThreadCreateFlags Flags;
 
 public:
-	explicit FNewThreadAwaiter(
-		EThreadPriority Priority, uint64 Affinity, EThreadCreateFlags Flags)
+	explicit FNewThreadAwaiter(EThreadPriority Priority, uint64 Affinity,
+	                           EThreadCreateFlags Flags)
 		: Priority(Priority), Affinity(Affinity), Flags(Flags) { }
 
 	void Suspend(FPromise&);

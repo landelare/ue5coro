@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -35,9 +35,9 @@
 using namespace UE5Coro::Private;
 
 #if UE5CORO_DEBUG
-std::atomic<int> FPromise::LastDebugID = -1; // -1 = no coroutines yet
+std::atomic<int> UE5Coro::Private::GLastDebugID = -1; // -1 = no coroutines yet
 // This is a synchronous call stack that doesn't follow or track co_await!
-thread_local TArray<FPromise*> FPromise::ResumeStack;
+thread_local TArray<FPromise*> UE5Coro::Private::GResumeStack;
 #endif
 
 bool FPromiseExtras::IsComplete() const
@@ -48,20 +48,20 @@ bool FPromiseExtras::IsComplete() const
 void FPromiseExtras::Complete()
 {
 	// This should be called with the mutex already held
-	checkf(!Lock.TryLock(), TEXT("Internal error"));
-	checkf(!IsComplete(), TEXT("Internal error"));
+	checkf(!Lock.TryLock(), TEXT("Internal error: completing without lock held"));
+	checkf(!IsComplete(), TEXT("Internal error: double completion"));
 	Completed->Trigger();
 	OnCompleted();
 	OnCompleted = nullptr;
 }
 
-FPromise::FPromise(std::shared_ptr<FPromiseExtras> Extras,
+FPromise::FPromise(std::shared_ptr<FPromiseExtras> InExtras,
                    const TCHAR* PromiseType)
-	: Extras(std::move(Extras))
+	: Extras(std::move(InExtras))
 {
 #if UE5CORO_DEBUG
-	this->Extras->DebugID = ++LastDebugID;
-	this->Extras->DebugPromiseType = PromiseType;
+	Extras->DebugID = ++GLastDebugID;
+	Extras->DebugPromiseType = PromiseType;
 #endif
 }
 
@@ -82,14 +82,15 @@ void FPromise::Resume()
 #if UE5CORO_DEBUG
 	checkf(!Extras->IsComplete(),
 	       TEXT("Attempting to resume completed coroutine"));
-	ResumeStack.Push(this);
+	GResumeStack.Push(this);
 	ON_SCOPE_EXIT
 	{
 		// Coroutine resumption might result in `this` having been freed already
 		// and not being considered `Alive`.
 		// This is technically undefined behavior.
-		checkf(ResumeStack.Last() == this, TEXT("Internal error"));
-		ResumeStack.Pop();
+		checkf(GResumeStack.Last() == this,
+		       TEXT("Internal error: coroutine resume stack derailed"));
+		GResumeStack.Pop();
 	};
 #endif
 

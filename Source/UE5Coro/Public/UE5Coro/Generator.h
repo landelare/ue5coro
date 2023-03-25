@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -34,16 +34,10 @@
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
 
-namespace UE5Coro::Private
-{
-template<typename>
-class TGeneratorPromise;
-}
-
 namespace UE5Coro
 {
-template<typename>
-class TGeneratorIterator;
+template<typename> class TGeneratorIterator;
+namespace Private { template<typename> class TGeneratorPromise; }
 
 /**
  * Generator coroutine. Make a function return Generator<T> instead of T and
@@ -61,14 +55,12 @@ struct [[nodiscard]] TGenerator
 private:
 	Private::stdcoro::coroutine_handle<promise_type> Handle;
 
-	explicit TGenerator(Private::stdcoro::coroutine_handle<promise_type> Handle)
+	explicit TGenerator(
+		Private::stdcoro::coroutine_handle<promise_type> Handle) noexcept
 		: Handle(Handle) { }
 
 public:
-	TGenerator(TGenerator&& Other)
-	{
-		std::swap(Handle, Other.Handle);
-	}
+	TGenerator(TGenerator&& Other) noexcept { std::swap(Handle, Other.Handle); }
 
 	~TGenerator()
 	{
@@ -81,7 +73,7 @@ public:
 	TGenerator& operator=(TGenerator&&) = delete;
 
 	/** Returns true if Current() is valid. */
-	explicit operator bool() const { return Handle && !Handle.done(); }
+	explicit operator bool() const noexcept { return Handle && !Handle.done(); }
 
 	/**	Resumes the generator. Returns true if Current() is valid. */
 	bool Resume()
@@ -99,9 +91,9 @@ public:
 		return *static_cast<T*>(Handle.promise().Current);
 	}
 
-	iterator CreateIterator() { return iterator(*this); }
-	iterator begin() { return iterator(*this); }
-	iterator end() const { return iterator(nullptr); }
+	iterator CreateIterator() noexcept { return iterator(*this); }
+	iterator begin() noexcept { return iterator(*this); }
+	iterator end() const noexcept { return iterator(nullptr); }
 };
 
 /** Provides an iterator-like interface over TGenerator: operator++ advances
@@ -113,24 +105,25 @@ class TGeneratorIterator
 
 public:
 	/** Constructs an iterator wrapper over a generator coroutine. */
-	explicit TGeneratorIterator(TGenerator<T>& Generator)
+	explicit TGeneratorIterator(TGenerator<T>& Generator) noexcept
 		: Generator(Generator ? &Generator : nullptr) { }
 
 	/** The end() iterator for every generator coroutine. */
-	explicit TGeneratorIterator(std::nullptr_t) : Generator(nullptr) { }
+	explicit TGeneratorIterator(std::nullptr_t) noexcept
+		: Generator(nullptr) { }
 
 	/** Returns true if the iterator is not equal to end().
 	 *  Provided for compatibility with code expecting UE-style iterators. */
-	explicit operator bool() const { return Generator != nullptr; }
+	explicit operator bool() const noexcept { return Generator != nullptr; }
 
 	/** Compares this iterator with another. Provided for STL compatibility. */
-	bool operator==(const TGeneratorIterator& Other) const
+	bool operator==(const TGeneratorIterator& Other) const noexcept
 	{
 		return Generator == Other.Generator;
 	}
 
 	/** Compares this iterator with another. Provided for STL compatibility. */
-	bool operator!=(const TGeneratorIterator& Other) const
+	bool operator!=(const TGeneratorIterator& Other) const noexcept
 	{
 		return Generator != Other.Generator;
 	}
@@ -173,9 +166,9 @@ public:
 	FGeneratorPromise() = default;
 	UE_NONCOPYABLE(FGeneratorPromise);
 
-	stdcoro::suspend_never initial_suspend() { return {}; }
+	stdcoro::suspend_never initial_suspend() noexcept { return {}; }
 	stdcoro::suspend_always final_suspend() noexcept { return {}; }
-	void return_void() { Current = nullptr; }
+	void return_void() noexcept { Current = nullptr; }
 	void unhandled_exception();
 
 	// co_await is not allowed in generators
@@ -190,21 +183,21 @@ class [[nodiscard]] TGeneratorPromise : public FGeneratorPromise
 	using handle_type = stdcoro::coroutine_handle<TGeneratorPromise>;
 
 public:
-	TGenerator<T> get_return_object()
+	TGenerator<T> get_return_object() noexcept
 	{
 		return TGenerator<T>(handle_type::from_promise(*this));
 	}
 
-	stdcoro::suspend_always yield_value(std::remove_reference_t<T>& Value)
+	auto yield_value(std::remove_reference_t<T>& Value) noexcept
 	{
 		Current = std::addressof(Value);
-		return {};
+		return stdcoro::suspend_always();
 	}
 
-	stdcoro::suspend_always yield_value(std::remove_reference_t<T>&& Value)
+	auto yield_value(std::remove_reference_t<T>&& Value) noexcept
 	{
 		Current = std::addressof(Value);
-		return {};
+		return stdcoro::suspend_always();
 	}
 };
 }

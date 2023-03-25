@@ -56,7 +56,7 @@ class UE5CORO_API UUE5CoroChainCallbackTarget : public UObject,
 public:
 	void Activate(int32 InExpectedLink, UE5Coro::Private::FTwoLives* InState);
 	void Deactivate();
-	int32 GetExpectedLink() const;
+	[[nodiscard]] int32 GetExpectedLink() const;
 
 	/** Signals the coroutine suspended with this linkage that it may resume. */
 	UFUNCTION()

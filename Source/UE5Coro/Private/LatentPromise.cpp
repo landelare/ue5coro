@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -40,7 +40,7 @@ using namespace UE5Coro::Private;
 
 namespace
 {
-class [[nodiscard]] FPendingLatentCoroutine : public FPendingLatentAction
+class [[nodiscard]] FPendingLatentCoroutine final : public FPendingLatentAction
 {
 	// The coroutine may move to other threads, but this object only interacts
 	// with it on the game thread.
@@ -70,7 +70,7 @@ public:
 	{
 		if (IsInGameThread())
 		{
-			checkf(Promise, TEXT("Internal error"));
+			checkf(Promise, TEXT("Internal error: unexpected double Detach"));
 			Promise = nullptr;
 		}
 		else
@@ -92,7 +92,8 @@ public:
 
 	virtual void UpdateOperation(FLatentResponse& Response) override
 	{
-		checkf(IsInGameThread(), TEXT("Internal error"));
+		checkf(IsInGameThread(),
+		       TEXT("Internal error: expected game thread update"));
 		if (UNLIKELY(!Promise))
 		{
 			Response.DoneIf(true);
@@ -111,20 +112,22 @@ public:
 		if (State >= FLatentPromise::Canceled)
 			Response.DoneIf(true);
 		if (State == FLatentPromise::Done)
-			Response.TriggerLink(LatentInfo.ExecutionFunction, LatentInfo.Linkage,
-			                     LatentInfo.CallbackTarget);
+			Response.TriggerLink(LatentInfo.ExecutionFunction,
+			                     LatentInfo.Linkage, LatentInfo.CallbackTarget);
 	}
 
 	virtual void NotifyActionAborted() override
 	{
-		checkf(IsInGameThread(), TEXT("Internal error"));
+		checkf(IsInGameThread(),
+		       TEXT("Internal error: expected callback from the game thread"));
 		if (LIKELY(Promise))
 			Promise->SetExitReason(ELatentExitReason::ActionAborted);
 	}
 
 	virtual void NotifyObjectDestroyed() override
 	{
-		checkf(IsInGameThread(), TEXT("Internal error"));
+		checkf(IsInGameThread(),
+		       TEXT("Internal error: expected callback from the game thread"));
 		if (LIKELY(Promise))
 			Promise->SetExitReason(ELatentExitReason::ObjectDestroyed);
 	}
@@ -155,15 +158,17 @@ void FLatentPromise::CreateLatentAction()
 void FLatentPromise::CreateLatentAction(FLatentActionInfo&& LatentInfo)
 {
 	// The static_assert on coroutine_traits prevents this
-	checkf(!PendingLatentCoroutine, TEXT("Internal error"));
+	checkf(!PendingLatentCoroutine,
+	       TEXT("Internal error: multiple latent infos were not prevented"));
 
 	PendingLatentCoroutine = new FPendingLatentCoroutine(*this, LatentInfo);
 }
 
 void FLatentPromise::Init()
 {
-	// This should have been an async coroutine without a LatentActionInfo
-	checkf(PendingLatentCoroutine, TEXT("Internal error"));
+	// This should have been an async promise without a LatentActionInfo
+	checkf(PendingLatentCoroutine,
+	       TEXT("Internal error: wrong coroutine promise type used"));
 
 	// Last resort if we got this far without a world
 	if (!World)
@@ -220,7 +225,7 @@ void FLatentPromise::ThreadSafeDestroy()
 {
 	// If the coroutine is async running, request destruction from the awaiter.
 	if (auto Old = AsyncRunning;
-		LatentState.compare_exchange_strong(Old, DeferredDestroy))
+	    LatentState.compare_exchange_strong(Old, DeferredDestroy))
 		return;
 
 	checkf(IsInGameThread(),
@@ -230,7 +235,7 @@ void FLatentPromise::ThreadSafeDestroy()
 	GLatentExitReason = ExitReason;
 	Handle.destroy(); // Counts as delete this;
 	checkf(GLatentExitReason == ELatentExitReason::Normal,
-	       TEXT("Internal error"));
+	       TEXT("Internal error: latent exit reason not restored"));
 }
 
 void FLatentPromise::AttachToGameThread()
@@ -238,12 +243,12 @@ void FLatentPromise::AttachToGameThread()
 	// This might fail to exchange if State == DeferredDestroy which is OK
 	auto Old = AsyncRunning;
 	LatentState.compare_exchange_strong(Old, LatentRunning);
-	checkCode(
-		auto State = LatentState.load();
-		checkf(State == FLatentPromise::LatentRunning ||
-		       State == FLatentPromise::DeferredDestroy,
-		       TEXT("Unexpected state when returning to game thread"));
-	);
+#if DO_CHECK
+	auto State = LatentState.load();
+	checkf(State == FLatentPromise::LatentRunning ||
+	       State == FLatentPromise::DeferredDestroy,
+	       TEXT("Unexpected state when returning to game thread"));
+#endif
 }
 
 void FLatentPromise::DetachFromGameThread()
@@ -256,8 +261,8 @@ void FLatentPromise::DetachFromGameThread()
 	// support destruction while being co_awaited.
 
 	if (auto Old = LatentRunning;
-		LatentState.compare_exchange_strong(Old, AsyncRunning) ||
-		Old == AsyncRunning || Old == DeferredDestroy)
+	    LatentState.compare_exchange_strong(Old, AsyncRunning) ||
+	    Old == AsyncRunning || Old == DeferredDestroy)
 		; // Done
 	else
 		checkf(false, TEXT("Unexpected latent coroutine state %d"), Old);
@@ -265,17 +270,18 @@ void FLatentPromise::DetachFromGameThread()
 
 void FLatentPromise::LatentCancel()
 {
-	checkCode(
-		auto CurrentState = LatentState.load();
-		ensureMsgf(CurrentState == FLatentPromise::LatentRunning,
-		           TEXT("Unexpected latent coroutine state %d"), CurrentState);
-	);
+#if DO_CHECK
+	auto CurrentState = LatentState.load();
+	ensureMsgf(CurrentState == FLatentPromise::LatentRunning,
+	           TEXT("Unexpected latent coroutine state %d"), CurrentState);
+#endif
 	LatentState = Canceled;
 }
 
 void FLatentPromise::SetExitReason(ELatentExitReason Reason)
 {
-	checkf(ExitReason == ELatentExitReason::Normal, TEXT("Internal error"));
+	checkf(ExitReason == ELatentExitReason::Normal,
+	       TEXT("Internal error: setting conflicting exit reasons"));
 	ExitReason = Reason;
 }
 
@@ -295,8 +301,8 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	auto& LatentInfo = Pending->GetLatentInfo();
 
 	// Don't let the coroutine run and clean up if this is a duplicate
-	if (LAM.FindExistingAction<FPendingLatentCoroutine>(LatentInfo.CallbackTarget,
-	                                                    LatentInfo.UUID))
+	if (LAM.FindExistingAction<FPendingLatentCoroutine>(
+			LatentInfo.CallbackTarget, LatentInfo.UUID))
 		return {FInitialSuspend::Destroy};
 
 	// Also refuse to run if there's no callback target
@@ -312,16 +318,16 @@ FInitialSuspend FLatentPromise::initial_suspend()
 
 stdcoro::suspend_always FLatentPromise::final_suspend() noexcept
 {
+#if DO_CHECK
 	ensureMsgf(IsInGameThread(),
 	           TEXT("Latent coroutines must end on the game thread"));
 	// Only this should be possible if co_returning cleanly on the game thread,
 	// ~FPendingLatentCoroutine is blocked from running and Latent::Cancel()
 	// doesn't resume.
-	checkCode(
-		auto State = LatentState.load();
-		ensureMsgf(State == LatentRunning,
-		           TEXT("Unexpected coroutine state %d"), State);
-	);
+	auto State = LatentState.load();
+	ensureMsgf(State == LatentRunning, TEXT("Unexpected coroutine state %d"),
+	           State);
+#endif
 	LatentState = Done;
 	return {};
 }

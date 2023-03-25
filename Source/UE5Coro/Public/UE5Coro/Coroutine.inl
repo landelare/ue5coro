@@ -70,7 +70,8 @@ T&& TCoroutine<T>::MoveResult()
 }
 
 template<typename F>
-std::enable_if_t<std::is_invocable_v<F>> TCoroutine<>::ContinueWith(F Continuation)
+auto TCoroutine<>::ContinueWith(F Continuation)
+	-> std::enable_if_t<std::is_invocable_v<F>>
 {
 	UE::TScopeLock _(Extras->Lock);
 	if (Extras->IsComplete())
@@ -88,8 +89,8 @@ std::enable_if_t<std::is_invocable_v<F>> TCoroutine<>::ContinueWith(F Continuati
 }
 
 template<typename U, typename F>
-std::enable_if_t<Private::TWeak<U>::value && std::is_invocable_v<F>>
-TCoroutine<>::ContinueWithWeak(U Ptr, F Continuation)
+auto TCoroutine<>::ContinueWithWeak(U Ptr, F Continuation)
+	-> std::enable_if_t<Private::TWeak<U>::value && std::is_invocable_v<F>>
 {
 	ContinueWith([Weak = typename Private::TWeak<U>::weak(std::move(Ptr)),
 	              Fn = std::move(Continuation)]
@@ -101,8 +102,8 @@ TCoroutine<>::ContinueWithWeak(U Ptr, F Continuation)
 }
 
 template<typename U, typename F>
-std::enable_if_t<std::is_invocable_v<F, typename Private::TWeak<U>::ptr>>
-TCoroutine<>::ContinueWithWeak(U Ptr, F Continuation)
+auto TCoroutine<>::ContinueWithWeak(U Ptr, F Continuation)
+	-> std::enable_if_t<std::is_invocable_v<F, typename Private::TWeak<U>::ptr>>
 {
 	ContinueWith([Weak = typename Private::TWeak<U>::weak(std::move(Ptr)),
 	              Fn = std::move(Continuation)]
@@ -115,8 +116,8 @@ TCoroutine<>::ContinueWithWeak(U Ptr, F Continuation)
 
 template<typename T>
 template<typename F>
-std::enable_if_t<std::is_invocable_v<F> || std::is_invocable_v<F, T>>
-TCoroutine<T>::ContinueWith(F Continuation)
+auto TCoroutine<T>::ContinueWith(F Continuation)
+	-> std::enable_if_t<std::is_invocable_v<F> || std::is_invocable_v<F, T>>
 {
 	// Handle functors that can't take (T) with the void specialization.
 	// This can't be an overload, it would be considered ambiguous.
@@ -143,9 +144,9 @@ TCoroutine<T>::ContinueWith(F Continuation)
 
 template<typename T>
 template<typename U, typename F>
-std::enable_if_t<Private::TWeak<U>::value &&
-                 (std::is_invocable_v<F> || std::is_invocable_v<F, T>)>
-TCoroutine<T>::ContinueWithWeak(U Ptr, F Continuation)
+auto TCoroutine<T>::ContinueWithWeak(U Ptr, F Continuation)
+	-> std::enable_if_t<Private::TWeak<U>::value &&
+	                    (std::is_invocable_v<F> || std::is_invocable_v<F, T>)>
 {
 	if constexpr (!std::is_invocable_v<F, T>)
 		TCoroutine<>::ContinueWithWeak(std::move(Ptr), std::move(Continuation));
@@ -155,15 +156,15 @@ TCoroutine<T>::ContinueWithWeak(U Ptr, F Continuation)
 		{
 			auto Strong = Private::TWeak<U>::Strengthen(Weak);
 			if (Private::TWeak<U>::Get(Strong))
-			    std::invoke(Fn, Result);
+				std::invoke(Fn, Result);
 		});
 }
 
 template<typename T>
 template<typename U, typename F>
-std::enable_if_t<std::is_invocable_v<F, typename Private::TWeak<U>::ptr> ||
-                 std::is_invocable_v<F, typename Private::TWeak<U>::ptr, T>>
-TCoroutine<T>::ContinueWithWeak(U Ptr, F Continuation)
+auto TCoroutine<T>::ContinueWithWeak(U Ptr, F Continuation)
+	-> std::enable_if_t<std::is_invocable_v<F, typename Private::TWeak<U>::ptr> ||
+	                    std::is_invocable_v<F, typename Private::TWeak<U>::ptr, T>>
 {
 	if constexpr (!std::is_invocable_v<F, typename Private::TWeak<U>::ptr, T>)
 		TCoroutine<>::ContinueWithWeak(std::move(Ptr), std::move(Continuation));

@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -44,8 +44,7 @@ struct TLatentLoader
 	TArray<Item> Sources;
 	TSharedPtr<FStreamableHandle> Handle;
 
-	explicit TLatentLoader(TArray<Item> Paths,
-	                       TAsyncLoadPriority Priority)
+	explicit TLatentLoader(TArray<Item> Paths, TAsyncLoadPriority Priority)
 #if UE5CORO_CPP20
 		requires std::is_same_v<Item, FSoftObjectPath>
 #endif
@@ -58,8 +57,7 @@ struct TLatentLoader
 		                                  Priority);
 	}
 
-	explicit TLatentLoader(TArray<Item> AssetIds,
-	                       const TArray<FName>& Bundles,
+	explicit TLatentLoader(TArray<Item> AssetIds, const TArray<FName>& Bundles,
 	                       TAsyncLoadPriority Priority)
 #if UE5CORO_CPP20
 		requires std::is_same_v<Item, FPrimaryAssetId>
@@ -129,8 +127,9 @@ bool ShouldResume(void*& Loader, bool bCleanup)
 template<int HiddenType>
 TArray<UObject*> AsyncLoad::InternalResume(void* State)
 {
-	using T = std::conditional_t<HiddenType == 0, FLatentLoader, FPrimaryLoader>;
-	checkf(ShouldResume<T>(State, false), TEXT("Internal error"));
+	using T = std::conditional_t<HiddenType, FPrimaryLoader, FLatentLoader>;
+	checkf(ShouldResume<T>(State, false),
+	       TEXT("Internal error: resuming with !ShouldResume"));
 
 	return static_cast<T*>(State)->ResolveItems();
 }
@@ -144,34 +143,33 @@ FLatentAwaiter Latent::AsyncLoadObjects(TArray<FSoftObjectPath> Paths,
 	                      &ShouldResume<FLatentLoader>);
 }
 
-FLatentAwaiter Latent::AsyncLoadPrimaryAsset(
-	const FPrimaryAssetId& AssetToLoad,
-	const TArray<FName>& LoadBundles,
-	TAsyncLoadPriority Priority)
+FLatentAwaiter Latent::AsyncLoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad,
+                                             const TArray<FName>& LoadBundles,
+                                             TAsyncLoadPriority Priority)
 {
 	return AsyncLoadPrimaryAssets(TArray{AssetToLoad}, LoadBundles, Priority);
 }
 
-FLatentAwaiter Latent::AsyncLoadPrimaryAssets(
-	TArray<FPrimaryAssetId> AssetsToLoad,
-	const TArray<FName>& LoadBundles,
-	TAsyncLoadPriority Priority)
+FLatentAwaiter Latent::AsyncLoadPrimaryAssets(TArray<FPrimaryAssetId> AssetsToLoad,
+                                              const TArray<FName>& LoadBundles,
+                                              TAsyncLoadPriority Priority)
 {
 	return FLatentAwaiter(
 		new FPrimaryLoader(std::move(AssetsToLoad), LoadBundles, Priority),
 		&ShouldResume<FPrimaryLoader>);
 }
 
-TAsyncLoadAwaiter<UClass*, 0> Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr,
-                                                     TAsyncLoadPriority Priority)
+auto Latent::AsyncLoadClass(TSoftClassPtr<UObject> Ptr,
+                            TAsyncLoadPriority Priority)
+	-> TAsyncLoadAwaiter<UClass*, 0>
 {
 	return TAsyncLoadAwaiter<UClass*, 0>(
 		AsyncLoadObjects(TArray{Ptr.ToSoftObjectPath()}, Priority));
 }
 
-TAsyncLoadAwaiter<TArray<UClass*>, 0> Latent::AsyncLoadClasses(
-	const TArray<TSoftClassPtr<UObject>>& Ptrs,
-	TAsyncLoadPriority Priority)
+auto Latent::AsyncLoadClasses(const TArray<TSoftClassPtr<UObject>>& Ptrs,
+                              TAsyncLoadPriority Priority)
+	-> TAsyncLoadAwaiter<TArray<UClass*>, 0>
 {
 	TArray<FSoftObjectPath> Paths;
 	Paths.Reserve(Ptrs.Num());
@@ -182,11 +180,12 @@ TAsyncLoadAwaiter<TArray<UClass*>, 0> Latent::AsyncLoadClasses(
 		AsyncLoadObjects(std::move(Paths), Priority));
 }
 
-FPackageLoadAwaiter Latent::AsyncLoadPackage(
-	const FPackagePath& Path, FName PackageNameToCreate,
-	EPackageFlags PackageFlags, int32 PIEInstanceID,
-	TAsyncLoadPriority PackagePriority,
-	const FLinkerInstancingContext* InstancingContext)
+auto Latent::AsyncLoadPackage(const FPackagePath& Path,
+                              FName PackageNameToCreate,
+                              EPackageFlags PackageFlags, int32 PIEInstanceID,
+                              TAsyncLoadPriority PackagePriority,
+                              const FLinkerInstancingContext* InstancingContext)
+	-> FPackageLoadAwaiter
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
@@ -202,8 +201,8 @@ FPackageLoadAwaiter::FPackageLoadAwaiter(
 	const FLinkerInstancingContext* InstancingContext)
 	: State(new FState)
 {
-	auto Delegate = FLoadPackageAsyncDelegate::CreateSP(
-		State.ToSharedRef(), &FState::Loaded);
+	auto Delegate = FLoadPackageAsyncDelegate::CreateSP(State.ToSharedRef(),
+	                                                    &FState::Loaded);
 	LoadPackageAsync(Path, PackageNameToCreate, std::move(Delegate),
 	                 PackageFlags, PIEInstanceID, PackagePriority,
 	                 InstancingContext);
@@ -212,7 +211,8 @@ FPackageLoadAwaiter::FPackageLoadAwaiter(
 void FPackageLoadAwaiter::FState::Loaded(const FName&, UPackage* Package,
                                          EAsyncLoadingResult::Type)
 {
-	checkf(IsInGameThread(), TEXT("Internal error"));
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: expected callback on the game thread"));
 	Result.Reset(Package); // Store the result
 
 	// Promise being nullptr indicates that the load finished between
@@ -240,6 +240,8 @@ void FPackageLoadAwaiter::Suspend(FPromise& Promise)
 
 UPackage* FPackageLoadAwaiter::await_resume()
 {
-	checkf(IsInGameThread() && State, TEXT("Internal error"));
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: expected to resume on the game thread"));
+	checkf(State, TEXT("Internal error: resuming without a result"));
 	return State->Result.Get();
 }

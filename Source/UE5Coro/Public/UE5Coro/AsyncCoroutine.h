@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -39,7 +39,7 @@
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
 #include <functional>
-#define UE5CORO_SUPPRESS_COROUTINE_INL
+#define UE5CORO_PRIVATE_SUPPRESS_COROUTINE_INL
 #include "UE5Coro/Coroutine.h"
 #include "Misc/SpinLock.h"
 
@@ -56,7 +56,7 @@ template<typename> class TFutureAwaiter;
 template<typename> class TTaskAwaiter;
 namespace Test { class FTestHelper; }
 
-template<typename P, typename A>
+template<typename, typename A>
 struct TAwaitTransform
 {
 	// Default passthrough
@@ -86,18 +86,18 @@ namespace UE5Coro::Private
 template<typename T>
 struct [[nodiscard]] TAwaiter
 {
-	bool await_ready() { return false; }
+	bool await_ready() noexcept { return false; }
 
 	template<typename P>
-	std::enable_if_t<std::is_base_of_v<FPromise, P>>
-	await_suspend(stdcoro::coroutine_handle<P> Handle)
+	auto await_suspend(stdcoro::coroutine_handle<P> Handle)
+		-> std::enable_if_t<std::is_base_of_v<FPromise, P>>
 	{
 		if constexpr (std::is_base_of_v<FLatentPromise, P>)
 			Handle.promise().DetachFromGameThread();
 		static_cast<T*>(this)->Suspend(Handle.promise());
 	}
 
-	void await_resume() { }
+	void await_resume() noexcept { }
 };
 
 struct FInitialSuspend
@@ -108,7 +108,7 @@ struct FInitialSuspend
 		Destroy,
 	} Action;
 
-	bool await_ready() { return false; }
+	bool await_ready() noexcept { return false; }
 
 	template<typename P>
 	void await_suspend(stdcoro::coroutine_handle<P> Handle)
@@ -120,7 +120,7 @@ struct FInitialSuspend
 		}
 	}
 
-	void await_resume() { }
+	void await_resume() noexcept { }
 };
 
 /** Fields of FPromise that may be alive after the coroutine is done. */
@@ -138,21 +138,21 @@ public:
 	TMulticastDelegate<void()> Continuations_DEPRECATED;
 	std::function<void()> OnCompleted = [] { };
 
-	FPromiseExtras() = default;
-	virtual ~FPromiseExtras() = default; // Virtual for warning suppression only
+	explicit FPromiseExtras() noexcept { }
 	UE_NONCOPYABLE(FPromiseExtras);
+	virtual ~FPromiseExtras() = default; // Virtual for warning suppression only
 
 	bool IsComplete() const;
 	virtual void Complete();
 };
 
 template<typename T>
-struct [[nodiscard]] TPromiseExtras : FPromiseExtras
+struct [[nodiscard]] TPromiseExtras final : FPromiseExtras
 {
 #if UE5CORO_DEBUG
 	std::atomic<bool> bMoveUsed = false;
 #endif
-	T ReturnValue;
+	T ReturnValue{};
 	std::function<void(const T&)> OnCompletedT = [](const T&) { };
 
 	virtual void Complete() override
@@ -163,27 +163,26 @@ struct [[nodiscard]] TPromiseExtras : FPromiseExtras
 	}
 };
 
-class [[nodiscard]] FPromise
-{
 #if UE5CORO_DEBUG
-	static std::atomic<int> LastDebugID;
-	static thread_local TArray<FPromise*> ResumeStack;
-
-	friend void TCoroutine<>::SetDebugName(const TCHAR*);
+extern std::atomic<int> GLastDebugID;
+extern thread_local TArray<FPromise*> GResumeStack;
 #endif
+
+class [[nodiscard]] UE5CORO_API FPromise
+{
+	friend void TCoroutine<>::SetDebugName(const TCHAR*);
 
 protected:
 	std::shared_ptr<FPromiseExtras> Extras;
 
-	UE5CORO_API explicit FPromise(std::shared_ptr<FPromiseExtras>,
-	                              const TCHAR* PromiseType);
+	explicit FPromise(std::shared_ptr<FPromiseExtras>, const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
 
 public:
-	UE5CORO_API virtual ~FPromise(); // Virtual for warning suppression only
-	UE5CORO_API virtual void Resume();
+	virtual ~FPromise(); // Virtual for warning suppression only
+	virtual void Resume();
 
-	UE5CORO_API void unhandled_exception();
+	void unhandled_exception();
 
 	// co_yield is not allowed in async coroutines
 	template<typename T>
@@ -194,17 +193,21 @@ class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
 {
 public:
 	template<typename... A>
-	explicit FAsyncPromise(std::shared_ptr<FPromiseExtras> Extras, A&&...)
-		: FPromise(std::move(Extras), TEXT("Async")) { }
+	explicit FAsyncPromise(std::shared_ptr<FPromiseExtras> InExtras, A&&...)
+		: FPromise(std::move(InExtras), TEXT("Async")) { }
 
-	FInitialSuspend initial_suspend() { return {FInitialSuspend::Resume}; }
+	FInitialSuspend initial_suspend() noexcept
+	{
+		return {FInitialSuspend::Resume};
+	}
+
 	stdcoro::suspend_never final_suspend() noexcept { return {}; }
 
 	template<typename T>
 	decltype(auto) await_transform(T&& Awaitable)
 	{
-		return TAwaitTransform<FAsyncPromise, std::remove_reference_t<T>>()
-			(std::forward<T>(Awaitable));
+		TAwaitTransform<FAsyncPromise, std::remove_reference_t<T>> Transform;
+		return Transform(std::forward<T>(Awaitable));
 	}
 };
 
@@ -257,8 +260,8 @@ public:
 	template<typename T>
 	decltype(auto) await_transform(T&& Awaitable)
 	{
-		return TAwaitTransform<FLatentPromise, std::remove_reference_t<T>>()
-			(std::forward<T>(Awaitable));
+		TAwaitTransform<FLatentPromise, std::remove_reference_t<T>> Transform;
+		return Transform(std::forward<T>(Awaitable));
 	}
 };
 
@@ -270,6 +273,7 @@ public:
 	explicit TCoroutinePromise(A&&... Args)
 		: Base(std::make_shared<TPromiseExtras<T>>(), std::forward<A>(Args)...)
 	{ }
+	UE_NONCOPYABLE(TCoroutinePromise);
 
 	void return_value(T Value)
 	{
@@ -279,7 +283,10 @@ public:
 		ExtrasT->ReturnValue = std::move(Value);
 	}
 
-	TCoroutine<T> get_return_object() { return TCoroutine<T>(this->Extras); }
+	TCoroutine<T> get_return_object() noexcept
+	{
+		return TCoroutine<T>(this->Extras);
+	}
 };
 
 template<typename Base>
@@ -289,8 +296,14 @@ public:
 	template<typename... A>
 	explicit TCoroutinePromise(A&&... Args)
 		: Base(std::make_shared<FPromiseExtras>(), std::forward<A>(Args)...) { }
-	void return_void() { }
-	TCoroutine<> get_return_object() { return TCoroutine<>(this->Extras); }
+	UE_NONCOPYABLE(TCoroutinePromise);
+
+	void return_void() noexcept { }
+
+	TCoroutine<> get_return_object() noexcept
+	{
+		return TCoroutine<>(this->Extras);
+	}
 };
 
 template<typename... T>
@@ -346,7 +359,8 @@ void FLatentPromise::Init(T& First, A&... Args)
 }
 
 template<typename T, typename... Args>
-struct UE5Coro::Private::stdcoro::coroutine_traits<UE5Coro::TCoroutine<T>, Args...>
+struct UE5Coro::Private::stdcoro::coroutine_traits<UE5Coro::TCoroutine<T>,
+                                                   Args...>
 {
 	static constexpr int LatentInfoCount =
 		(0 + ... + std::is_convertible_v<Args, FLatentActionInfo>);

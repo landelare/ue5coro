@@ -1,21 +1,21 @@
 // Copyright © Laura Andelare
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted (subject to the limitations in the disclaimer
 // below) provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
 // THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 // CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
@@ -49,8 +49,8 @@ FHttpAwaiter::FState::FState(FHttpRequestRef&& Request)
 FHttpAwaiter::FHttpAwaiter(FHttpRequestRef&& Request)
 	: State(new FState(std::move(Request)))
 {
-	State->Request->OnProcessRequestComplete().BindSP(
-		State.ToSharedRef(), &FState::RequestComplete);
+	State->Request->OnProcessRequestComplete().BindSP(State.ToSharedRef(),
+	                                                  &FState::RequestComplete);
 	State->Request->ProcessRequest();
 }
 
@@ -76,7 +76,7 @@ bool FHttpAwaiter::await_ready()
 void FHttpAwaiter::Suspend(FPromise& Promise)
 {
 	// This should be locked from await_ready
-	checkf(!State->Lock.TryLock(), TEXT("Internal error"));
+	checkf(!State->Lock.TryLock(), TEXT("Internal error: lock wasn't taken"));
 	State->Promise = &Promise;
 	State->Lock.Unlock();
 }
@@ -84,7 +84,8 @@ void FHttpAwaiter::Suspend(FPromise& Promise)
 void FHttpAwaiter::FState::Resume()
 {
 	// Don't needlessly dispatch AsyncTasks to the GT from the GT
-	ensureMsgf(IsInGameThread(), TEXT("Internal error"));
+	ensureMsgf(IsInGameThread(),
+	           TEXT("Internal error: expected HTTP callback on the game thread"));
 	// leave bSuspended true to prevent any further suspensions (not co_awaits)
 
 	if (Thread == ENamedThreads::GameThread)
@@ -108,6 +109,7 @@ void FHttpAwaiter::FState::RequestComplete(FHttpRequestPtr,
 
 TTuple<FHttpResponsePtr, bool> FHttpAwaiter::await_resume()
 {
-	checkf(State->Result.has_value(), TEXT("Internal error"));
-	return State->Result.value();
+	checkf(State->Result.has_value(),
+	       TEXT("Internal error: resuming with no value"));
+	return *State->Result;
 }
