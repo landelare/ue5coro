@@ -105,11 +105,17 @@ coroutine is already running, a second copy will **not** start, matching the
 behavior of most of the engine's built-in latent actions.
 
 You may use awaiters such as UE5Coro\:\:Async\:\:MoveToThread or
-UE5Coro\:\:Tasks\:\:MoveToTask to switch threads, but the coroutine must finish
-on the game thread.
-If the latent action manager decides to delete the latent task and it's on
-another thread, it may continue until the next co_await after which your stack
-will be unwound **on the game thread**.
+UE5Coro\:\:Tasks\:\:MoveToTask to switch threads.
+Finishing the coroutine is allowed on any thread, but note that in C++, the
+destructors of locals run on the current thread **before** the coroutine is
+considered complete, which might not be desired.
+
+BP will always continue on the game thread after the coroutine state (locals,
+etc.) is cleaned up.
+
+If the latent action manager decides to delete the latent task and it's
+currently running on another thread, it is canceled and may continue until the
+next co_await, after which its locals will be destroyed **on the game thread**.
 
 ## Awaiters
 

@@ -92,8 +92,6 @@ void DoTest(FAutomationTestBase& Test)
 			TestToCoro->Wait();
 			State = 2;
 			CoroToTest->Trigger();
-			IF_CORO_LATENT
-				co_await UE5Coro::Async::MoveToGameThread();
 		});
 		Test.TestEqual(TEXT("Initial state"), State, 1);
 		Test.TestTrue(TEXT("Wait 1"), CoroToTest->Wait());
@@ -115,8 +113,6 @@ void DoTest(FAutomationTestBase& Test)
 			TestToCoro->Wait();
 			State = 2;
 			CoroToTest->Trigger();
-			IF_CORO_LATENT
-				co_await UE5Coro::Async::MoveToGameThread();
 		});
 		Test.TestEqual(TEXT("Initial state"), State, 1);
 		Test.TestTrue(TEXT("Wait 1"), CoroToTest->Wait());
@@ -134,8 +130,6 @@ void DoTest(FAutomationTestBase& Test)
 				UE5Coro::Async::MoveToNewThread(),
 				UE5Coro::Async::MoveToThread(ENamedThreads::AnyThread));
 			CoroToTest->Trigger();
-			IF_CORO_LATENT
-				co_await UE5Coro::Async::MoveToGameThread();
 		});
 		Test.TestTrue(TEXT("Triggered"), CoroToTest->Wait());
 	}

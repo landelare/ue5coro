@@ -157,8 +157,6 @@ void DoTest(FAutomationTestBase& Test)
 			co_await Async::MoveToNewThread();
 			StartTest->Wait();
 			FPlatformProcess::Sleep(0.1f);
-			IF_CORO_LATENT
-				co_await Async::MoveToGameThread();
 		});
 
 		// Waiting itself has to run on another thread.
@@ -170,8 +168,6 @@ void DoTest(FAutomationTestBase& Test)
 			StartTest->Trigger();
 			Test.TestFalse(TEXT("Timeout"), Coro.Wait(1));
 			Test.TestTrue(TEXT("Waited enough"), Coro.Wait());
-			IF_CORO_LATENT
-				co_await Async::MoveToGameThread();
 			bDone = true;
 		});
 		FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });

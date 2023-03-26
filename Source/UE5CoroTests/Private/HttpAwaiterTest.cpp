@@ -92,8 +92,6 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestFalse(TEXT("Success"), bSuccess);
 		Test.TestTrue(TEXT("Response"), static_cast<bool>(Response));
 		FPlatformMisc::MemoryBarrier();
-		IF_CORO_LATENT
-			co_await Async::MoveToGameThread();
 		bDone = true;
 	});
 	// Test is being used by the coroutine on another thread here

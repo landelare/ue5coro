@@ -268,8 +268,9 @@ public:
 	virtual void ThreadSafeDestroy() override;
 
 	virtual void Resume(bool bBypassCancellationHolds = false) override;
+	void CancelFromWithin();
 
-	void AttachToGameThread();
+	void AttachToGameThread(bool bFromAnyThread);
 	void DetachFromGameThread();
 
 	void Respond(struct FLatentResponse&, const FLatentActionInfo&) const;

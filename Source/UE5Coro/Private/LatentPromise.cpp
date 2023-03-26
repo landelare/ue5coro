@@ -186,9 +186,21 @@ void FLatentPromise::Resume(bool bBypassCancellationHolds)
 	// Return ownership to the game thread and the latent action manager
 	// once the multi-threaded adventure is over
 	if (LatentFlags & LF_Detached && IsInGameThread())
-		AttachToGameThread();
+		AttachToGameThread(false);
 
 	FPromise::Resume(bBypassCancellationHolds);
+}
+
+void FLatentPromise::CancelFromWithin()
+{
+	// Force move the coroutine back to the game thread
+	AttachToGameThread(true);
+
+	Cancel();
+
+	checkf(ShouldCancel(false),
+	       TEXT("Latent coroutines may only be canceled from within if no "
+	            "FCancellationGuards are present"));
 }
 
 void FLatentPromise::ThreadSafeDestroy()
@@ -211,10 +223,10 @@ void FLatentPromise::ThreadSafeDestroy()
 	       TEXT("Internal error: latent exit reason not restored"));
 }
 
-void FLatentPromise::AttachToGameThread()
+void FLatentPromise::AttachToGameThread(bool bFromAnyThread)
 {
-	checkf(IsInGameThread(),
-	       TEXT("Internal error: attaching to the GT while not on the GT"));
+	checkf(bFromAnyThread || IsInGameThread(),
+	       TEXT("Internal error: expected to be on the game thread"));
 	LatentFlags &= ~LF_Detached;
 }
 

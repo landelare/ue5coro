@@ -290,7 +290,7 @@ public:
 		// co_awaiting this in async mode is meaningless, use co_return instead.
 		-> std::enable_if_t<std::is_base_of_v<FLatentPromise, P>>
 	{
-		Handle.promise().Cancel();
+		Handle.promise().CancelFromWithin();
 	}
 
 	void await_resume() noexcept { }

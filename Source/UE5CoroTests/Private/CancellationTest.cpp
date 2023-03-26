@@ -68,6 +68,18 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("No return value"), Coro.GetResult(), 0);
 	}
 
+	IF_CORO_LATENT
+	{
+		auto Coro = World.Run(CORO_R(int)
+		{
+			co_await Async::MoveToNewThread();
+			co_await Latent::Cancel();
+			co_return 1;
+		});
+		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
+		Test.TestEqual(TEXT("No return value"), Coro.GetResult(), 0);
+	}
+
 	{
 		bool bDestroyed = false;
 		auto Coro = World.Run(CORO

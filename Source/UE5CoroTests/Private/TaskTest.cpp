@@ -76,8 +76,6 @@ void DoCreateTest(FAutomationTestBase& Test)
 			TestToCoro->Wait();
 			State = 1;
 			CoroToTest->Trigger();
-			IF_CORO_LATENT
-				co_await Async::MoveToGameThread();
 		});
 
 		Test.TestEqual(TEXT("Initial state"), State, 0);
@@ -97,8 +95,6 @@ void DoCreateTest(FAutomationTestBase& Test)
 			TestToCoro->Wait();
 			State = 1;
 			CoroToTest->Trigger();
-			IF_CORO_LATENT
-				co_await Async::MoveToGameThread();
 		});
 
 		Test.TestEqual(TEXT("Initial state"), State, 0);
@@ -117,8 +113,6 @@ void DoCreateTest(FAutomationTestBase& Test)
 			co_await WhenAll(Tasks::MoveToTask(TEXT("Test1")),
 			                 Tasks::MoveToTask(TEXT("Test2")));
 			CoroToTest->Trigger();
-			IF_CORO_LATENT
-				co_await Async::MoveToGameThread();
 		});
 		TestToCoro->Trigger();
 		Test.TestTrue(TEXT("Triggered"), CoroToTest->Wait());
@@ -143,8 +137,6 @@ void DoConsumeTest(FAutomationTestBase& Test)
 			});
 			++State;
 			CoroToTest->Trigger();
-			IF_CORO_LATENT
-				co_await Async::MoveToGameThread();
 		});
 		TestToCoro->Trigger();
 		CoroToTest->Wait();
@@ -166,8 +158,6 @@ void DoConsumeTest(FAutomationTestBase& Test)
 			});
 			++State;
 			CoroToTest->Trigger();
-			IF_CORO_LATENT
-				co_await Async::MoveToGameThread();
 		});
 		TestToCoro->Trigger();
 		CoroToTest->Wait();
