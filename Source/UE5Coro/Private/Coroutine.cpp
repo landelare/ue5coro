@@ -76,3 +76,36 @@ void TCoroutine<>::SetDebugName(const TCHAR* Name)
 		GCurrentPromise->Extras->DebugName = Name;
 #endif
 }
+
+bool TCoroutine<>::operator==(const TCoroutine<>& Other) const noexcept
+{
+	return Extras == Other.Extras;
+}
+
+#if UE5CORO_CPP20
+auto TCoroutine<>::operator<=>(const TCoroutine<>& Other) const noexcept
+	-> std::strong_ordering
+{
+	return Extras <=> Other.Extras;
+}
+#else
+bool TCoroutine<>::operator!=(const TCoroutine<>& Other) const noexcept
+{
+	return !(*this == Other);
+}
+
+bool TCoroutine<>::operator<(const TCoroutine<>& Other) const noexcept
+{
+	return Extras < Other.Extras;
+}
+#endif
+
+uint32 UE5Coro::GetTypeHash(const TCoroutine<>& Handle) noexcept
+{
+	return static_cast<uint32>(std::hash<TCoroutine<>>()(Handle));
+}
+
+size_t std::hash<TCoroutine<>>::operator()(const TCoroutine<>& Handle) const noexcept
+{
+	return std::hash<void*>()(Handle.Extras.get());
+}

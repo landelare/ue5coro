@@ -57,6 +57,8 @@ class UE5CORO_API TCoroutine<>
 {
 	template<typename, typename>
 	friend class Private::TCoroutinePromise;
+	friend UE5CORO_API uint32 GetTypeHash(const TCoroutine<>&) noexcept; // ADL
+	friend std::hash<TCoroutine<>>;
 
 protected:
 	std::shared_ptr<Private::FPromiseExtras> Extras;
@@ -125,6 +127,16 @@ public:
 	/** Sets a debug name for the currently-executing coroutine.
 	 *  Only valid to call from within a coroutine returning TCoroutine. */
 	static void SetDebugName(const TCHAR* Name);
+
+	/** @return True if the two objects refer to the same coroutine invocation. */
+	bool operator==(const TCoroutine<>&) const noexcept;
+
+#if UE5CORO_CPP20
+	std::strong_ordering operator<=>(const TCoroutine<>&) const noexcept;
+#else
+	bool operator!=(const TCoroutine<>&) const noexcept;
+	bool operator<(const TCoroutine<>&) const noexcept;
+#endif
 };
 
 /** Extra functionality for coroutines with non-void return types. */
@@ -175,6 +187,10 @@ public:
 };
 
 static_assert(sizeof(TCoroutine<int>) == sizeof(TCoroutine<>));
+#if UE5CORO_CPP20
+static_assert(std::totally_ordered<TCoroutine<>>);
+static_assert(std::totally_ordered_with<TCoroutine<>, TCoroutine<int>>);
+#endif
 }
 
 /** USTRUCT wrapper for TCoroutine<>. */
@@ -197,6 +213,31 @@ struct UE5CORO_API FAsyncCoroutine
 };
 
 static_assert(sizeof(FAsyncCoroutine) == sizeof(UE5Coro::TCoroutine<>));
+
+
+#pragma region std::hash
+template<>
+struct UE5CORO_API std::hash<UE5Coro::TCoroutine<>>
+{
+	size_t operator()(const UE5Coro::TCoroutine<>&) const noexcept;
+};
+template<>
+struct std::hash<FAsyncCoroutine>
+{
+	size_t operator()(const UE5Coro::TCoroutine<>& Handle) const noexcept
+	{
+		return std::hash<UE5Coro::TCoroutine<>>()(Handle);
+	}
+};
+template<typename T>
+struct std::hash<UE5Coro::TCoroutine<T>>
+{
+	size_t operator()(const UE5Coro::TCoroutine<T>& Handle) const noexcept
+	{
+		return std::hash<UE5Coro::TCoroutine<>>()(Handle);
+	}
+};
+#pragma endregion
 
 /** Taking this struct as a parameter in a coroutine will force latent execution
  *  mode, even if it does not have a FLatentActionInfo parameter.<br>

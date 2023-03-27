@@ -29,9 +29,11 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <map>
 #include "TestWorld.h"
 #include "Misc/AutomationTest.h"
 #include "UE5CoroTestObject.h"
+#include "UE5Coro/Coroutine.h"
 #include "UE5Coro/AsyncAwaiters.h"
 
 using namespace UE5Coro;
@@ -258,6 +260,31 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Moved to"), *Coro1.GetResult(), 1);
 		Test.TestEqual(TEXT("Coro2"), Coro2.GetResult(), 2);
 		Test.TestEqual(TEXT("Coro3"), Coro3.MoveResult(), 3);
+	}
+
+	{
+		TMap<FAsyncCoroutine, int> Map1;
+		TSortedMap<TCoroutine<int>, int> Map2;
+		std::unordered_map<TCoroutine<>, int> Map3;
+		std::map<TCoroutine<int>, int> Map4;
+		for (int i = 0; i < 5; ++i)
+		{
+			Map1.Add(World.Run(CORO_R(int) { co_return i; }), i);
+			Map2.Add(World.Run(CORO_R(int) { co_return i; }), i);
+			Map3[World.Run(CORO_R(int) { co_return i; })] = i;
+			Map4[World.Run(CORO_R(int) { co_return i; })] = i;
+		}
+		IF_CORO_LATENT
+			World.Tick();
+		auto TestMap = [&](auto& Map)
+		{
+			for (auto& [Key, Value] : Map)
+				Test.TestEqual(TEXT("Value"), Map[Key], Value);
+		};
+		TestMap(Map1);
+		TestMap(Map2);
+		TestMap(Map3);
+		TestMap(Map4);
 	}
 
 	DoTestSharedPtr<TThreadSafeSharedPtr, T...>(World, Test);

@@ -17,6 +17,10 @@ Copies of a TCoroutine refer to the same coroutine as the original.
 TCoroutine&lt;T&gt; has all the functionality of TCoroutine<>, plus additional
 methods and overloads for the return type.
 
+TCoroutines are comparable (they have a strict, total, but meaningless order),
+and hashable with GetTypeHash and std::hash.
+Copies referring to the same coroutine invocation compare equal to each other.
+
 A non-void coroutine return type must be at least _DefaultConstructible_,
 _MoveAssignable_, and _Destructible_.
 Full functionality also requires _CopyConstructible_.
