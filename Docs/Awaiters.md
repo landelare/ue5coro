@@ -72,12 +72,13 @@ TFuture\<T\> itself is movable and can only be used (including co_await) once.
 ## Latent awaiters
 
 UE5Coro::Latent awaiters are locked to the game thread.
-Their lifetime is tied to the world so it's possible, e.g., if PIE ends that
-co_awaiting them will not resume your coroutine.
-In this case your stack is still unwound normally (similarly to if an exception
-was thrown) and your destructors are called so it's safe to use `FScopeLock`s,
-smart pointers, etc. across a co_await, but something like this could cause
-problems:
+Their lifetime is tied to the world and the latent action manager can decide to
+cancel them, so it's possible, e.g., if PIE ends or its owning AActor is
+destroyed, that co_awaiting them will not resume your coroutine.
+In this case the coroutine's state and locals are still destroyed normally
+(similarly to if an exception was thrown) and their destructors called, so it's
+safe to use `FScopeLock`s, smart pointers, etc. across a co_await, but something
+like this could cause problems:
 
 ```cpp
 T* Thing = new T();
@@ -85,7 +86,7 @@ co_await UE5Coro::Latent::Something(); // This may not resume
 delete Thing;
 ```
 
-It's undefined when exactly your coroutine stack is unwound, it might be, e.g.,
+It's undefined when exactly the coroutine's state is cleared, it might be, e.g.,
 when the latent action is destroyed or when the co_await would normally resume
 the coroutine.
 In practice, for awaiters in this namespace it will usually happen within 2
@@ -93,7 +94,7 @@ ticks.
 
 Note that while async mode coroutines normally drive and own themselves, if
 they're currently co_awaiting a latent awaiter, the world **can** decide to
-destroy the coroutine, in which case the same stack unwinding happens.
+destroy the coroutine, in which case the same cancellation/cleanup happens.
 
 The return values of these functions are movable and some of them support
 multiple concurrent co_awaits, but relying on the latter is not recommended.
@@ -102,11 +103,11 @@ multiple concurrent co_awaits, but relying on the latter is not recommended.
 
 To help with the example code from the previous section above, the engine's own
 `ON_SCOPE_EXIT` can be used to place code in a destructor, ensuring that it will
-always run even if the latent action manager cancels the coroutine.
+always run even if the coroutine is canceled.
 
 The types in UE5Coro/LatentCallbacks.h provide specialized versions of this that
-only execute the provided function/lambda if the coroutine is canceled for a
-certain reason.
+only execute the provided function/lambda if the coroutine is canceled by the
+latent action manager for a certain reason.
 Note that a coroutine canceling itself with `UE5Coro::Latent::Cancel()` counts
 as neither of these but a normal completion.
 

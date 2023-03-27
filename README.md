@@ -52,6 +52,7 @@ by this plugin, or keep reading for a quick overview.
 various awaiter objects. They can be used to implement BP latent actions such as
 Delay, or as a generic fork in code execution like AsyncTask, but not
 necessarily involving multithreading.
+  * [Cancellation](Docs/Cancellation.md) support has its own page.
 * [Generators](Docs/Generator.md) are caller-controlled and return a variable
 number of results without having to allocate and go through a temporary TArray.
 * [Overview of built-in awaiters](Docs/Awaiters.md) that you can use with async
