@@ -33,10 +33,15 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
+#include "UE5Coro/AsyncCoroutine.h"
 
 namespace UE5Coro
 {
-namespace Private { class FPromise; }
+namespace Private
+{
+class FPromise;
+class FCancellationAwaiter;
+}
 
 /**
  * Guards against user-requested cancellation. For advanced use.<br>
@@ -61,5 +66,22 @@ public:
 	// These objects only make sense as locals
 	void* operator new(std::size_t) = delete;
 	void* operator new[](std::size_t) = delete;
+};
+
+/** co_awaiting the return value of this function does nothing if the calling
+ *  coroutine is not currently canceled.
+ *  If it is canceled, the cancellation will be processed immediately.
+ *  FCancellationGuards are respected. */
+UE5CORO_API Private::FCancellationAwaiter FinishNowIfCanceled();
+}
+
+namespace UE5Coro::Private
+{
+class [[nodiscard]] UE5CORO_API FCancellationAwaiter
+	: public TAwaiter<FCancellationAwaiter>
+{
+public:
+	bool await_ready();
+	void Suspend(FPromise&);
 };
 }

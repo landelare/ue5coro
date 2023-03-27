@@ -79,11 +79,6 @@ FPromise::~FPromise()
 	Continuations.Broadcast();
 }
 
-bool FPromise::ShouldCancel(bool bBypassHolds) const
-{
-	return CancellationTracker.ShouldCancel(bBypassHolds);
-}
-
 FPromise& FPromise::Current()
 {
 	checkf(GCurrentPromise,
@@ -94,6 +89,11 @@ FPromise& FPromise::Current()
 void FPromise::Cancel()
 {
 	CancellationTracker.Cancel();
+}
+
+bool FPromise::ShouldCancel(bool bBypassHolds) const
+{
+	return CancellationTracker.ShouldCancel(bBypassHolds);
 }
 
 void FPromise::HoldCancellation()

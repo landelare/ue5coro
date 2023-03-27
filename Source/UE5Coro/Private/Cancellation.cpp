@@ -50,3 +50,19 @@ FCancellationGuard::~FCancellationGuard()
 #endif
 	FPromise::Current().ReleaseCancellation();
 }
+
+FCancellationAwaiter UE5Coro::FinishNowIfCanceled()
+{
+	return {};
+}
+
+bool FCancellationAwaiter::await_ready()
+{
+	return !FPromise::Current().ShouldCancel(false);
+}
+
+void FCancellationAwaiter::Suspend(FPromise& Promise)
+{
+	// Resume is also responsible for cancellation-induced self-destruction
+	Promise.Resume();
+}

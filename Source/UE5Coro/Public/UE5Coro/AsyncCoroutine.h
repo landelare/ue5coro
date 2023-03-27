@@ -195,7 +195,6 @@ protected:
 	explicit FPromise(std::shared_ptr<FPromiseExtras>, const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
 	virtual ~FPromise(); // Virtual for warning suppression only
-	bool ShouldCancel(bool bBypassHolds = false) const;
 
 public:
 	static FPromise& Current();
@@ -203,6 +202,7 @@ public:
 	/** Request deletion now or very soon. */
 	virtual void ThreadSafeDestroy() = 0;
 	void Cancel();
+	bool ShouldCancel(bool bBypassHolds = false) const;
 	void HoldCancellation();
 	void ReleaseCancellation();
 	virtual void Resume(bool bBypassCancellationHolds = false);

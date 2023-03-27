@@ -149,6 +149,24 @@ void DoTest(FAutomationTestBase& Test)
 			World.Tick();
 		Test.TestTrue(TEXT("Canceled"), bDone);
 	}
+
+	{
+		bool bDone = false;
+		auto Coro = World.Run(CORO
+		{
+			co_await Async::MoveToNewThread();
+			ON_SCOPE_EXIT { bDone = true; };
+			for (;;)
+				co_await FinishNowIfCanceled();
+		});
+		for (int i = 0; i < 10; ++i)
+		{
+			World.Tick();
+			Test.TestFalse(TEXT("Still running"), bDone);
+		}
+		Coro.Cancel();
+		FTestHelper::PumpGameThread(World, [&] { return bDone; });
+	}
 }
 }
 
