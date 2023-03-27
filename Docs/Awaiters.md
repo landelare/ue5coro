@@ -8,6 +8,11 @@ header files for that.
 
 UE5Coro::WhenAny and WhenAll let you combine any type of co_awaitable objects
 into one that resumes the coroutine when one or all of them have completed.
+
+UE5Coro::Race behaves like WhenAny, but it can only take TCoroutines (including
+implicitly-converted FAsyncCoroutines), and the first coroutine to complete will
+cancel the others.
+
 When multiple types of awaiters are mixed, it's unspecified whose system will
 resume - for example:
 ```cpp
@@ -18,7 +23,8 @@ co_await UE5Coro::WhenAll(Async, MoveTemp(Latent), Task);
 ```
 The code above might resume in an AsyncTask, game thread Tick, or the UE::Tasks
 system.
-WhenAll/WhenAny are thread safe.
+WhenAny, Race, and WhenAll are all thread safe.
+
 Some awaiters (mostly Latent ones) require being moved into the call like in the
 example above.
 C\+\+20 will let you know that the call's constraints were not satisfied on the
@@ -27,7 +33,7 @@ C\+\+17 will hit a static_assert inside the function, prompting you to fix it.
 The calling line will often be found in the error's notes somewhere.
 
 Every parameter is consumed and counts as co_awaited by these calls, even if
-WhenAny finishes early.
+WhenAny or Race finish early.
 
 The return values of these functions are copyable and allow one concurrent
 co_await across all copies.

@@ -41,6 +41,7 @@ namespace UE5Coro::Private
 {
 class FAnyAwaiter;
 class FAllAwaiter;
+class FRaceAwaiter;
 
 #if UE5CORO_CPP20
 // If your WhenAny/WhenAll call doesn't satisfy this concept, you'll need to
@@ -65,6 +66,19 @@ namespace UE5Coro
  *  finished first. */
 template<UE5CORO_PRIVATE_AWAITABLE... T>
 Private::FAnyAwaiter WhenAny(T&&...);
+
+/** co_awaits all coroutines in the array.
+ *  The first one to finish cancels the others and resumes the caller.
+ *  The result of the co_await expression is the array index of the coroutine
+ *  that finished first. */
+UE5CORO_API Private::FRaceAwaiter Race(TArray<TCoroutine<>>);
+
+/** co_awaits all of the coroutines provided.
+ *  The first one to finish cancels the others and resumes the caller.
+ *  The result of the co_await expression is the index of the parameter that
+ *  finished first. */
+template<typename... T>
+Private::FRaceAwaiter Race(TCoroutine<T>... Args);
 
 /** co_awaits all parameters, resumes its own awaiting coroutine when all
  *  of them finish. */
@@ -125,6 +139,27 @@ public:
 		: FAggregateAwaiter(std::forward<T>(Args)...) { }
 	void await_resume() noexcept { }
 };
+
+class [[nodiscard]] UE5CORO_API FRaceAwaiter : public TAwaiter<FRaceAwaiter>
+{
+	struct FData
+	{
+		UE::FSpinLock Lock;
+		TArray<TCoroutine<>> Handles;
+		int Index = -1;
+		FPromise* Promise = nullptr;
+
+		explicit FData(TArray<TCoroutine<>>&& Array)
+			: Handles(std::move(Array)) { }
+	};
+	std::shared_ptr<FData> Data;
+
+public:
+	explicit FRaceAwaiter(TArray<TCoroutine<>>&&);
+	bool await_ready();
+	void Suspend(FPromise&);
+	int await_resume() noexcept;
+};
 }
 
 template<UE5CORO_PRIVATE_AWAITABLE... T>
@@ -135,6 +170,12 @@ UE5Coro::Private::FAnyAwaiter UE5Coro::WhenAny(T&&... Args)
 		"Attempted to copy a noncopyable awaiter, move it instead");
 	return Private::FAnyAwaiter(sizeof...(Args) ? 1 : 0,
 	                            std::forward<T>(Args)...);
+}
+
+template<typename... T>
+UE5Coro::Private::FRaceAwaiter UE5Coro::Race(TCoroutine<T>... Args)
+{
+	return Race(TArray<TCoroutine<>>{std::move(Args)...});
 }
 
 template<UE5CORO_PRIVATE_AWAITABLE... T>

@@ -196,6 +196,40 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("Resumed"), State, 2);
 		World.Tick();
 	}
+
+	{
+		int State = 0;
+		auto Coro = World.Run(CORO_R(int)
+		{
+			auto A = World.Run(CORO
+			{
+				ON_SCOPE_EXIT { State = 1; };
+				co_await Latent::Ticks(5);
+				for (;;)
+					co_await Latent::NextTick();
+			});
+
+			auto B = World.Run(CORO
+			{
+				co_await Latent::NextTick();
+			});
+
+			co_return co_await Race(A, B);
+		});
+		World.EndTick();
+		World.Tick(); // NextTick
+		World.Tick(); // B completes
+		IF_NOT_CORO_LATENT
+		{
+			// Only latent->latent awaits poll, async needs all 5 ticks
+			World.Tick();
+			World.Tick();
+			Test.TestEqual(TEXT("State"), State, 0);
+			World.Tick();
+		}
+		Test.TestEqual(TEXT("State"), State, 1);
+		Test.TestEqual(TEXT("Return value"), Coro.GetResult(), 1);
+	}
 }
 }
 

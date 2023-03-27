@@ -31,6 +31,7 @@
 
 #include "UE5Coro/AggregateAwaiters.h"
 
+using namespace UE5Coro;
 using namespace UE5Coro::Private;
 
 int FAggregateAwaiter::GetResumerIndex() const
@@ -61,4 +62,78 @@ void FAggregateAwaiter::Suspend(FPromise& Promise)
 
 	Data->Promise = &Promise;
 	Data->Lock.Unlock();
+}
+
+FRaceAwaiter UE5Coro::Race(TArray<TCoroutine<>> Array)
+{
+	return FRaceAwaiter(std::move(Array));
+}
+
+FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
+	: Data(std::make_shared<FData>(std::move(Array)))
+{
+	// Add a continuation to every coroutine, but any one of them might
+	// invalidate the array
+	for (int i = 0; i < Data->Handles.Num(); ++i)
+	{
+		TCoroutine<>* Coro;
+		{
+			// Must be limited in scope because ContinueWith may be synchronous
+			// and the lock is not recursive
+			UE::TScopeLock _(Data->Lock);
+			if (Data->Index != -1) // Did a coroutine finish during this loop?
+				return; // Don't bother asking the others, they've all canceled
+			Coro = &Data->Handles[i];
+		}
+
+		Coro->ContinueWith([Data = Data, i]
+		{
+			UE::TScopeLock _(Data->Lock);
+
+			// Nothing to do if this wasn't the first one
+			if (Data->Index != -1)
+				return;
+			Data->Index = i;
+
+			for (int j = 0; j < Data->Handles.Num(); ++j)
+				if (j != i) // Cancel the others
+					Data->Handles[j].Cancel();
+
+			if (auto* Promise = Data->Promise)
+			{
+				_.Unlock();
+				Promise->Resume();
+			}
+		});
+	}
+}
+
+bool FRaceAwaiter::await_ready()
+{
+	Data->Lock.Lock();
+	if (Data->Index != -1)
+	{
+		Data->Lock.Unlock();
+		return true;
+	}
+	else
+		return false; // Passing the lock to Suspend
+}
+
+void FRaceAwaiter::Suspend(FPromise& Promise)
+{
+	// Expecting a lock from await_ready
+	checkf(!Data->Lock.TryLock(), TEXT("Internal error: lock not held"));
+	checkf(!Data->Promise, TEXT("Unexpected double race await"));
+	Data->Promise = &Promise;
+	Data->Lock.Unlock();
+}
+
+int FRaceAwaiter::await_resume() noexcept
+{
+	// This will be read on the same thread that wrote Index, or after
+	// await_ready determined its value; no lock needed
+	checkf(Data->Index != -1,
+	       TEXT("Internal error: resuming with unknown result"));
+	return Data->Index;
 }
