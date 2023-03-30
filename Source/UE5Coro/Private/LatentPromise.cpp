@@ -167,6 +167,13 @@ FLatentPromise::~FLatentPromise()
 	GLatentExitReason = ELatentExitReason::Normal;
 }
 
+bool FLatentPromise::IsEarlyDestroy() const
+{
+	// Destruction can come before or after final_suspend, but the only reason
+	// it can come before is a cancellation, both regular and forced
+	return !(LatentFlags & LF_InFinalSuspend);
+}
+
 void FLatentPromise::Resume(bool bBypassCancellationHolds)
 {
 	if (UNLIKELY(bBypassCancellationHolds))
@@ -205,8 +212,6 @@ void FLatentPromise::CancelFromWithin()
 
 void FLatentPromise::ThreadSafeDestroy()
 {
-	// There's no parent implementation to call
-
 	// Latent coroutines always end on the game thread
 	if (!IsInGameThread())
 	{
@@ -217,8 +222,7 @@ void FLatentPromise::ThreadSafeDestroy()
 	// Since we're on the game thread now, there's no possibility of a race with
 	// ~FPendingLatentCoroutine requesting another deletion
 	GLatentExitReason = ExitReason;
-	auto Handle = stdcoro::coroutine_handle<FLatentPromise>::from_promise(*this);
-	Handle.destroy(); // Counts as delete this;
+	FPromise::ThreadSafeDestroy(); // Counts as delete this;
 	checkf(GLatentExitReason == ELatentExitReason::Normal,
 	       TEXT("Internal error: latent exit reason not restored"));
 }

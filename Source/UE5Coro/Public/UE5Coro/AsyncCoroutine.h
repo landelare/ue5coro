@@ -56,6 +56,8 @@ template<typename> class TFutureAwaiter;
 template<typename> class TTaskAwaiter;
 namespace Test { class FTestHelper; }
 
+extern thread_local bool GDestroyedEarly;
+
 template<typename, typename A>
 struct TAwaitTransform
 {
@@ -195,12 +197,13 @@ protected:
 	explicit FPromise(std::shared_ptr<FPromiseExtras>, const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);
 	virtual ~FPromise(); // Virtual for warning suppression only
+	virtual bool IsEarlyDestroy() const = 0;
 
 public:
 	static FPromise& Current();
 
 	/** Request deletion now or very soon. */
-	virtual void ThreadSafeDestroy() = 0;
+	virtual void ThreadSafeDestroy();
 	void Cancel();
 	bool ShouldCancel(bool bBypassHolds = false) const;
 	void HoldCancellation();
@@ -217,12 +220,12 @@ public:
 
 class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
 {
+	virtual bool IsEarlyDestroy() const override;
+
 public:
 	template<typename... A>
 	explicit FAsyncPromise(std::shared_ptr<FPromiseExtras> InExtras, A&&...)
 		: FPromise(std::move(InExtras), TEXT("Async")) { }
-
-	virtual void ThreadSafeDestroy() override;
 
 	FInitialSuspend initial_suspend() noexcept
 	{
@@ -261,6 +264,7 @@ class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
 
 protected:
 	virtual ~FLatentPromise() override;
+	virtual bool IsEarlyDestroy() const override;
 
 public:
 	template<typename... T>

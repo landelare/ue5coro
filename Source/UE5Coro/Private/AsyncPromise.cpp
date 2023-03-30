@@ -33,11 +33,7 @@
 
 using namespace UE5Coro::Private;
 
-void FAsyncPromise::ThreadSafeDestroy()
+bool FAsyncPromise::IsEarlyDestroy() const
 {
-	// There's no parent implementation to call
-
-	// Async coroutines always own themselves and are free threaded
-	auto Handle = stdcoro::coroutine_handle<FAsyncPromise>::from_promise(*this);
-	Handle.destroy(); // counts as delete this;
+	return ShouldCancel();
 }

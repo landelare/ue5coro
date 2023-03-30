@@ -35,6 +35,16 @@
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
 
+namespace
+{
+// lvalue ref to work around TScopeGuard
+void CleanupIfCanceled(std::function<void()>& Fn)
+{
+	if (GDestroyedEarly)
+		Fn();
+}
+}
+
 FCancellationGuard::FCancellationGuard()
 #if UE5CORO_DEBUG
 	: Promise(&FPromise::Current())
@@ -49,6 +59,11 @@ FCancellationGuard::~FCancellationGuard()
 	checkf(Promise == &FPromise::Current(), TEXT("Hold/Release mismatch"));
 #endif
 	FPromise::Current().ReleaseCancellation();
+}
+
+FOnCoroutineCanceled::FOnCoroutineCanceled(std::function<void()> Fn)
+	: TScopeGuard(std::bind(&CleanupIfCanceled, std::move(Fn)))
+{
 }
 
 FCancellationAwaiter UE5Coro::FinishNowIfCanceled()

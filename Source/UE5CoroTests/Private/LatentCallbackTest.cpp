@@ -32,6 +32,7 @@
 #include "TestWorld.h"
 #include "UE5CoroTestObject.h"
 #include "Misc/AutomationTest.h"
+#include "UE5Coro/Cancellation.h"
 #include "UE5Coro/LatentAwaiters.h"
 #include "UE5Coro/LatentCallbacks.h"
 
@@ -44,23 +45,26 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentCallbackTest, "UE5Coro.Latent.Callbacks"
                                  EAutomationTestFlags::ProductFilter)
 
 FAsyncCoroutine UUE5CoroTestObject::ObjectDestroyedTest(
-	int& State, bool& bAbnormal, FLatentActionInfo)
+	int& State, bool& bAbnormal, bool& bCanceled, FLatentActionInfo)
 {
 	State = 1;
 	Latent::FOnActionAborted A([&] { State = 2; });
 	Latent::FOnObjectDestroyed B([&] { State = 3; });
 	Latent::FOnAbnormalExit C([&] { bAbnormal = true; });
+	FOnCoroutineCanceled D([&] { bCanceled = true; });
 	co_await Latent::Ticks(10);
 	State = 10;
 }
 
 bool FLatentCallbackTest::RunTest(const FString& Parameters)
 {
-	int State;
+	int State = 0;
+	bool bCanceled = false;
 	{
 		FTestWorld World;
 		World.Run([&](FLatentActionInfo) -> TCoroutine<>
 		{
+			FOnCoroutineCanceled _([&] { bCanceled = true; });
 			ON_SCOPE_EXIT { State = 2; };
 			State = 1;
 			co_await Latent::NextTick();
@@ -68,12 +72,14 @@ bool FLatentCallbackTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Initial state"), State, 1);
 	}
 	TestEqual(TEXT("On scope exit"), State, 2);
+	TestTrue(TEXT("Canceled"), bCanceled);
 
 	{
 		FTestWorld World;
 		bool bAbnormal = false;
+		bCanceled = false;
 		auto* Object = NewObject<UUE5CoroTestObject>();
-		Object->ObjectDestroyedTest(State, bAbnormal,
+		Object->ObjectDestroyedTest(State, bAbnormal, bCanceled,
 		                            {0, 0, TEXT("Empty"), Object});
 		World.EndTick();
 		TestEqual(TEXT("Initial state"), State, 1);
@@ -85,13 +91,15 @@ bool FLatentCallbackTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Resumed state"), State, 10);
 		World.Tick();
 		TestFalse(TEXT("Normal exit"), bAbnormal);
+		TestFalse(TEXT("Not canceled"), bCanceled);
 	}
 
 	{
 		FTestWorld World;
 		bool bAbnormal = false;
+		bCanceled = false;
 		auto* Object = NewObject<UUE5CoroTestObject>();
-		Object->ObjectDestroyedTest(State, bAbnormal,
+		Object->ObjectDestroyedTest(State, bAbnormal, bCanceled,
 		                            {0, 0, TEXT("Empty"), Object});
 		TestEqual(TEXT("Initial state"), State, 1);
 		auto& LAM = World->GetLatentActionManager();
@@ -99,14 +107,15 @@ bool FLatentCallbackTest::RunTest(const FString& Parameters)
 		World.Tick();
 		TestEqual(TEXT("On action aborted"), State, 2);
 		TestTrue(TEXT("Abnormal exit"), bAbnormal);
+		TestTrue(TEXT("Implicitly canceled"), bCanceled);
 	}
 
 	{
 		FTestWorld World;
 		bool bAbnormal = false;
-
+		bCanceled = false;
 		auto* Object = NewObject<UUE5CoroTestObject>();
-		Object->ObjectDestroyedTest(State, bAbnormal,
+		Object->ObjectDestroyedTest(State, bAbnormal, bCanceled,
 		                            {0, 0, TEXT("Empty"), Object});
 		TestEqual(TEXT("Initial state"), State, 1);
 		Object->MarkAsGarbage();
@@ -114,6 +123,7 @@ bool FLatentCallbackTest::RunTest(const FString& Parameters)
 		World.Tick();
 		TestEqual(TEXT("On object destroyed"), State, 3);
 		TestTrue(TEXT("Abnormal exit"), bAbnormal);
+		TestTrue(TEXT("Implicitly canceled"), bCanceled);
 	}
 	return true;
 }

@@ -58,36 +58,74 @@ void DoTest(FAutomationTestBase& Test)
 
 	IF_CORO_LATENT
 	{
+		bool bCanceled = false;
 		auto Coro = World.Run(CORO_R(int)
 		{
+			FOnCoroutineCanceled _([&] { bCanceled = true; });
 			co_await Latent::Cancel();
 			co_return 1;
 		});
 		World.Tick(); // Cancellation is not processed until the next tick
 		Test.TestTrue(TEXT("Done"), Coro.IsDone());
+		Test.TestTrue(TEXT("Canceled"), bCanceled);
 		Test.TestEqual(TEXT("No return value"), Coro.GetResult(), 0);
 	}
 
 	IF_CORO_LATENT
 	{
+		std::atomic<bool> bCanceled = false;
 		auto Coro = World.Run(CORO_R(int)
 		{
+			FOnCoroutineCanceled _([&] { bCanceled = true; });
 			co_await Async::MoveToNewThread();
 			co_await Latent::Cancel();
 			co_return 1;
 		});
 		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
+		Test.TestTrue(TEXT("Canceled"), bCanceled);
 		Test.TestEqual(TEXT("No return value"), Coro.GetResult(), 0);
 	}
 
 	{
+		bool bCanceled = false;
+		bool bDestroyed = false;
+		World.Run(CORO
+		{
+			FOnCoroutineCanceled _([&] { bCanceled = true; });
+			ON_SCOPE_EXIT { bDestroyed = true; };
+			co_return;
+		});
+		Test.TestTrue(TEXT("Destroyed"), bDestroyed);
+		Test.TestFalse(TEXT("Not canceled"), bCanceled);
+	}
+
+	{
+		bool bCanceled = false;
+		bool bDestroyed = false;
+		{
+			FTestWorld World2;
+			World2.Run(CORO
+			{
+				FOnCoroutineCanceled _([&] { bCanceled = true; });
+				ON_SCOPE_EXIT { bDestroyed = true; };
+				co_await Latent::NextTick();
+			});
+		} // Indirectly cancel by destroying the world during a latent co_await
+		Test.TestTrue(TEXT("Destroyed"), bDestroyed);
+		Test.TestTrue(TEXT("Canceled"), bCanceled);
+	}
+
+	{
+		bool bCanceled = false;
 		bool bDestroyed = false;
 		auto Coro = World.Run(CORO
 		{
+			FOnCoroutineCanceled _([&] { bCanceled = true; });
 			ON_SCOPE_EXIT { bDestroyed = true; };
 			co_await Latent::Ticks(5);
 		});
 		World.EndTick();
+		Test.TestFalse(TEXT("Active"), bCanceled);
 		Test.TestFalse(TEXT("Active"), bDestroyed);
 		Coro.Cancel();
 		IF_CORO_LATENT
@@ -98,6 +136,7 @@ void DoTest(FAutomationTestBase& Test)
 				Test.TestFalse(TEXT("Not canceled yet"), bDestroyed);
 				World.Tick();
 			}
+		Test.TestTrue(TEXT("Canceled"), bCanceled);
 		Test.TestTrue(TEXT("Canceled"), bDestroyed);
 	}
 

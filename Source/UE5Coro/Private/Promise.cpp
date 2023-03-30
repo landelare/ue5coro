@@ -39,6 +39,7 @@ std::atomic<int> UE5Coro::Private::GLastDebugID = -1; // -1 = no coroutines yet
 #endif
 
 thread_local FPromise* UE5Coro::Private::GCurrentPromise = nullptr;
+thread_local bool UE5Coro::Private::GDestroyedEarly = false;
 
 bool FPromiseExtras::IsComplete() const
 {
@@ -67,6 +68,7 @@ FPromise::~FPromise()
 	checkf(!Extras->IsComplete(),
 	       TEXT("Unexpected late/double coroutine destruction"));
 	auto Continuations = std::move(Extras->Continuations_DEPRECATED);
+	GDestroyedEarly = false;
 
 	// The coroutine is considered completed NOW
 	Extras->Completed->Trigger();
@@ -77,6 +79,15 @@ FPromise::~FPromise()
 	Extras->ReturnValuePtr = nullptr;
 
 	Continuations.Broadcast();
+}
+
+void FPromise::ThreadSafeDestroy()
+{
+	auto Handle = stdcoro::coroutine_handle<FPromise>::from_promise(*this);
+	GDestroyedEarly = IsEarlyDestroy();
+	Handle.destroy(); // counts as delete this;
+	checkf(!GDestroyedEarly,
+	       TEXT("Internal error: early destroy flag not reset"));
 }
 
 FPromise& FPromise::Current()

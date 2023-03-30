@@ -68,6 +68,21 @@ public:
 	void* operator new[](std::size_t) = delete;
 };
 
+/**
+ * Provided for advanced scenarios, prefer ON_SCOPE_EXIT or RAII for
+ * unconditional cleanup.<br><br>
+ * This will ONLY call the provided callback if this object is in scope within
+ * a coroutine that's being cleaned up early: due to manual cancellation, the
+ * latent action manager deleting its corresponding latent action, etc.<br>
+ * <br>Example usage:<br>
+ * FOnCoroutineCanceled Guard([this]{cleanup code});
+ */
+struct [[nodiscard]] UE5CORO_API FOnCoroutineCanceled
+	: ScopeExitSupport::TScopeGuard<std::function<void()>>
+{
+	explicit FOnCoroutineCanceled(std::function<void()> Fn);
+};
+
 /** co_awaiting the return value of this function does nothing if the calling
  *  coroutine is not currently canceled.
  *  If it is canceled, the cancellation will be processed immediately.

@@ -58,5 +58,5 @@ public:
 		UKismetSystemLibrary::DelayUntilNextTick(this, LatentInfo);
 	}
 
-	FAsyncCoroutine ObjectDestroyedTest(int&, bool&, FLatentActionInfo);
+	FAsyncCoroutine ObjectDestroyedTest(int&, bool&, bool&, FLatentActionInfo);
 };

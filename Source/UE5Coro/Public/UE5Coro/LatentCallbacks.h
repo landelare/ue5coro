@@ -40,11 +40,11 @@ namespace UE5Coro::Latent
 {
 /**
  * Provided for advanced scenarios, prefer ON_SCOPE_EXIT or RAII for
- * unconditional cleanup.<br><br>
- * This is a combination of FOnActionAborted and FOnObjectDestroyed and will run
- * the provided callback in either of those two situations. It has no effect
- * within an async mode coroutine. Note that because NotifyObjectDestroyed is
- * included, `this` might not be valid.<br>
+ * unconditional cleanup, or FOnCoroutineCanceled for a generic handler.<br><br>
+ * This is a combination of FOnActionAborted and FOnObjectDestroyed and will
+ * ONLY run the provided callback in either of those two situations.<br>
+ * It has no effect within an async mode coroutine. Note that because
+ * NotifyObjectDestroyed is included, `this` might not be valid.<br>
  * <br>Example usage:<br>
  * Latent::FOnAbnormalExit Guard([]{cleanup code});
  */
