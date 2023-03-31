@@ -47,6 +47,7 @@ class FLatentPromise;
 class FPackageLoadAwaiter;
 template<typename, int> class TAsyncLoadAwaiter;
 template<typename> class TAsyncQueryAwaiter;
+template<typename> class TAsyncQueryAwaiterRV;
 }
 
 namespace UE5Coro::Latent
@@ -407,10 +408,22 @@ public:
 	explicit TAsyncQueryAwaiter(UWorld*, FTraceHandle (UWorld::*)(P...), A...);
 	~TAsyncQueryAwaiter();
 
+	// Workaround for not being able to rvalue overload await_resume
+	TAsyncQueryAwaiter& operator co_await() &;
+	TAsyncQueryAwaiterRV<T>& operator co_await() &&;
+
 	bool await_ready();
 	void Suspend(FPromise&);
-	const TArray<T>& await_resume() &;
-	TArray<T> await_resume() &&;
+	const TArray<T>& await_resume();
+};
+
+template<typename T>
+class [[nodiscard]] UE5CORO_API TAsyncQueryAwaiterRV
+	: public TAsyncQueryAwaiter<T>
+{
+public:
+	TAsyncQueryAwaiterRV() = delete; // Objects of this type are never created
+	TArray<T> await_resume();
 };
 }
 

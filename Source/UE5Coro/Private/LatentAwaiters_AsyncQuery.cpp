@@ -86,6 +86,20 @@ template<typename T>
 TAsyncQueryAwaiter<T>::~TAsyncQueryAwaiter() = default;
 
 template<typename T>
+TAsyncQueryAwaiter<T>& TAsyncQueryAwaiter<T>::operator co_await() &
+{
+	return *this;
+}
+
+template<typename T>
+TAsyncQueryAwaiterRV<T>& TAsyncQueryAwaiter<T>::operator co_await() &&
+{
+	static_assert(sizeof(*this) == sizeof(TAsyncQueryAwaiterRV<T>));
+	// Technically, this object is not a TAsyncQueryAwaiterRV
+	return *std::launder(reinterpret_cast<TAsyncQueryAwaiterRV<T>*>(this));
+}
+
+template<typename T>
 bool TAsyncQueryAwaiter<T>::await_ready()
 {
 	checkf(IsInGameThread(),
@@ -103,7 +117,7 @@ void TAsyncQueryAwaiter<T>::Suspend(FPromise& Promise)
 }
 
 template<typename T>
-const TArray<T>& TAsyncQueryAwaiter<T>::await_resume() &
+const TArray<T>& TAsyncQueryAwaiter<T>::await_resume()
 {
 	checkf(IsInGameThread(),
 	       TEXT("Internal error: expected to resume on the game thread"));
@@ -113,13 +127,15 @@ const TArray<T>& TAsyncQueryAwaiter<T>::await_resume() &
 }
 
 template<typename T>
-TArray<T> TAsyncQueryAwaiter<T>::await_resume() &&
+TArray<T> TAsyncQueryAwaiterRV<T>::await_resume()
 {
-	return const_cast<TArray<T>&&>(await_resume());
+	return const_cast<TArray<T>&&>(TAsyncQueryAwaiter<T>::await_resume());
 }
 
 template class UE5CORO_API TAsyncQueryAwaiter<FHitResult>;
+template class UE5CORO_API TAsyncQueryAwaiterRV<FHitResult>;
 template class UE5CORO_API TAsyncQueryAwaiter<FOverlapResult>;
+template class UE5CORO_API TAsyncQueryAwaiterRV<FOverlapResult>;
 }
 
 TAsyncQueryAwaiter<FHitResult> Latent::AsyncLineTraceByChannel(
