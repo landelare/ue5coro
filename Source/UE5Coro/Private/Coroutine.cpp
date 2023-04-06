@@ -71,8 +71,8 @@ bool TCoroutine<>::IsDone() const
 void TCoroutine<>::SetDebugName(const TCHAR* Name)
 {
 #if UE5CORO_DEBUG
-	if (ensureMsgf(GResumeStack.Num() > 0,
+	if (ensureMsgf(GCurrentPromise,
 	               TEXT("Attempting to set a debug name outside a coroutine")))
-		GResumeStack.Last()->Extras->DebugName = Name;
+		GCurrentPromise->Extras->DebugName = Name;
 #endif
 }

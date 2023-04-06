@@ -36,9 +36,8 @@ using namespace UE5Coro::Private;
 
 #if UE5CORO_DEBUG
 std::atomic<int> UE5Coro::Private::GLastDebugID = -1; // -1 = no coroutines yet
-// This is a synchronous call stack that doesn't follow or track co_await!
-thread_local TArray<FPromise*> UE5Coro::Private::GResumeStack;
 #endif
+thread_local FPromise* UE5Coro::Private::GCurrentPromise = nullptr;
 
 bool FPromiseExtras::IsComplete() const
 {
@@ -76,20 +75,18 @@ FPromise::~FPromise()
 
 void FPromise::Resume(bool bBypassCancellationHolds)
 {
-#if UE5CORO_DEBUG
 	checkf(!Extras->IsComplete(),
 	       TEXT("Attempting to resume completed coroutine"));
-	GResumeStack.Push(this);
+	checkf(this, TEXT("Corruption")); // Still useful on some compilers
+	auto* CallerPromise = GCurrentPromise;
+	GCurrentPromise = this;
 	ON_SCOPE_EXIT
 	{
 		// Coroutine resumption might result in `this` having been freed already
-		// and not being considered `Alive`.
-		// This is technically undefined behavior.
-		checkf(GResumeStack.Last() == this,
-		       TEXT("Internal error: coroutine resume stack derailed"));
-		GResumeStack.Pop();
+		checkf(GCurrentPromise == this,
+		       TEXT("Internal error: coroutine resume tracking derailed"));
+		GCurrentPromise = CallerPromise;
 	};
-#endif
 
 	// Self-destruct instead of resuming if a cancellation was received
 	if (UNLIKELY(bCanceled))

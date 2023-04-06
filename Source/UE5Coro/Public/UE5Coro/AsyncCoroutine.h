@@ -166,8 +166,9 @@ struct [[nodiscard]] TPromiseExtras final : FPromiseExtras
 
 #if UE5CORO_DEBUG
 extern std::atomic<int> GLastDebugID;
-extern thread_local TArray<FPromise*> GResumeStack;
 #endif
+
+extern thread_local FPromise* GCurrentPromise;
 
 class [[nodiscard]] UE5CORO_API FPromise
 {
