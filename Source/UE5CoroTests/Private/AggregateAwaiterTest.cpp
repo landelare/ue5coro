@@ -203,7 +203,7 @@ void DoTest(FAutomationTestBase& Test)
 		{
 			auto A = World.Run(CORO
 			{
-				ON_SCOPE_EXIT { State = 1; };
+				ON_SCOPE_EXIT { State = 2; };
 				co_await Latent::Ticks(5);
 				for (;;)
 					co_await Latent::NextTick();
@@ -211,6 +211,7 @@ void DoTest(FAutomationTestBase& Test)
 
 			auto B = World.Run(CORO
 			{
+				ON_SCOPE_EXIT { State = 1; };
 				co_await Latent::NextTick();
 			});
 
@@ -218,16 +219,17 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		World.EndTick();
 		World.Tick(); // NextTick
-		World.Tick(); // B completes
+		Test.TestEqual(TEXT("State"), State, 1);
+		World.Tick(); // A needs to poll to process the cancellation from Race
 		IF_NOT_CORO_LATENT
 		{
 			// Only latent->latent awaits poll, async needs all 5 ticks
 			World.Tick();
 			World.Tick();
-			Test.TestEqual(TEXT("State"), State, 0);
+			Test.TestEqual(TEXT("State"), State, 1);
 			World.Tick();
 		}
-		Test.TestEqual(TEXT("State"), State, 1);
+		Test.TestEqual(TEXT("State"), State, 2);
 		Test.TestEqual(TEXT("Return value"), Coro.GetResult(), 1);
 	}
 }

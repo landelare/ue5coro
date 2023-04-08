@@ -179,8 +179,6 @@ void DoTest(FAutomationTestBase& Test)
 		int Value = 0;
 		World.Run(CORO_R(int) { co_return 1; })
 		     .ContinueWith([&](int InValue) { Value = InValue; });
-		IF_CORO_LATENT
-			World.Tick();
 		Test.TestEqual(TEXT("Value"), Value, 1);
 	}
 
@@ -274,8 +272,6 @@ void DoTest(FAutomationTestBase& Test)
 			Map3[World.Run(CORO_R(int) { co_return i; })] = i;
 			Map4[World.Run(CORO_R(int) { co_return i; })] = i;
 		}
-		IF_CORO_LATENT
-			World.Tick();
 		auto TestMap = [&](auto& Map)
 		{
 			for (auto& [Key, Value] : Map)

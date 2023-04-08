@@ -126,6 +126,18 @@ struct FInitialSuspend
 	void await_resume() noexcept { }
 };
 
+struct FFinalSuspend
+{
+	bool bDestroy;
+	bool await_ready() noexcept { return false; }
+	void await_suspend(stdcoro::coroutine_handle<> Handle) noexcept
+	{
+		if (bDestroy)
+			Handle.destroy();
+	}
+	void await_resume() noexcept { }
+};
+
 /** Fields of FPromise that may be alive after the coroutine is done. */
 class [[nodiscard]] UE5CORO_API FPromiseExtras
 {
@@ -249,7 +261,7 @@ class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
 	enum ELatentFlags
 	{
 		LF_Detached = 1,
-		LF_InFinalSuspend = 2,
+		LF_Successful = 2,
 	};
 	std::atomic<int> LatentFlags = 0; // int to get the bitwise operators
 	ELatentExitReason ExitReason = static_cast<ELatentExitReason>(0);
@@ -276,15 +288,14 @@ public:
 
 	void AttachToGameThread(bool bFromAnyThread);
 	void DetachFromGameThread();
-
-	void Respond(struct FLatentResponse&, const FLatentActionInfo&) const;
+	bool IsOnGameThread() const;
 
 	ELatentExitReason GetExitReason() const { return ExitReason; }
 	void SetExitReason(ELatentExitReason Reason);
 	void SetCurrentAwaiter(FLatentAwaiter*);
 
 	FInitialSuspend initial_suspend();
-	stdcoro::suspend_always final_suspend() noexcept;
+	FFinalSuspend final_suspend() noexcept;
 
 	template<typename T>
 	decltype(auto) await_transform(T&& Awaitable)

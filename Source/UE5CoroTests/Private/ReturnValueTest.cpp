@@ -67,8 +67,6 @@ void DoTest(FAutomationTestBase& Test)
 	{
 		auto A = World.Run(CORO_R(int) { co_return 1; });
 		auto B = World.Run(CORO_R(int) { co_return 1.0; });
-		IF_CORO_LATENT
-			World.Tick(); // Latent coroutines complete on tick
 		Test.TestEqual(TEXT("Return value passthrough"), A.MoveResult(), 1);
 		Test.TestEqual(TEXT("Implicit conversion"), B.MoveResult(), 1);
 	}
@@ -83,8 +81,6 @@ void DoTest(FAutomationTestBase& Test)
 				co_return true;
 			});
 		});
-		IF_CORO_LATENT
-			World.Tick(); // Outer poll
 		Test.TestTrue(TEXT("co_await result"), bSuccess);
 	}
 
@@ -98,8 +94,6 @@ void DoTest(FAutomationTestBase& Test)
 				co_return true;
 			});
 		});
-		IF_CORO_LATENT
-			World.Tick(); // Inner completion
 		Test.TestTrue(TEXT("co_await result"), bSuccess);
 	}
 
@@ -114,13 +108,7 @@ void DoTest(FAutomationTestBase& Test)
 				co_return true;
 			});
 		});
-		IF_CORO_LATENT
-		{
-			World.Tick(); // Inner completion
-			Test.TestTrue(TEXT("Inner returned"), bInnerReturned);
-			Test.TestFalse(TEXT("Outer not polled yet"), bSuccess);
-			World.Tick(); // Outer poll
-		}
+		Test.TestTrue(TEXT("Inner returned"), bInnerReturned);
 		Test.TestTrue(TEXT("co_await result"), bSuccess);
 	}
 

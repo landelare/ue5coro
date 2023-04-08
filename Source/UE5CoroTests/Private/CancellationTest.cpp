@@ -65,7 +65,6 @@ void DoTest(FAutomationTestBase& Test)
 			co_await Latent::Cancel();
 			co_return 1;
 		});
-		World.Tick(); // Cancellation is not processed until the next tick
 		Test.TestTrue(TEXT("Done"), Coro.IsDone());
 		Test.TestTrue(TEXT("Canceled"), bCanceled);
 		Test.TestEqual(TEXT("No return value"), Coro.GetResult(), 0);
@@ -128,14 +127,12 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestFalse(TEXT("Active"), bCanceled);
 		Test.TestFalse(TEXT("Active"), bDestroyed);
 		Coro.Cancel();
-		IF_CORO_LATENT
-			World.Tick(); // Latent coroutines poll on tick
-		else
-			for (int i = 0; i < 5; ++i) // Async needs to attempt to resume
-			{
+		for (int i = 0; i < 5; ++i) // Async needs to attempt to resume
+		{
+			IF_NOT_CORO_LATENT // Latent->latent sees the cancellation right away
 				Test.TestFalse(TEXT("Not canceled yet"), bDestroyed);
-				World.Tick();
-			}
+			World.Tick();
+		}
 		Test.TestTrue(TEXT("Canceled"), bCanceled);
 		Test.TestTrue(TEXT("Canceled"), bDestroyed);
 	}

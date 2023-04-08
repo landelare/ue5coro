@@ -71,12 +71,6 @@ void DoTest(FAutomationTestBase& Test)
 		{
 			co_return co_await Promise.GetFuture();
 		});
-
-		IF_CORO_LATENT
-		{
-			Test.TestFalse(TEXT("Not polled yet"), Coro.IsDone());
-			World.Tick();
-		}
 		Test.TestTrue(TEXT("Already done"), Coro.IsDone());
 		Test.TestEqual(TEXT("Value"), Coro.GetResult(), 1);
 	}

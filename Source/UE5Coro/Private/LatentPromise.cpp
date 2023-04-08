@@ -47,6 +47,7 @@ class [[nodiscard]] FPendingLatentCoroutine final : public FPendingLatentAction
 	// Since latent promises are destroyed on the game thread, there's nothing
 	// to synchronize and the lock is not used to access Extras->Promise.
 	std::shared_ptr<FPromiseExtras> Extras;
+	bool bCoroutineWasSuccessful = false;
 	FLatentActionInfo LatentInfo;
 	FLatentAwaiter* CurrentAwaiter = nullptr;
 
@@ -78,7 +79,7 @@ public:
 
 		if (UNLIKELY(!LatentPromise))
 		{
-			Response.DoneIf(true);
+			FinishNow(Response);
 			return;
 		}
 
@@ -91,9 +92,22 @@ public:
 
 		// Resume() might have deleted LatentPromise, check it again
 		if (LIKELY(Extras->Promise))
-			LatentPromise->Respond(Response, LatentInfo);
+		{
+			checkf(!Extras->IsComplete(),
+			       TEXT("Internal error: completed promise was not cleared"));
+
+			// If ownership is with the game thread, check if the promise is
+			// waiting to be completed
+			if (LatentPromise->IsOnGameThread())
+			{
+				using FLatentHandle = stdcoro::coroutine_handle<FLatentPromise>;
+				if (auto Handle = FLatentHandle::from_promise(*LatentPromise);
+				    Handle.done() || LatentPromise->ShouldCancel(false))
+					FinishNow(Response);
+			}
+		}
 		else
-			Response.DoneIf(true);
+			FinishNow(Response);
 	}
 
 	virtual void NotifyActionAborted() override
@@ -115,6 +129,16 @@ public:
 	}
 
 	const FLatentActionInfo& GetLatentInfo() const { return LatentInfo; }
+
+	void SetCoroutineWasSuccessful() { bCoroutineWasSuccessful = true; }
+
+	void FinishNow(FLatentResponse& Response)
+	{
+		if (bCoroutineWasSuccessful)
+			Response.TriggerLink(LatentInfo.ExecutionFunction,
+			                     LatentInfo.Linkage, LatentInfo.CallbackTarget);
+		Response.DoneIf(true);
+	}
 
 	void SetCurrentAwaiter(FLatentAwaiter* Awaiter)
 	{
@@ -171,7 +195,7 @@ bool FLatentPromise::IsEarlyDestroy() const
 {
 	// Destruction can come before or after final_suspend, but the only reason
 	// it can come before is a cancellation, both regular and forced
-	return !(LatentFlags & LF_InFinalSuspend);
+	return !(LatentFlags & LF_Successful);
 }
 
 void FLatentPromise::Resume(bool bBypassCancellationHolds)
@@ -208,6 +232,11 @@ void FLatentPromise::CancelFromWithin()
 	checkf(ShouldCancel(false),
 	       TEXT("Latent coroutines may only be canceled from within if no "
 	            "FCancellationGuards are present"));
+
+	// If the self-cancellation arrived on the game thread, don't wait for the
+	// next FPendingLatentCoroutine tick to start cleaning up
+	if (IsInGameThread())
+		ThreadSafeDestroy();
 }
 
 void FLatentPromise::ThreadSafeDestroy()
@@ -245,28 +274,9 @@ void FLatentPromise::DetachFromGameThread()
 	LatentFlags |= LF_Detached;
 }
 
-void FLatentPromise::Respond(FLatentResponse& Response,
-                             const FLatentActionInfo& LatentInfo) const
+bool FLatentPromise::IsOnGameThread() const
 {
-	checkf(IsInGameThread(),
-	       TEXT("Internal error: latent action tick off the game thread"));
-	checkf(!Extras->IsComplete(),
-	       TEXT("Internal error: completed promise is still polled"));
-
-	auto Flags = LatentFlags.load();
-	bool bDetached = Flags & LF_Detached;
-	bool bFinalSuspend = Flags & LF_InFinalSuspend;
-
-	// Cancellations are implicitly held until the coroutine re-attaches.
-	// If there's an attached cancellation or final_suspend, the coroutine will
-	// not do anything meaningful and the latent action is over.
-	if (ShouldCancel(false) && !bDetached || bFinalSuspend)
-		Response.DoneIf(true);
-
-	// The coroutine ran to completion and BP should continue
-	if (bFinalSuspend)
-		Response.TriggerLink(LatentInfo.ExecutionFunction, LatentInfo.Linkage,
-		                     LatentInfo.CallbackTarget);
+	return !(LatentFlags & LF_Detached);
 }
 
 void FLatentPromise::SetExitReason(ELatentExitReason Reason)
@@ -311,13 +321,19 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	return {FInitialSuspend::Resume};
 }
 
-stdcoro::suspend_always FLatentPromise::final_suspend() noexcept
+FFinalSuspend FLatentPromise::final_suspend() noexcept
 {
-	// Too late for cancellations now.
-	// Flags are overwritten, i.e., the coroutine is unconditionally reattached.
-	LatentFlags = LF_InFinalSuspend;
+	// Too late for cancellations now, continue with BP
+	static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine)
+		->SetCoroutineWasSuccessful();
+
+	// Flags are overwritten, i.e., the coroutine is unconditionally reattached
+	LatentFlags = LF_Successful;
 
 	// Due to the free-threaded attachment, there's a potential data race now,
 	// including another thread deleting `this`, so it may not be used anymore
-	return {};
+
+	// If running on the game thread, complete (self-destruct) now.
+	// Otherwise, let FPendingLatentCoroutine deal with it when it's ticked.
+	return {IsInGameThread()};
 }
