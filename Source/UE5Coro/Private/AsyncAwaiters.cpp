@@ -69,6 +69,11 @@ FAsyncAwaiter Async::MoveToGameThread()
 	return FAsyncAwaiter(ENamedThreads::GameThread, {});
 }
 
+FAsyncYieldAwaiter Async::Yield()
+{
+	return {};
+}
+
 FNewThreadAwaiter Async::MoveToNewThread(EThreadPriority Priority,
                                          uint64 Affinity,
                                          EThreadCreateFlags Flags)

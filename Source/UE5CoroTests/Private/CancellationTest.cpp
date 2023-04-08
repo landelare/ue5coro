@@ -145,8 +145,9 @@ void DoTest(FAutomationTestBase& Test)
 		auto Coro = World.Run(CORO
 		{
 			ON_SCOPE_EXIT { bDone = true; };
+			co_await Async::MoveToThread(ENamedThreads::AnyThread);
 			for (;;)
-				co_await Async::MoveToThread(ENamedThreads::AnyThread);
+				co_await Async::Yield();
 		});
 		for (int i = 0; i < 10; ++i)
 		{

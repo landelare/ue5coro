@@ -41,13 +41,15 @@ namespace UE5Coro::Private
 {
 class FAsyncAwaiter;
 class FAsyncPromise;
+class FAsyncYieldAwaiter;
 class FLatentPromise;
 class FNewThreadAwaiter;
 }
 
 namespace UE5Coro::Async
 {
-/** Suspends the coroutine and resumes it on the provided named thread.<br>
+/** Suspends the coroutine and resumes it on the provided named thread, if it's
+ *  not already on that thread. If it is, nothing happens.<br>
  *  The return value of this function is reusable. Repeated co_awaits will keep
  *	moving back into the provided thread. */
 UE5CORO_API Private::FAsyncAwaiter MoveToThread(ENamedThreads::Type);
@@ -57,6 +59,13 @@ UE5CORO_API Private::FAsyncAwaiter MoveToThread(ENamedThreads::Type);
  *  As such, its return value is reusable and will keep co_awaiting back into
  *  the game thread. */
 UE5CORO_API Private::FAsyncAwaiter MoveToGameThread();
+
+/** Always suspends the coroutine and resumes it on the same kind of named
+ *  thread that it's currently running on, or AnyThread otherwise.<br>
+ *  The return value of this function is reusable and always refers to the
+ *  current thread, even if the coroutine has moved threads since this function
+ *  was called. */
+UE5CORO_API Private::FAsyncYieldAwaiter Yield();
 
 /** Starts a new thread with additional control over priority, affinity, etc.
  *  and resumes the coroutine there.<br>
@@ -85,6 +94,13 @@ public:
 		: Thread(Thread), ResumeAfter(std::move(ResumeAfter)) { }
 
 	bool await_ready();
+	void Suspend(FPromise&);
+};
+
+class [[nodiscard]] UE5CORO_API FAsyncYieldAwaiter
+	: public TAwaiter<FAsyncYieldAwaiter>
+{
+public:
 	void Suspend(FPromise&);
 };
 

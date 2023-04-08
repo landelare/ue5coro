@@ -63,17 +63,35 @@ public:
 
 bool FAsyncAwaiter::await_ready()
 {
-	if (ResumeAfter.has_value())
-		return ResumeAfter->IsDone();
-	return false;
+	// Bits used to identify a kind of thread, without the scheduling flags
+	constexpr auto Mask = ENamedThreads::ThreadIndexMask |
+	                      ENamedThreads::ThreadPriorityMask;
+
+	// This needs to be scheduled after the coroutine's completion regardless of
+	// the target thread
+	if (ResumeAfter.has_value() && !ResumeAfter->IsDone())
+		return false;
+
+	// Don't move threads if we're already on the target thread
+	auto ThisThread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
+	return (ThisThread & Mask) == (Thread & Mask);
 }
 
 void FAsyncAwaiter::Suspend(FPromise& Promise)
 {
 	auto* Task = TGraphTask<FResumeTask>::CreateTask()
 	                                     .ConstructAndHold(Thread, Promise);
+
+	// await_ready returning false and the coroutine having finished since is OK,
+	// ContinueWith will run this synchronously
 	if (ResumeAfter.has_value())
 		ResumeAfter->ContinueWith([Task] { Task->Unlock(); });
 	else
 		Task->Unlock();
+}
+
+void FAsyncYieldAwaiter::Suspend(FPromise& Promise)
+{
+	TGraphTask<FResumeTask>::CreateTask().ConstructAndDispatchWhenReady(
+		FTaskGraphInterface::Get().GetCurrentThreadIfKnown(), Promise);
 }
