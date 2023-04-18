@@ -88,6 +88,14 @@ struct [[nodiscard]] UE5CORO_API FOnCoroutineCanceled
  *  If it is canceled, the cancellation will be processed immediately.
  *  FCancellationGuards are respected. */
 UE5CORO_API Private::FCancellationAwaiter FinishNowIfCanceled();
+
+/** Checks if the current coroutine is canceled, without processing the
+ *  cancellation.<br>
+ *  Prefer co_await to invoke normal cancellation processing instead.<br>
+ *  Only valid to call from within a coroutine returning TCoroutine.
+ *  @return True if the current coroutine is canceled.<br>
+ *  FCancellationGuards do not affect the return value of this function. */
+[[nodiscard]] UE5CORO_API bool IsCurrentCoroutineCanceled();
 }
 
 namespace UE5Coro::Private

@@ -88,3 +88,11 @@ there's an active FCancellationGuard.
 
 Async mode cancellations are processed on the thread that co_awaited.
 Latent mode cancellations are always processed on the game thread.
+
+`UE5Coro::IsCurrentCoroutineCanceled()` is also available that simply returns a
+bool but does not process the cancellation.
+This function "sees through" FCancellationGuards and will return `true` if an
+incoming cancellation request is currently deferred.
+
+Prefer `co_await FinishNowIfCanceled();` to
+`if (IsCurrentCoroutineCanceled()) co_return;`.

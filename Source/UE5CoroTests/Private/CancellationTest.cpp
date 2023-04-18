@@ -61,7 +61,12 @@ void DoTest(FAutomationTestBase& Test)
 		bool bCanceled = false;
 		auto Coro = World.Run(CORO_R(int)
 		{
-			FOnCoroutineCanceled _([&] { bCanceled = true; });
+			FOnCoroutineCanceled _([&]
+			{
+				bCanceled = true;
+				Test.TestTrue(TEXT("Read cancellation from within"),
+				              IsCurrentCoroutineCanceled());
+			});
 			co_await Latent::Cancel();
 			co_return 1;
 		});
@@ -76,6 +81,8 @@ void DoTest(FAutomationTestBase& Test)
 		auto Coro = World.Run(CORO_R(int)
 		{
 			FOnCoroutineCanceled _([&] { bCanceled = true; });
+			Test.TestFalse(TEXT("Not canceled yet"),
+			               IsCurrentCoroutineCanceled());
 			co_await Async::MoveToNewThread();
 			co_await Latent::Cancel();
 			co_return 1;
@@ -90,8 +97,20 @@ void DoTest(FAutomationTestBase& Test)
 		bool bDestroyed = false;
 		World.Run(CORO
 		{
-			FOnCoroutineCanceled _([&] { bCanceled = true; });
-			ON_SCOPE_EXIT { bDestroyed = true; };
+			FOnCoroutineCanceled _([&]
+			{
+				bCanceled = true;
+				Test.TestFalse(TEXT("Not canceled"),
+				               IsCurrentCoroutineCanceled());
+			});
+			ON_SCOPE_EXIT
+			{
+				bDestroyed = true;
+				Test.TestFalse(TEXT("Not canceled"),
+				               IsCurrentCoroutineCanceled());
+			};
+			Test.TestFalse(TEXT("Not canceled yet"),
+			               IsCurrentCoroutineCanceled());
 			co_return;
 		});
 		Test.TestTrue(TEXT("Destroyed"), bDestroyed);
@@ -105,8 +124,20 @@ void DoTest(FAutomationTestBase& Test)
 			FTestWorld World2;
 			World2.Run(CORO
 			{
-				FOnCoroutineCanceled _([&] { bCanceled = true; });
-				ON_SCOPE_EXIT { bDestroyed = true; };
+				FOnCoroutineCanceled _([&]
+				{
+					bCanceled = true;
+					Test.TestTrue(TEXT("Read cancellation from within"),
+					              IsCurrentCoroutineCanceled());
+				});
+				ON_SCOPE_EXIT
+				{
+					bDestroyed = true;
+					Test.TestTrue(TEXT("Read cancellation from within"),
+					              IsCurrentCoroutineCanceled());
+				};
+				Test.TestFalse(TEXT("Not canceled yet"),
+				               IsCurrentCoroutineCanceled());
 				co_await Latent::NextTick();
 			});
 		} // Indirectly cancel by destroying the world during a latent co_await
@@ -119,8 +150,20 @@ void DoTest(FAutomationTestBase& Test)
 		bool bDestroyed = false;
 		auto Coro = World.Run(CORO
 		{
-			FOnCoroutineCanceled _([&] { bCanceled = true; });
-			ON_SCOPE_EXIT { bDestroyed = true; };
+			FOnCoroutineCanceled _([&]
+			{
+				bCanceled = true;
+				Test.TestTrue(TEXT("Read cancellation from within"),
+				              IsCurrentCoroutineCanceled());
+			});
+			ON_SCOPE_EXIT
+			{
+				bDestroyed = true;
+				Test.TestTrue(TEXT("Read cancellation from within"),
+				              IsCurrentCoroutineCanceled());
+			};
+			Test.TestFalse(TEXT("Not canceled yet"),
+			               IsCurrentCoroutineCanceled());
 			co_await Latent::Ticks(5);
 		});
 		World.EndTick();
@@ -142,6 +185,8 @@ void DoTest(FAutomationTestBase& Test)
 		auto Coro = World.Run(CORO
 		{
 			ON_SCOPE_EXIT { bDone = true; };
+			Test.TestFalse(TEXT("Not canceled yet"),
+			               IsCurrentCoroutineCanceled());
 			co_await Async::MoveToThread(ENamedThreads::AnyThread);
 			for (;;)
 				co_await Async::Yield();
@@ -168,8 +213,12 @@ void DoTest(FAutomationTestBase& Test)
 				FCancellationGuard _;
 				while (!bContinue)
 					co_await Latent::NextTick();
+				Test.TestTrue(TEXT("Incoming guarded cancellation"),
+				              IsCurrentCoroutineCanceled());
 			}
 			// Then, allow cancellations
+			Test.TestTrue(TEXT("Incoming unguarded cancellation"),
+			              IsCurrentCoroutineCanceled());
 			for (;;)
 				co_await Latent::NextTick();
 		});
@@ -191,6 +240,8 @@ void DoTest(FAutomationTestBase& Test)
 		bool bDone = false;
 		auto Coro = World.Run(CORO
 		{
+			Test.TestFalse(TEXT("Not canceled yet"),
+			               IsCurrentCoroutineCanceled());
 			co_await Async::MoveToNewThread();
 			ON_SCOPE_EXIT { bDone = true; };
 			for (;;)

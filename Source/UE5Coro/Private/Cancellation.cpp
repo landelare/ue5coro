@@ -71,6 +71,11 @@ FCancellationAwaiter UE5Coro::FinishNowIfCanceled()
 	return {};
 }
 
+bool UE5Coro::IsCurrentCoroutineCanceled()
+{
+	return FPromise::Current().ShouldCancel(true);
+}
+
 bool FCancellationAwaiter::await_ready()
 {
 	return !FPromise::Current().ShouldCancel(false);
