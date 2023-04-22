@@ -80,7 +80,11 @@ void DoTest(FAutomationTestBase& Test)
 		std::atomic<bool> bCanceled = false;
 		auto Coro = World.Run(CORO_R(int)
 		{
-			FOnCoroutineCanceled _([&] { bCanceled = true; });
+			FOnCoroutineCanceled _([&]
+			{
+				bCanceled = true;
+				Test.TestTrue(TEXT("Back on the game thread"), IsInGameThread());
+			});
 			Test.TestFalse(TEXT("Not canceled yet"),
 			               IsCurrentCoroutineCanceled());
 			co_await Async::MoveToNewThread();
@@ -184,7 +188,13 @@ void DoTest(FAutomationTestBase& Test)
 		std::atomic<bool> bDone = false;
 		auto Coro = World.Run(CORO
 		{
-			ON_SCOPE_EXIT { bDone = true; };
+			ON_SCOPE_EXIT
+			{
+				bDone = true;
+				IF_CORO_LATENT
+					Test.TestTrue(TEXT("Back on the game thread"),
+					              IsInGameThread());
+			};
 			Test.TestFalse(TEXT("Not canceled yet"),
 			               IsCurrentCoroutineCanceled());
 			co_await Async::MoveToThread(ENamedThreads::AnyThread);
@@ -243,7 +253,13 @@ void DoTest(FAutomationTestBase& Test)
 			Test.TestFalse(TEXT("Not canceled yet"),
 			               IsCurrentCoroutineCanceled());
 			co_await Async::MoveToNewThread();
-			ON_SCOPE_EXIT { bDone = true; };
+			ON_SCOPE_EXIT
+			{
+				bDone = true;
+				IF_CORO_LATENT
+					Test.TestTrue(TEXT("Back on the game thread"),
+					              IsInGameThread());
+			};
 			for (;;)
 				co_await FinishNowIfCanceled();
 		});
