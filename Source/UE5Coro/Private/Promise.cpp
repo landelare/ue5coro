@@ -67,7 +67,6 @@ FPromise::~FPromise()
 	checkf(!Extras->Lock.TryLock(), TEXT("Internal error: lock not held"));
 	checkf(!Extras->IsComplete(),
 	       TEXT("Unexpected late/double coroutine destruction"));
-	auto Continuations = std::move(Extras->Continuations_DEPRECATED);
 	GDestroyedEarly = false;
 
 	// The coroutine is considered completed NOW
@@ -77,8 +76,6 @@ FPromise::~FPromise()
 	for (auto& Fn : OnCompleted)
 		Fn(Extras->ReturnValuePtr);
 	Extras->ReturnValuePtr = nullptr;
-
-	Continuations.Broadcast();
 }
 
 void FPromise::ThreadSafeDestroy()

@@ -155,7 +155,6 @@ public:
 		FPromise* Promise; // nullptr once destroyed
 		void* ReturnValuePtr; // in the destructor only
 	};
-	TMulticastDelegate<void()> Continuations_DEPRECATED;
 
 	explicit FPromiseExtras(FPromise& Promise) noexcept : Promise(&Promise) { }
 	UE_NONCOPYABLE(FPromiseExtras);

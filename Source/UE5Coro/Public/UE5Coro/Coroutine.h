@@ -80,14 +80,6 @@ public:
 	 *  Has no effect on coroutines that have already completed. */
 	void Cancel();
 
-	/** Returns a delegate broadcasting this coroutine's completion for any
-	 *  reason, including being unsuccessful or canceled.
-	 *  This will be Broadcast() on the same thread where the coroutine is
-	 *	destroyed. */
-	[[deprecated("This method only works if the coroutine is not complete yet. "
-	             "Use ContinueWith instead.")]]
-	TMulticastDelegate<void()>& OnCompletion();
-
 	/** Blocks until the coroutine completes for any reason, including being
 	 *  unsuccessful or canceled.
 	 *  This could result in a deadlock if the coroutine wants to use the thread
