@@ -45,7 +45,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncQueryTestAsync, "UE5Coro.AsyncQuery.Async
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncQueryTestLatent, "UE5Coro.AsyncQuery.Latent",
                                  EAutomationTestFlags::ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
-                                 EAutomationTestFlags::ProductFilter);
+                                 EAutomationTestFlags::ProductFilter)
 
 #if defined(_MSC_VER) && _MSVC_LANG < 2020'02L
 // MSVC workaround - DoTest is not a coroutine but it won't compile without this

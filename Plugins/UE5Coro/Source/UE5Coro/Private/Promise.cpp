@@ -116,9 +116,9 @@ void FPromise::ReleaseCancellation()
 
 void FPromise::Resume(bool bBypassCancellationHolds)
 {
+	checkf(this, TEXT("Corruption")); // Still useful on some compilers
 	checkf(!Extras->IsComplete(),
 	       TEXT("Attempting to resume completed coroutine"));
-	checkf(this, TEXT("Corruption")); // Still useful on some compilers
 	auto* CallerPromise = GCurrentPromise;
 	GCurrentPromise = this;
 	ON_SCOPE_EXIT

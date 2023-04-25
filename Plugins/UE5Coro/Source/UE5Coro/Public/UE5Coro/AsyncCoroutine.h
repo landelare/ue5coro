@@ -452,8 +452,8 @@ struct UE5Coro::Private::stdcoro::coroutine_traits<UE5Coro::TCoroutine<T>,
 	              "Multiple latent info/force parameters found in coroutine");
 	static constexpr bool bUseLatent = LatentInfoCount || LatentForceCount;
 	using promise_type = UE5Coro::Private::TCoroutinePromise<
-	    T, std::conditional_t<bUseLatent, UE5Coro::Private::FLatentPromise,
-	                                      UE5Coro::Private::FAsyncPromise>>;
+		T, std::conditional_t<bUseLatent, UE5Coro::Private::FLatentPromise,
+		                                  UE5Coro::Private::FAsyncPromise>>;
 };
 
 template<typename T, typename... Args>

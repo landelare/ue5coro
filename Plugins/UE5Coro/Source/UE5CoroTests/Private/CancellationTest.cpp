@@ -47,7 +47,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCancelTestAsync, "UE5Coro.Cancel.Async",
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCancelTestLatent, "UE5Coro.Cancel.Latent",
                                  EAutomationTestFlags::ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
-                                 EAutomationTestFlags::ProductFilter);
+                                 EAutomationTestFlags::ProductFilter)
 
 namespace
 {

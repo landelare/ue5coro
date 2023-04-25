@@ -7,10 +7,15 @@ Unreal Engine 5 with a focus on gameplay logic and BP integration.
 ## Setup
 
 Download the release that you wish to use from the
-[Releases](https://github.com/landelare/ue5coro/releases) page, extract it to
-your project's Plugins folder and in case you downloaded a source code zip,
-rename the folder that it contains to just `UE5Coro` so that you end up with
+[Releases](https://github.com/landelare/ue5coro/releases) page, and copy the
+contents of its Plugins folder into your project's Plugins folder.
+Done correctly, you should end up with
 `YourProject\Plugins\UE5Coro\UE5Coro.uplugin`.
+
+_Note that 1.8 and earlier versions had a different folder structure._
+_Refer to the README.md file from your chosen release for matching instructions._
+
+Depending on the language version you're targeting, do **ONE OF** these:
 
 ### C++20
 
