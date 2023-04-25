@@ -31,9 +31,21 @@
 
 using UnrealBuildTool;
 
-public class UE5Coro : ModuleRules
+public class UE5Coro : UE5CoroModuleRules
 {
 	public UE5Coro(ReadOnlyTargetRules Target)
+		: base(Target)
+	{
+		PublicDependencyModuleNames.AddRange(new[]
+		{
+			"HTTP",
+		});
+	}
+}
+
+public abstract class UE5CoroModuleRules : ModuleRules
+{
+	protected UE5CoroModuleRules(ReadOnlyTargetRules Target)
 		: base(Target)
 	{
 		if (!Target.bEnableCppCoroutinesForEvaluation)
@@ -49,7 +61,6 @@ public class UE5Coro : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
-			"HTTP",
 		});
 	}
 }

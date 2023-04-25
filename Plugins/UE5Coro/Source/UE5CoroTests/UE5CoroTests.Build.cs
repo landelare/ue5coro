@@ -31,24 +31,13 @@
 
 using UnrealBuildTool;
 
-public class UE5CoroTests : ModuleRules
+public class UE5CoroTests : UE5CoroModuleRules
 {
 	public UE5CoroTests(ReadOnlyTargetRules Target)
 		: base(Target)
 	{
-		if (!Target.bEnableCppCoroutinesForEvaluation)
-		{
-			CppStandard = CppStandardVersion.Cpp20;
-			PublicDefinitions.Add("UE5CORO_CPP20=1");
-		}
-
-		bUseUnity = false;
-
 		PublicDependencyModuleNames.AddRange(new[]
 		{
-			"Core",
-			"CoreUObject",
-			"Engine",
 			"HTTP",
 			"UE5Coro",
 		});

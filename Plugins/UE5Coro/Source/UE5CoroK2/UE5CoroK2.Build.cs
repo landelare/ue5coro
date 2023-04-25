@@ -31,25 +31,14 @@
 
 using UnrealBuildTool;
 
-public class UE5CoroK2 : ModuleRules
+public class UE5CoroK2 : UE5CoroModuleRules
 {
 	public UE5CoroK2(ReadOnlyTargetRules Target)
 		: base(Target)
 	{
-		if (!Target.bEnableCppCoroutinesForEvaluation)
-		{
-			CppStandard = CppStandardVersion.Cpp20;
-			PublicDefinitions.Add("UE5CORO_CPP20=1");
-		}
-
-		bUseUnity = false;
-
 		PublicDependencyModuleNames.AddRange(new[]
 		{
 			"BlueprintGraph",
-			"Core",
-			"CoreUObject",
-			"Engine",
 			"UE5Coro",
 		});
 	}
