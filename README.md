@@ -1,6 +1,6 @@
 # UE5Coro
 
-This plugin implements C\+\+
+These plugins implement C\+\+
 [coroutines](https://en.cppreference.com/w/cpp/language/coroutines) for
 Unreal Engine 5 with a focus on gameplay logic and BP integration.
 
@@ -26,8 +26,12 @@ CppStandard = CppStandardVersion.Cpp20;
 ```
 
 Add `"UE5Coro"` to your dependency module names in the same Build.cs file – up
-to you if it's private or public – enable the plugin in the Unreal editor,
-and you're ready to go!
+to you if it's private or public – and you're ready to go!
+
+Core functionality from UE5Coro is enabled by default.
+If you'd like to use the additional GAS integration from UE5CoroGAS, you'll
+need to manually enable that plugin and also reference `"UE5CoroGAS"` in your
+Build.cs.
 
 ### C++17
 
@@ -37,8 +41,12 @@ add this line:
 bEnableCppCoroutinesForEvaluation = true;
 ```
 
-No additional per-module setup is needed in this case, add `"UE5Coro"` to your
-dependency module names and enable the plugin like any other.
+No additional per-module setup is needed in this case: add `"UE5Coro"` to your
+dependency module names and you're done, the UE5Coro plugin is enabled by
+default.
+
+`"UE5CoroGAS"` is in a separate plugin that needs to be turned on explicitly and
+referenced normally.
 
 _Potential UE5.1 bug:_ if you're building the engine from source and it seems to
 be rebuilding itself for no reason once you've done the Target.cs change above,
@@ -46,12 +54,13 @@ edit TargetRules.cs in the engine instead so that this flag is true by default.
 
 ## Features
 
-`#include "UE5Coro.h"` gives you every functionality that this plugin provides.
+`#include "UE5Coro.h"` gives you every functionality that UE5Coro provides,
+`#include "UE5CoroGAS.h"` gives you all the UE5CoroGAS functionality, etc.
 You may opt to IWYU the various smaller headers, but no guidance is given as to
 which feature requires which header.
 
 Click these links for the detailed description of the main features provided
-by this plugin, or keep reading for a quick overview.
+by these plugins, or keep reading for a few highlights.
 
 * [Async coroutines](Docs/Async.md) control their own resumption by awaiting
 various awaiter objects. They can be used to implement BP latent actions such as
@@ -62,6 +71,7 @@ necessarily involving multithreading.
 number of results without having to allocate and go through a temporary TArray.
 * [Overview of built-in awaiters](Docs/Awaiters.md) that you can use with async
 coroutines.
+* [Gameplay Ability System](Docs/GAS.md) integration.
 
 ### Async coroutines
 
@@ -71,7 +81,7 @@ UFUNCTIONs need to use the `FAsyncCoroutine` wrapper.
 
 Having a `FLatentActionInfo` parameter makes the coroutine implement a BP latent
 action.
-You do not need to do anything with this parameter, just have it and the plugin
+You do not need to do anything with this parameter, just have it and UE5Coro
 will register it with the latent action manager.
 World context objects are also supported and automatically processed.
 It's recommended to have them as the first parameter.
@@ -148,7 +158,7 @@ FAsyncCoroutine UExampleFunctionLibrary::K2_Foo(FLatentActionInfo LatentInfo)
 ```
 
 There are various other engine features with coroutine support including some
-engine types that are made directly co_awaitable by the plugin.
+engine types that are made directly co_awaitable in `TCoroutine`s.
 Check out the [Awaiters](Docs/Awaiters.md) page for an overview.
 
 ### Generators

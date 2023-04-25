@@ -1,0 +1,36 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.9",
+	"FriendlyName": "UE5Coro – Gameplay Ability System",
+	"Description": "C++17/20 coroutines for GAS",
+	"Category": "Programming",
+	"CreatedBy": "Laura Andelare",
+	"CreatedByURL": "https://github.com/landelare/ue5coro",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"EnabledByDefault": false,
+	"CanContainContent": false,
+	"CanContainVerse": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "UE5CoroGAS",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "GameplayAbilities",
+			"Enabled": true
+		},
+		{
+			"Name": "UE5Coro",
+			"Enabled": true
+		}
+	]
+}
