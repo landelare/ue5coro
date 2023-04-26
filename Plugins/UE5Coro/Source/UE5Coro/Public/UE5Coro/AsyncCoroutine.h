@@ -449,7 +449,7 @@ struct UE5Coro::Private::stdcoro::coroutine_traits<UE5Coro::TCoroutine<T>,
 {
 	static constexpr int LatentInfoCount =
 		(0 + ... + std::is_convertible_v<Args, FLatentActionInfo>);
-	static constexpr bool LatentForceCount =
+	static constexpr int LatentForceCount =
 		(0 + ... + std::is_same_v<Args, FForceLatentCoroutine>);
 	static_assert(LatentInfoCount + LatentForceCount <= 1,
 	              "Multiple latent info/force parameters found in coroutine");
