@@ -67,6 +67,7 @@ FPromise::~FPromise()
 	checkf(!Extras->Lock.TryLock(), TEXT("Internal error: lock not held"));
 	checkf(!Extras->IsComplete(),
 	       TEXT("Unexpected late/double coroutine destruction"));
+	Extras->bWasSuccessful = !GDestroyedEarly;
 	GDestroyedEarly = false;
 
 	// The coroutine is considered completed NOW

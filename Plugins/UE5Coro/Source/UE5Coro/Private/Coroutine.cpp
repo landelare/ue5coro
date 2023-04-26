@@ -58,6 +58,11 @@ bool TCoroutine<>::IsDone() const
 	return Wait(0, true);
 }
 
+bool TCoroutine<>::WasSuccessful() const
+{
+	return Extras->bWasSuccessful;
+}
+
 void TCoroutine<>::SetDebugName(const TCHAR* Name)
 {
 #if UE5CORO_DEBUG

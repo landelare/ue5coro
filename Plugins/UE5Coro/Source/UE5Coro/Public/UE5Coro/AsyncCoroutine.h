@@ -149,6 +149,9 @@ public:
 #endif
 
 	FEventRef Completed{EEventMode::ManualReset};
+	// This could be read from another thread
+	std::atomic<bool> bWasSuccessful = false;
+
 	UE::FSpinLock Lock;
 	union
 	{

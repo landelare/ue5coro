@@ -145,6 +145,7 @@ void DoTest(FAutomationTestBase& Test)
 			World.Tick(); // Outer completion
 		}
 		Test.TestTrue(TEXT("Outer complete"), Coro.IsDone());
+		Test.TestTrue(TEXT("Outer successful"), Coro.WasSuccessful());
 		auto Array = Coro.MoveResult();
 		Test.TestEqual(TEXT("Outer array Num"), Array.Num(), 1);
 		Test.TestEqual(TEXT("Outer array[0]"), Array[0], 4);

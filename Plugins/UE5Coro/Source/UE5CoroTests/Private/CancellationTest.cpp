@@ -72,6 +72,7 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		Test.TestTrue(TEXT("Done"), Coro.IsDone());
 		Test.TestTrue(TEXT("Canceled"), bCanceled);
+		Test.TestFalse(TEXT("Not successful"), Coro.WasSuccessful());
 		Test.TestEqual(TEXT("No return value"), Coro.GetResult(), 0);
 	}
 
@@ -93,13 +94,14 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
 		Test.TestTrue(TEXT("Canceled"), bCanceled);
+		Test.TestFalse(TEXT("Not successful"), Coro.WasSuccessful());
 		Test.TestEqual(TEXT("No return value"), Coro.GetResult(), 0);
 	}
 
 	{
 		bool bCanceled = false;
 		bool bDestroyed = false;
-		World.Run(CORO
+		auto Coro = World.Run(CORO
 		{
 			FOnCoroutineCanceled _([&]
 			{
@@ -119,14 +121,16 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		Test.TestTrue(TEXT("Destroyed"), bDestroyed);
 		Test.TestFalse(TEXT("Not canceled"), bCanceled);
+		Test.TestTrue(TEXT("Successful"), Coro.WasSuccessful());
 	}
 
 	{
 		bool bCanceled = false;
 		bool bDestroyed = false;
+		std::optional<TCoroutine<>> Coro;
 		{
 			FTestWorld World2;
-			World2.Run(CORO
+			Coro = World2.Run(CORO
 			{
 				FOnCoroutineCanceled _([&]
 				{
@@ -144,9 +148,11 @@ void DoTest(FAutomationTestBase& Test)
 				               IsCurrentCoroutineCanceled());
 				co_await Latent::NextTick();
 			});
+			Test.TestFalse(TEXT("Still running"), Coro->WasSuccessful());
 		} // Indirectly cancel by destroying the world during a latent co_await
 		Test.TestTrue(TEXT("Destroyed"), bDestroyed);
 		Test.TestTrue(TEXT("Canceled"), bCanceled);
+		Test.TestFalse(TEXT("Not successful"), Coro->WasSuccessful());
 	}
 
 	{
@@ -173,6 +179,8 @@ void DoTest(FAutomationTestBase& Test)
 		World.EndTick();
 		Test.TestFalse(TEXT("Active"), bCanceled);
 		Test.TestFalse(TEXT("Active"), bDestroyed);
+		Test.TestFalse(TEXT("Not done yet"), Coro.IsDone());
+		Test.TestFalse(TEXT("Still running"), Coro.WasSuccessful());
 		Coro.Cancel();
 		for (int i = 0; i < 5; ++i) // Async needs to attempt to resume
 		{
@@ -182,6 +190,7 @@ void DoTest(FAutomationTestBase& Test)
 		}
 		Test.TestTrue(TEXT("Canceled"), bCanceled);
 		Test.TestTrue(TEXT("Canceled"), bDestroyed);
+		Test.TestFalse(TEXT("Not successful"), Coro.WasSuccessful());
 	}
 
 	{
@@ -210,6 +219,7 @@ void DoTest(FAutomationTestBase& Test)
 		// Also acts as a busy wait for the async test
 		FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
 		Test.TestTrue(TEXT("Canceled"), bDone);
+		Test.TestFalse(TEXT("Not successful"), Coro.WasSuccessful());
 	}
 
 	{
@@ -244,6 +254,7 @@ void DoTest(FAutomationTestBase& Test)
 		IF_NOT_CORO_LATENT
 			World.Tick();
 		Test.TestTrue(TEXT("Canceled"), bDone);
+		Test.TestFalse(TEXT("Not successful"), Coro.WasSuccessful());
 	}
 
 	{

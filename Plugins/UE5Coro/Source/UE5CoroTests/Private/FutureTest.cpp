@@ -72,6 +72,7 @@ void DoTest(FAutomationTestBase& Test)
 			co_return co_await Promise.GetFuture();
 		});
 		Test.TestTrue(TEXT("Already done"), Coro.IsDone());
+		Test.TestTrue(TEXT("Successful"), Coro.WasSuccessful());
 		Test.TestEqual(TEXT("Value"), Coro.GetResult(), 1);
 	}
 

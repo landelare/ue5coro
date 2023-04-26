@@ -91,6 +91,10 @@ public:
 	/** Returns if the coroutine has run to completion or faulted. */
 	[[nodiscard]] bool IsDone() const;
 
+	/** Returns true if the coroutine ran to completion successfully.
+	 *  Cancellations after completion don't change this flag. */
+	[[nodiscard]] bool WasSuccessful() const;
+
 	/** Calls the provided functor when this coroutine is complete, including
 	 *  unsuccessful completions such as being canceled.<br>
 	 *  If the coroutine is already complete, it will be called immediately,
