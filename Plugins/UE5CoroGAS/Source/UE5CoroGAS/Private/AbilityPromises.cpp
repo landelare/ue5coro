@@ -29,7 +29,54 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include "UE5Coro/Definitions.h"
+#include "UE5CoroGAS/AbilityPromises.h"
 #include "UE5CoroGAS/UE5CoroGameplayAbility.h"
+
+using namespace UE5Coro;
+using namespace UE5Coro::GAS;
+using namespace UE5Coro::Private;
+
+FAbilityCoroutine::FAbilityCoroutine(std::shared_ptr<FPromiseExtras> Extras)
+	: TCoroutine(std::move(Extras))
+{
+}
+
+FLatentActionInfo FAbilityPromise::MakeLatentInfo(UObject& Task)
+{
+	static int DummyId = 0;
+	return {0, DummyId++, TEXT("None"), &Task};
+}
+
+FAbilityPromise::FAbilityPromise(UObject& Target)
+	: Super(Target, MakeLatentInfo(Target))
+{
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: Expected to start on the game thread"));
+}
+
+FAbilityCoroutine FAbilityPromise::get_return_object() noexcept
+{
+	return FAbilityCoroutine(Extras);
+}
+
+FFinalSuspend FAbilityPromise::final_suspend() noexcept
+{
+	// Skip triggering a BP link because there isn't one
+	return Super::final_suspend<false>();
+}
+
+template<typename T>
+TAbilityPromise<T>::TAbilityPromise(T& Target)
+	: FAbilityPromise(Target)
+{
+	checkf(bCalledFromActivate, TEXT("Do not call Execute coroutines directly!"));
+	bCalledFromActivate = false;
+	Target.CoroutineStarting(this);
+}
+
+namespace UE5Coro::Private
+{
+template<typename T>
+bool TAbilityPromise<T>::bCalledFromActivate = false;
+template UE5COROGAS_API struct TAbilityPromise<UUE5CoroGameplayAbility>;
+}
