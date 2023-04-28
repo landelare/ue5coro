@@ -163,7 +163,7 @@ void FLatentPromise::CreateLatentAction()
 // This is a separate function so that template Init() doesn't need the type
 void FLatentPromise::CreateLatentAction(FLatentActionInfo&& LatentInfo)
 {
-	// The static_assert on coroutine_traits prevents this
+	// The static_assert on coroutine_traits and Init() logic prevent this
 	checkf(!PendingLatentCoroutine,
 	       TEXT("Internal error: multiple latent infos were not prevented"));
 
@@ -172,16 +172,16 @@ void FLatentPromise::CreateLatentAction(FLatentActionInfo&& LatentInfo)
 
 void FLatentPromise::Init()
 {
-	// This should have been an async promise without a LatentActionInfo
-	checkf(PendingLatentCoroutine,
-	       TEXT("Internal error: wrong coroutine promise type used"));
-
 	// Last resort if we got this far without a world
 	if (!World)
 	{
 		World = GWorld;
 		checkf(World, TEXT("Could not determine world for latent coroutine"));
 	}
+
+	// Handle being forced to latent without a FLatentActionInfo
+	if (!PendingLatentCoroutine)
+		CreateLatentAction();
 }
 
 FLatentPromise::~FLatentPromise()

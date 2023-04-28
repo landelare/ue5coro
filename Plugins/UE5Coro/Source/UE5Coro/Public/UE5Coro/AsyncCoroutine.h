@@ -272,7 +272,6 @@ class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
 	void CreateLatentAction(FLatentActionInfo&&);
 	void Init();
 	template<typename... T> void Init(const UObject*, T&...);
-	template<typename... T> void Init(FForceLatentCoroutine, T&...);
 	template<typename... T> void Init(FLatentActionInfo, T&...);
 	template<typename T, typename... A> void Init(T&, A&...);
 
@@ -408,16 +407,6 @@ void FLatentPromise::Init(const UObject* WorldContext, T&... Args)
 	// Keep trying to find a world from the UObjects passed in
 	if (!World && WorldContext)
 		World = WorldContext->GetWorld(); // null is fine
-
-	Init(Args...);
-}
-
-template<typename... T>
-void FLatentPromise::Init(FForceLatentCoroutine, T&... Args)
-{
-	// The static_assert on coroutine_traits prevents this
-	check(!PendingLatentCoroutine);
-	CreateLatentAction();
 
 	Init(Args...);
 }
