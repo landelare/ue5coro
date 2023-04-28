@@ -47,7 +47,7 @@ class [[nodiscard]] FPendingLatentCoroutine final : public FPendingLatentAction
 	// Since latent promises are destroyed on the game thread, there's nothing
 	// to synchronize and the lock is not used to access Extras->Promise.
 	std::shared_ptr<FPromiseExtras> Extras;
-	bool bCoroutineWasSuccessful = false;
+	bool bTriggerLink = false;
 	FLatentActionInfo LatentInfo;
 	FLatentAwaiter* CurrentAwaiter = nullptr;
 
@@ -130,11 +130,11 @@ public:
 
 	const FLatentActionInfo& GetLatentInfo() const { return LatentInfo; }
 
-	void SetCoroutineWasSuccessful() { bCoroutineWasSuccessful = true; }
+	void RequestLink() { bTriggerLink = true; }
 
 	void FinishNow(FLatentResponse& Response)
 	{
-		if (bCoroutineWasSuccessful)
+		if (bTriggerLink)
 			Response.TriggerLink(LatentInfo.ExecutionFunction,
 			                     LatentInfo.Linkage, LatentInfo.CallbackTarget);
 		Response.DoneIf(true);
@@ -321,11 +321,13 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	return {FInitialSuspend::Resume};
 }
 
+template<bool bTriggerBP>
 FFinalSuspend FLatentPromise::final_suspend() noexcept
 {
-	// Too late for cancellations now, continue with BP
-	static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine)
-		->SetCoroutineWasSuccessful();
+	// Too late for cancellations now, continue with BP if requested
+	if constexpr (bTriggerBP)
+		static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine)
+			->RequestLink();
 
 	// Flags are overwritten, i.e., the coroutine is unconditionally reattached
 	LatentFlags = LF_Successful;
@@ -337,3 +339,5 @@ FFinalSuspend FLatentPromise::final_suspend() noexcept
 	// Otherwise, let FPendingLatentCoroutine deal with it when it's ticked.
 	return {IsInGameThread()};
 }
+template UE5CORO_API FFinalSuspend FLatentPromise::final_suspend<false>();
+template UE5CORO_API FFinalSuspend FLatentPromise::final_suspend<true>();

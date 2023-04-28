@@ -296,6 +296,7 @@ public:
 	void SetCurrentAwaiter(FLatentAwaiter*);
 
 	FInitialSuspend initial_suspend();
+	template<bool bTriggerBP = true>
 	FFinalSuspend final_suspend() noexcept;
 
 	template<typename T>
