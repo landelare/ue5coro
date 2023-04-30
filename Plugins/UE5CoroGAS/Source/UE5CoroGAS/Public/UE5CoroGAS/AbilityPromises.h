@@ -40,6 +40,7 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "UE5Coro/AsyncCoroutine.h"
 
+class UUE5CoroAbilityTask;
 class UUE5CoroGameplayAbility;
 
 namespace UE5Coro
@@ -94,6 +95,13 @@ using TAbilityCoroutineIfBaseOf = TAbilityCoroutine<
 	std::enable_if_t<std::is_base_of_v<Base, Derived>>>;
 }
 }
+
+template<typename T>
+struct UE5Coro::Private::stdcoro::coroutine_traits<
+	UE5Coro::Private::TAbilityCoroutineIfBaseOf<UUE5CoroAbilityTask, T>, T&>
+{
+	using promise_type = UE5Coro::Private::TAbilityPromise<UUE5CoroAbilityTask>;
+};
 
 template<typename T>
 struct UE5Coro::Private::stdcoro::coroutine_traits<

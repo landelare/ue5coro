@@ -1,6 +1,8 @@
 # UE5CoroGAS
 
 This optional extra plugin integrates with the Gameplay Ability System.
+It provides coroutine-based replacements of various GAS-related classes with
+tighter integration than what would be possible using the public UE5Coro API.
 
 This plugin also introduces the `UE5Coro::GAS::FAbilityCoroutine` return type.
 Coroutines returning this run in a special [latent mode](Async.md#latent-mode)
@@ -47,3 +49,34 @@ your subclasses.
 You're responsible for interacting correctly with ExecuteAbility from BP.
 The BlueprintImplementableEvents for ActivateAbility(FromEvent) will not be
 called.
+
+## Ability tasks
+
+`UUE5CoroAbilityTask` lets you implement an ability task with a coroutine.
+Instead of overriding Activate, override Execute with a coroutine to perform the
+task and Succeded/Failed to broadcast the delegates your task needs.<br>
+**It is undefined behavior to override Execute with a subroutine.**
+
+Due to UnrealHeaderTool limitations, it's not possible to provide a ready-to-go
+generic ability task.
+Your subclass will need to provide the static UFUNCTION to create the task and
+UPROPERTY delegates for completion events.
+
+`UUE5CoroSimpleAbilityTask` provides a generic pair of delegates corresponding
+to Succeeded and Failed, and is recommended as the base class for coroutine
+tasks that don't need additional delegates.
+You only need to provide the static UFUNCTION.
+
+Unreal expects a gameplay task to call its delegates _after_ EndTask, so make
+sure that they are broadcast from Succeeded or Failed, not Execute.
+GAS itself will mark the task as garbage in EndTask, so `this` will not be valid
+(but also not garbage collected yet) when Succeeded or Failed runs.
+
+Execute will run in latent mode with the following additional integrations:
+
+* The coroutine completing will call EndTask and one of Succeeded or Failed,
+the latter two being virtuals on `UUE5CoroAbilityTask` with no-op default
+implementations.
+`UUE5CoroSimpleAbilityTask` broadcasts the delegate corresponding to the method.
+Self-cancel with `Latent::Cancel` to trigger Failed instead of Succeeded.
+* OnDestroy (e.g., from EndTask) will cancel the coroutine.

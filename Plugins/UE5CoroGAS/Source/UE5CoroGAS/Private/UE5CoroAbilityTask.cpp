@@ -29,56 +29,76 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "UE5CoroGAS/AbilityPromises.h"
 #include "UE5CoroGAS/UE5CoroAbilityTask.h"
-#include "UE5CoroGAS/UE5CoroGameplayAbility.h"
 
-using namespace UE5Coro;
-using namespace UE5Coro::GAS;
 using namespace UE5Coro::Private;
 
-FAbilityCoroutine::FAbilityCoroutine(std::shared_ptr<FPromiseExtras> Extras)
-	: TCoroutine(std::move(Extras))
+void UUE5CoroAbilityTask::Activate()
 {
+	Super::Activate();
+
+	// Is there a use for this? PerformActivation seems to guard against it.
+	ensureMsgf(!Promise, TEXT("Multiple overlapping activations"));
+
+	checkf(!TAbilityPromise<ThisClass>::bCalledFromActivate,
+	       TEXT("Internal error: Activate() recursion"));
+	TAbilityPromise<ThisClass>::bCalledFromActivate = true;
+	auto Coroutine = Execute();
+	checkf(!TAbilityPromise<ThisClass>::bCalledFromActivate,
+	       TEXT("Did you implement Execute() with a coroutine?"));
+#if UE5CORO_CPP20
+	Coroutine.ContinueWithWeak(this, [=, this]
+#else
+	Coroutine.ContinueWithWeak(this, [=]
+#endif
+	{
+		checkf(IsInGameThread(),
+		       TEXT("Internal error: Expected to continue on the game thread"));
+		checkf(Promise,
+		       TEXT("Internal error: Expected to be the active coroutine"));
+		Promise = nullptr;
+		Super::EndTask();
+		if (Coroutine.WasSuccessful())
+			Succeeded();
+		else
+			Failed();
+	});
 }
 
-FLatentActionInfo FAbilityPromise::MakeLatentInfo(UObject& Task)
+void UUE5CoroAbilityTask::EndTask()
 {
-	static int DummyId = 0;
-	return {0, DummyId++, TEXT("None"), &Task};
+	check(!"Do not call EndTask() manually");
 }
 
-FAbilityPromise::FAbilityPromise(UObject& Target)
-	: Super(Target, MakeLatentInfo(Target))
+void UUE5CoroAbilityTask::OnDestroy(bool bInOwnerFinished)
 {
 	checkf(IsInGameThread(),
-	       TEXT("Internal error: Expected to start on the game thread"));
+	       TEXT("Internal error: Expected to be destroyed on the game thread"));
+
+	// GAS itself relies on this hack in TaskOwnerEnded... :(
+	if (!IsValid(this))
+		return;
+
+	// A forced cancellation would be more appropriate because this is a
+	// destruction, but the coroutine might be running (and NOT suspended)
+	if (Promise)
+		Promise->Cancel();
+
+	Super::OnDestroy(bInOwnerFinished);
+	checkf(!IsValid(this), TEXT("Internal error: expected MarkAsGarbage()"));
 }
 
-FAbilityCoroutine FAbilityPromise::get_return_object() noexcept
+void UUE5CoroAbilityTask::CoroutineStarting(TAbilityPromise<ThisClass>* InPromise)
 {
-	return FAbilityCoroutine(Extras);
+	Promise = InPromise;
 }
 
-FFinalSuspend FAbilityPromise::final_suspend() noexcept
+void UUE5CoroSimpleAbilityTask::Succeeded()
 {
-	// Skip triggering a BP link because there isn't one
-	return Super::final_suspend<false>();
+	OnSucceeded.Broadcast();
 }
 
-template<typename T>
-TAbilityPromise<T>::TAbilityPromise(T& Target)
-	: FAbilityPromise(Target)
+void UUE5CoroSimpleAbilityTask::Failed()
 {
-	checkf(bCalledFromActivate, TEXT("Do not call Execute coroutines directly!"));
-	bCalledFromActivate = false;
-	Target.CoroutineStarting(this);
-}
-
-namespace UE5Coro::Private
-{
-template<typename T>
-bool TAbilityPromise<T>::bCalledFromActivate = false;
-template UE5COROGAS_API struct TAbilityPromise<UUE5CoroAbilityTask>;
-template UE5COROGAS_API struct TAbilityPromise<UUE5CoroGameplayAbility>;
+	OnFailed.Broadcast();
 }

@@ -32,4 +32,5 @@
 #pragma once
 
 #include "UE5Coro/Definitions.h"
+#include "UE5CoroGAS/UE5CoroAbilityTask.h"
 #include "UE5CoroGAS/UE5CoroGameplayAbility.h"
