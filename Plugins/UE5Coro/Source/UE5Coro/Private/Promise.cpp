@@ -139,6 +139,17 @@ void FPromise::Resume(bool bBypassCancellationHolds)
 		stdcoro::coroutine_handle<FPromise>::from_promise(*this).resume();
 }
 
+void FPromise::ResumeFast()
+{
+	checkf(!Extras->IsComplete() && !ShouldCancel(true),
+	       TEXT("Internal error: Fast resume preconditions not met"));
+	// If this is a FLatentPromise, !LF_Detached is also assumed
+	auto* CallerPromise = GCurrentPromise;
+	GCurrentPromise = this;
+	ON_SCOPE_EXIT { GCurrentPromise = CallerPromise; };
+	stdcoro::coroutine_handle<FPromise>::from_promise(*this).resume();
+}
+
 void FPromise::AddContinuation(std::function<void(void*)> Fn)
 {
 	// Expecting a non-empty function and the lock to be held by the caller

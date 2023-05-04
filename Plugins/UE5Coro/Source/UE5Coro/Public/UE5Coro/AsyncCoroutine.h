@@ -117,7 +117,7 @@ struct FInitialSuspend
 	{
 		switch (Action)
 		{
-			case Resume: Handle.promise().Resume(); break;
+			case Resume: Handle.promise().ResumeFast(); break;
 			// This is very early and doesn't yet count as cancellation
 			case Destroy: Handle.destroy(); break;
 		}
@@ -223,6 +223,7 @@ public:
 	void HoldCancellation();
 	void ReleaseCancellation();
 	virtual void Resume(bool bBypassCancellationHolds = false);
+	void ResumeFast();
 	void AddContinuation(std::function<void(void*)>);
 
 	void unhandled_exception();
