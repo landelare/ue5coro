@@ -34,6 +34,7 @@
 #include "UE5Coro/AsyncAwaiters.h"
 #include "UE5Coro/Cancellation.h"
 #include "UE5Coro/LatentAwaiters.h"
+#include "UE5Coro/LatentCallbacks.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
@@ -59,19 +60,25 @@ void DoTest(FAutomationTestBase& Test)
 	IF_CORO_LATENT
 	{
 		bool bCanceled = false;
+		bool bAborted = false;
+		bool bDestroyed = false;
 		auto Coro = World.Run(CORO_R(int)
 		{
-			FOnCoroutineCanceled _([&]
+			FOnCoroutineCanceled _1([&]
 			{
 				bCanceled = true;
 				Test.TestTrue(TEXT("Read cancellation from within"),
 				              IsCurrentCoroutineCanceled());
 			});
+			Latent::FOnActionAborted _2([&] { bAborted = true; });
+			Latent::FOnObjectDestroyed _3([&] { bDestroyed = true; });
 			co_await Latent::Cancel();
 			co_return 1;
 		});
 		Test.TestTrue(TEXT("Done"), Coro.IsDone());
 		Test.TestTrue(TEXT("Canceled"), bCanceled);
+		Test.TestFalse(TEXT("Not aborted"), bAborted);
+		Test.TestFalse(TEXT("Not destroyed"), bDestroyed);
 		Test.TestFalse(TEXT("Not successful"), Coro.WasSuccessful());
 		Test.TestEqual(TEXT("No return value"), Coro.GetResult(), 0);
 	}
@@ -79,13 +86,17 @@ void DoTest(FAutomationTestBase& Test)
 	IF_CORO_LATENT
 	{
 		std::atomic<bool> bCanceled = false;
+		std::atomic<bool> bAborted = false;
+		std::atomic<bool> bDestroyed = false;
 		auto Coro = World.Run(CORO_R(int)
 		{
-			FOnCoroutineCanceled _([&]
+			FOnCoroutineCanceled _1([&]
 			{
 				bCanceled = true;
 				Test.TestTrue(TEXT("Back on the game thread"), IsInGameThread());
 			});
+			Latent::FOnActionAborted _2([&] { bAborted = true; });
+			Latent::FOnObjectDestroyed _3([&] { bDestroyed = true; });
 			Test.TestFalse(TEXT("Not canceled yet"),
 			               IsCurrentCoroutineCanceled());
 			co_await Async::MoveToNewThread();
@@ -94,6 +105,8 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
 		Test.TestTrue(TEXT("Canceled"), bCanceled);
+		Test.TestFalse(TEXT("Not aborted"), bAborted);
+		Test.TestFalse(TEXT("Not destroyed"), bDestroyed);
 		Test.TestFalse(TEXT("Not successful"), Coro.WasSuccessful());
 		Test.TestEqual(TEXT("No return value"), Coro.GetResult(), 0);
 	}

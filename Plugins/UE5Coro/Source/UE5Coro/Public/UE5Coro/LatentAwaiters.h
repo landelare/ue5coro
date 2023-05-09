@@ -54,7 +54,7 @@ namespace UE5Coro::Latent
 {
 /** Stops the latent coroutine immediately WITHOUT firing the latent exec pin.<br>
  *  The coroutine WILL NOT be resumed.
- *  This does not count as the coroutine being aborted.
+ *  This does not count as the coroutine being aborted for FOnActionAborted.
  *  @see TCoroutine<>::Cancel to cancel a coroutine from outside. */
 Private::FLatentCancellation Cancel() noexcept;
 
