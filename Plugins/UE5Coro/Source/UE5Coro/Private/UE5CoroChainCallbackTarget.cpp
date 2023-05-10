@@ -29,7 +29,7 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "UE5Coro/UE5CoroChainCallbackTarget.h"
+#include "UE5CoroChainCallbackTarget.h"
 #include "UE5Coro/UE5CoroSubsystem.h"
 
 using namespace UE5Coro::Private;
@@ -90,4 +90,13 @@ TStatId UUE5CoroChainCallbackTarget::GetStatId() const
 {
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UUE5CoroChainCallbackTarget,
 	                                STATGROUP_Tickables);
+}
+
+// This is only used by tests
+namespace UE5Coro::Private
+{
+UE5CORO_API UClass* ChainCallbackTarget_StaticClass()
+{
+	return UUE5CoroChainCallbackTarget::StaticClass();
+}
 }

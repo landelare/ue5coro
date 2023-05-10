@@ -29,7 +29,7 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "UE5Coro/UE5CoroAnimCallbackTarget.h"
+#include "UE5CoroAnimCallbackTarget.h"
 #include "UE5Coro/AnimationAwaiters.h"
 
 using namespace UE5Coro::Private;

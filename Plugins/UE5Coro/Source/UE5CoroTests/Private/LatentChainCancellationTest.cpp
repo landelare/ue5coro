@@ -33,10 +33,10 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/LatentAwaiters.h"
-#include "UE5Coro/UE5CoroChainCallbackTarget.h"
 
 using namespace std::placeholders;
 using namespace UE5Coro;
+using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncChainCancelTest, "UE5Coro.Chain.Cancel.Async",
@@ -48,6 +48,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentChainCancelTest, "UE5Coro.Chain.Cancel.L
                                  EAutomationTestFlags::ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
+
+namespace UE5Coro::Private
+{
+extern UE5CORO_API UClass* ChainCallbackTarget_StaticClass();
+}
 
 namespace
 {
@@ -73,9 +78,10 @@ void DoTest(FAutomationTestBase& Test)
 	};
 
 	{
-		TSet<UUE5CoroChainCallbackTarget*> Targets;
-		for (auto* Target : TObjectRange<UUE5CoroChainCallbackTarget>())
-			Targets.Add(Target);
+		TSet<UObject*> Targets;
+		for (auto* Target : TObjectRange<UObject>())
+			if (Target->IsA(ChainCallbackTarget_StaticClass()))
+				Targets.Add(Target);
 
 		World.Run(CORO
 		{
@@ -89,9 +95,10 @@ void DoTest(FAutomationTestBase& Test)
 			State = 2;
 		});
 		Test.TestEqual(TEXT("Started"), State, 1);
-		UUE5CoroChainCallbackTarget* NewTarget = nullptr;
-		for (auto* Target : TObjectRange<UUE5CoroChainCallbackTarget>())
-			if (!Targets.Contains(Target))
+		UObject* NewTarget = nullptr;
+		for (auto* Target : TObjectRange<UObject>())
+			if (Target->IsA(ChainCallbackTarget_StaticClass()) &&
+			    !Targets.Contains(Target))
 			{
 				NewTarget = Target;
 				break;

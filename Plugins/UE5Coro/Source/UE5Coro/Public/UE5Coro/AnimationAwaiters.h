@@ -33,7 +33,9 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
-#include "UE5Coro/UE5CoroAnimCallbackTarget.h"
+#include "UE5Coro/AsyncCoroutine.h"
+
+class UUE5CoroAnimCallbackTarget;
 
 namespace UE5Coro::Private
 {
@@ -150,6 +152,9 @@ protected:
 
 	FAnimAwaiter(UAnimInstance*, UAnimMontage*);
 	~FAnimAwaiter();
+
+	UE5CORO_API FAnimAwaiter(const FAnimAwaiter&);
+	UE5CORO_API FAnimAwaiter& operator=(const FAnimAwaiter&);
 
 public:
 	UE5CORO_API void Suspend(FPromise&);

@@ -33,39 +33,53 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
-#include "UE5CoroChainCallbackTarget.generated.h"
+#include <optional>
+#include <variant>
+#include "UE5Coro/AsyncCoroutine.h"
+#include "UE5CoroAnimCallbackTarget.generated.h"
 
-namespace UE5Coro::Private
-{
-class FTwoLives;
-}
-
-/**
- * Internal class supporting some async coroutine functionality.<br>
- * You never need to interact with it directly.
- */
-UCLASS(Hidden, Within = UE5CoroSubsystem)
-class UE5CORO_API UUE5CoroChainCallbackTarget : public UObject,
-                                                public FTickableGameObject
+UCLASS(Hidden)
+class UE5CORO_API UUE5CoroAnimCallbackTarget : public UObject,
+                                               public FTickableGameObject
 {
 	GENERATED_BODY()
 
-	int32 ExpectedLink = 0;
-	UE5Coro::Private::FTwoLives* State = nullptr;
+	TWeakObjectPtr<UAnimInstance> WeakInstance;
+	UE5Coro::Private::FPromise* Promise = nullptr;
+	// UPlayMontageCallbackProxy uses this value as the default
+	int32 MontageIDFilter = INDEX_NONE;
+	std::optional<FName> NotifyFilter; // "None" is a valid name for a notify
+
+	void TryResume();
 
 public:
-	void Activate(int32 InExpectedLink, UE5Coro::Private::FTwoLives* InState);
-	void Deactivate();
-	[[nodiscard]] int32 GetExpectedLink() const;
+	// Void's result is indicated by this holding a bool, not monostate
+	std::variant<std::monostate, bool, const FBranchingPointNotifyPayload*,
+	             TTuple<FName, const FBranchingPointNotifyPayload*>> Result;
 
-	/** Signals the coroutine suspended with this linkage that it may resume. */
+	void ListenForMontageEvent(UAnimInstance*, UAnimMontage*, bool);
+	void ListenForNotify(UAnimInstance*, UAnimMontage*, FName);
+	void ListenForPlayMontageNotify(UAnimInstance*, UAnimMontage*,
+	                                std::optional<FName>, bool);
+	void RequestResume(UE5Coro::Private::FPromise&);
+	void CancelResume();
+
+#pragma region Callbacks
 	UFUNCTION()
-	void ExecuteLink(int32 Link);
+	void NotifyCallback();
+	UFUNCTION()
+	void MontageCallbackBool(UAnimMontage* Montage, bool bInterrupted);
+	UFUNCTION()
+	void MontageCallbackNameAndPayload(
+		FName NotifyName, const FBranchingPointNotifyPayload& Payload);
+#pragma endregion
 
 #pragma region FTickableGameObject overrides
+	// These are needed to catch the anim instance getting destroyed without
+	// a callback. Editor tick is needed to handle Persona and the end of PIE.
 	virtual ETickableTickType GetTickableTickType() const override;
-	virtual bool IsTickableWhenPaused() const override { return true; }
 	virtual bool IsTickableInEditor() const override { return true; }
+	virtual bool IsTickableWhenPaused() const override { return true; }
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
 #pragma endregion

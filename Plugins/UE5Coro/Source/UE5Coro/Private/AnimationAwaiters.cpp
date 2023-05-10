@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5Coro/AnimationAwaiters.h"
+#include "UE5CoroAnimCallbackTarget.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
@@ -95,6 +96,10 @@ FAnimAwaiter::~FAnimAwaiter()
 	if (UNLIKELY(bSuspended))
 		Target->CancelResume();
 }
+
+// These cannot be defaulted in the .h, they use UUE5CoroAnimCallbackTarget
+FAnimAwaiter::FAnimAwaiter(const FAnimAwaiter&) = default;
+FAnimAwaiter& FAnimAwaiter::operator=(const FAnimAwaiter&) = default;
 
 void FAnimAwaiter::Suspend(FPromise& Promise)
 {
