@@ -29,47 +29,22 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
+#include "UE5CoroDelegateCallbackTarget.h"
 
-#include "CoreMinimal.h"
-#include "UE5Coro/Definitions.h"
-#include "Kismet/KismetSystemLibrary.h"
-#include "UE5Coro/LatentAwaiters.h"
-#include "UE5CoroTestObject.generated.h"
-
-class UUE5CoroTestObject;
-
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE(FUE5CoroTestSparseDelegate,
-                                          UUE5CoroTestObject, SparseDelegate);
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(
-	FUE5CoroTestSparseParamsDelegate, UUE5CoroTestObject, SparseParamsDelegate,
-	int, A, int&, B);
-
-UCLASS(MinimalAPI, Hidden)
-class UUE5CoroTestObject : public UObject
+void UUE5CoroDelegateCallbackTarget::Init(std::function<void(void*)> InFn)
 {
-	GENERATED_BODY()
+	Fn = std::move(InFn);
+}
 
-public:
-	UPROPERTY(BlueprintAssignable)
-	FUE5CoroTestSparseDelegate SparseDelegate;
-	UPROPERTY(BlueprintAssignable)
-	FUE5CoroTestSparseParamsDelegate SparseParamsDelegate;
+void UUE5CoroDelegateCallbackTarget::ProcessEvent(UFunction*, void* Parms)
+{
+	// This might also be caused by a multithreaded race condition
+	checkf(Fn, TEXT("Internal error: Unexpected early or double callback"));
+	std::exchange(Fn, nullptr)(Parms);
+	MarkAsGarbage(); // Prevent further calls from dynamic delegates
+}
 
-	std::function<void()> Callback;
-
-	UFUNCTION()
-	void RunCallback() { Callback(); }
-
-	UFUNCTION()
-	void Empty() { }
-
-	virtual UWorld* GetWorld() const override { return GWorld; }
-
-	void Latent(FLatentActionInfo LatentInfo)
-	{
-		UKismetSystemLibrary::DelayUntilNextTick(this, LatentInfo);
-	}
-
-	FAsyncCoroutine ObjectDestroyedTest(int&, bool&, bool&, FLatentActionInfo);
-};
+void UUE5CoroDelegateCallbackTarget::Execute()
+{
+	check(!"Internal error: This function should never run");
+}

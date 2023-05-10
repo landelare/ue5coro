@@ -58,7 +58,7 @@ namespace Test { class FTestHelper; }
 
 extern thread_local bool GDestroyedEarly;
 
-template<typename, typename A>
+template<typename, typename A, typename = void>
 struct TAwaitTransform
 {
 	// Default passthrough

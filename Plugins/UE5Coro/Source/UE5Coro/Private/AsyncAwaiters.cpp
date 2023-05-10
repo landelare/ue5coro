@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5Coro/AsyncAwaiters.h"
+#include "UE5CoroDelegateCallbackTarget.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
@@ -84,4 +85,37 @@ FNewThreadAwaiter Async::MoveToNewThread(EThreadPriority Priority,
 void FNewThreadAwaiter::Suspend(FPromise& Promise)
 {
 	new FAutoStartResumeRunnable(Promise, Priority, Affinity, Flags);
+}
+
+FDelegateAwaiter::~FDelegateAwaiter()
+{
+	Cleanup();
+}
+
+void FDelegateAwaiter::Suspend(FPromise& InPromise)
+{
+	checkf(!Promise, TEXT("Internal error: Unexpected double suspend"));
+	Promise = &InPromise;
+}
+
+void FDelegateAwaiter::TryResumeOnce()
+{
+	if (Promise)
+		std::exchange(Promise, nullptr)->Resume();
+}
+
+UObject* FDelegateAwaiter::SetupCallbackTarget(std::function<void(void*)> Fn)
+{
+	FGCScopeGuard _;
+	auto* Target = NewObject<UUE5CoroDelegateCallbackTarget>();
+	Target->SetInternalFlags(EInternalObjectFlags::Async);
+	Target->Init(std::move(Fn));
+	checkf(!Cleanup, TEXT("Internal error: double setup"));
+	Cleanup = [Target]
+	{
+		FGCScopeGuard _;
+		Target->ClearInternalFlags(EInternalObjectFlags::Async);
+		Target->MarkAsGarbage();
+	};
+	return Target;
 }

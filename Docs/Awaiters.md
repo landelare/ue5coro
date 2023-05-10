@@ -49,6 +49,75 @@ See UE5Coro\:\:Tasks for support of the more modern UE\:\:Tasks system.
 The return values of these functions are copyable, thread-safe, and allow any
 number of concurrent co_awaits.
 
+### Delegates
+
+Delegates that are made by the following macro families are co_awaitable:
+* DECLARE_DELEGATE (TDelegate)
+* DECLARE_DYNAMIC_DELEGATE (TScriptDelegate)
+* DECLARE_DYNAMIC_MULTICAST_DELEGATE (TMulticastScriptDelegate)
+* DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE (TSparseDynamicDelegate)
+* DECLARE_EVENT (TMulticastDelegate)
+* DECLARE_MULTICAST_DELEGATE (TMulticastDelegate)
+* ~~DECLARE_TS_DELEGATE~~[^nomacro]
+(TDelegate<..., FDefaultTSDelegateUserPolicy>)
+* DECLARE_TS_MULTICAST_DELEGATE
+(TMulticastScriptDelegate<..., FDefaultTSDelegateUserPolicy>)
+
+[^nomacro]: There is no `DECLARE_TS_DELEGATE` in UE5.2, but the delegates that
+    it would define are supported anyway.
+
+`RetVal` and any number of `Params` are supported.
+`RetVal` delegates will receive a default-constructed or zeroed value once the
+coroutine co_returns or co_awaits something else.
+Return types that aren't _DefaultConstructible_ or `void` are not supported.
+
+Using the macros is not required: `TDelegate<void()>` works directly, etc.
+Since this is considered an async awaiter, there are no restrictions on what
+delegate can be co_awaited beyond the engine's own limitations.
+It's supported to, e.g., co_await a BlueprintAssignable delegate from a
+non-UObject on any thread, but you're responsible for avoiding race conditions.
+A co_await will implicitly Add to or Bind the delegate behind the scenes.
+
+The coroutine will resume on the same thread that the delegate is Executed or
+Broadcasted from.
+
+This feature is very convenient, but also very dangerous:
+if the delegate never executes, the coroutine will be stuck waiting for it
+forever, essentially leaking memory.
+Cancellations are also not processed until the delegate executes.
+
+#### Parameters and return values
+
+If the delegate has no parameters, the type of the co_await expression is void.
+If it has parameters, the co_await expression will result in an object of an
+unspecified internal type that can be used with structured bindings.
+References will match the delegate caller's references, and can be written to.
+They will remain valid until the next co_await.
+
+```c++
+// Assume this is declared somewhere else
+DECLARE_DYNAMIC_DELEGATE_RetVal_TwoParams(double, FExample, int, int&);
+FExample Delegate;
+
+// ...
+
+co_await Delegate; // Delegate.Execute() returns 0.0 to its caller
+auto X = co_await Delegate; // Not supported, this type is internal to UE5Coro
+auto [A, B] = co_await Delegate; // Caller gets 0.0, A is int, B is int
+auto&& [C, D] = co_await Delegate; // Caller gets 0.0, C is int, D is int&
+// auto& [E, F] = co_await Delegate; // Does not compile, E can't bind to int
+
+// D is valid until the next co_await
+D = 1; // The caller of Delegate.Execute() will see this write
+
+if (bSomething)
+    co_await Async::Yield();
+// D might or might not be valid here depending on bSomething
+
+co_await Async::Yield();
+// D is definitely stale, using it here is undefined behavior
+```
+
 ### TFuture
 
 TFuture\<T\> is directly co_awaitable.

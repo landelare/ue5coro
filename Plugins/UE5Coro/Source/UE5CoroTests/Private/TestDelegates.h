@@ -32,44 +32,24 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UE5Coro/Definitions.h"
-#include "Kismet/KismetSystemLibrary.h"
-#include "UE5Coro/LatentAwaiters.h"
-#include "UE5CoroTestObject.generated.h"
+#include "TestDelegates.generated.h"
 
-class UUE5CoroTestObject;
-
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE(FUE5CoroTestSparseDelegate,
-                                          UUE5CoroTestObject, SparseDelegate);
-DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_TwoParams(
-	FUE5CoroTestSparseParamsDelegate, UUE5CoroTestObject, SparseParamsDelegate,
-	int, A, int&, B);
-
-UCLASS(MinimalAPI, Hidden)
-class UUE5CoroTestObject : public UObject
+USTRUCT()
+struct FUE5CoroTestConstructionChecker
 {
 	GENERATED_BODY()
-
-public:
-	UPROPERTY(BlueprintAssignable)
-	FUE5CoroTestSparseDelegate SparseDelegate;
-	UPROPERTY(BlueprintAssignable)
-	FUE5CoroTestSparseParamsDelegate SparseParamsDelegate;
-
-	std::function<void()> Callback;
-
-	UFUNCTION()
-	void RunCallback() { Callback(); }
-
-	UFUNCTION()
-	void Empty() { }
-
-	virtual UWorld* GetWorld() const override { return GWorld; }
-
-	void Latent(FLatentActionInfo LatentInfo)
-	{
-		UKismetSystemLibrary::DelayUntilNextTick(this, LatentInfo);
-	}
-
-	FAsyncCoroutine ObjectDestroyedTest(int&, bool&, bool&, FLatentActionInfo);
+	static inline bool bConstructed = false;
+	FUE5CoroTestConstructionChecker() { bConstructed = true; }
 };
+
+DECLARE_DYNAMIC_DELEGATE(FUE5CoroTestDynamicVoidDelegate);
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FUE5CoroTestDynamicParamsDelegate,
+                                   int, A, int&, B);
+DECLARE_DYNAMIC_DELEGATE_RetVal(FUE5CoroTestConstructionChecker,
+                                FUE5CoroTestDynamicRetvalDelegate);
+DECLARE_DYNAMIC_DELEGATE_RetVal_TwoParams(FUE5CoroTestConstructionChecker,
+                                          FUE5CoroTestDynamicAllDelegate,
+                                          int, A, int&, B);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUE5CoroTestDynamicMulticastVoidDelegate);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FUE5CoroTestDynamicMulticastParamsDelegate, int, A, int&, B);
