@@ -30,6 +30,8 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5CoroGAS/UE5CoroGameplayAbility.h"
+#include "UE5CoroTaskCallbackTarget.h"
+#include "UE5Coro/LatentAwaiters.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
@@ -68,6 +70,34 @@ UUE5CoroGameplayAbility::~UUE5CoroGameplayAbility()
 #if UE5CORO_DEBUG
 	Activations = nullptr;
 #endif
+}
+
+FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object)
+{
+	checkf(IsInGameThread(),
+	       TEXT("This method is only available on the game thread"));
+	checkf(Object, TEXT("Attempting to await null object"));
+	// Find BlueprintAssignable properties
+	auto* Class = Object->GetClass();
+	FProperty* Property = nullptr;
+	for (auto* i = Class->PropertyLink; i; i = i->NextRef)
+	{
+		if (!i->HasAnyPropertyFlags(CPF_BlueprintAssignable))
+			continue;
+		checkf(!Property,
+		       TEXT("Only one BlueprintAssignable UPROPERTY is supported."));
+		Property = i;
+		if constexpr (!UE5CORO_DEBUG) // Keep looking for others in debug
+			break;
+	}
+	checkf(Property, TEXT("A BlueprintAssignable UPROPERTY is required."));
+	auto* DelegateProp = CastFieldChecked<FMulticastDelegateProperty>(Property);
+
+	auto* Target = NewObject<UUE5CoroTaskCallbackTarget>(this);
+	FScriptDelegate Delegate;
+	Delegate.BindUFunction(Target, "Execute");
+	DelegateProp->AddDelegate(std::move(Delegate), Object);
+	return FLatentAwaiter(new TStrongObjectPtr(Target), &ShouldResumeTask);
 }
 
 void UUE5CoroGameplayAbility::ActivateAbility(
@@ -146,4 +176,15 @@ void UUE5CoroGameplayAbility::CoroutineStarting(TAbilityPromise<ThisClass>* Prom
 	       TEXT("Internal error: expected coroutine on the game thread"));
 	// Promise is not fully-constructed yet, but its address is known
 	Activations->Add(GCurrentPredictionKey, Promise);
+}
+
+bool UUE5CoroGameplayAbility::ShouldResumeTask(void*& State, bool bCleanup)
+{
+	auto* Ptr = static_cast<TStrongObjectPtr<UUE5CoroTaskCallbackTarget>*>(State);
+	if (UNLIKELY(bCleanup))
+	{
+		delete Ptr;
+		return false;
+	}
+	return (*Ptr)->bExecuted;
 }

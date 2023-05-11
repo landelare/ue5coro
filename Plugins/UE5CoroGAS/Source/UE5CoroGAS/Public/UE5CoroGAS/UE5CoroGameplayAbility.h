@@ -76,6 +76,11 @@ protected:
 	               const FGameplayEventData* TriggerEventData)
 		PURE_VIRTUAL(UUE5CoroGameplayAbility::ExecuteAbility, co_return;);
 
+	/** Given a UObject* with a single BlueprintAssignable UPROPERTY,
+	 *  the return value of this function lets you co_await that delegate safely,
+	 *  handling cancellations even if the delegate never Broadcasts. */
+	UE5Coro::Private::FLatentAwaiter Task(UObject*);
+
 private:
 	/** Override ExecuteAbility instead. */
 	virtual void ActivateAbility(FGameplayAbilitySpecHandle,
@@ -90,4 +95,6 @@ private:
 	                        bool) final override;
 
 	void CoroutineStarting(UE5Coro::Private::TAbilityPromise<ThisClass>*);
+
+	static bool ShouldResumeTask(void*&, bool);
 };
