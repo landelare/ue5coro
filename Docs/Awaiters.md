@@ -81,10 +81,21 @@ A co_await will implicitly Add to or Bind the delegate behind the scenes.
 The coroutine will resume on the same thread that the delegate is Executed or
 Broadcasted from.
 
+#### Alternatives
+
 This feature is very convenient, but also very dangerous:
 if the delegate never executes, the coroutine will be stuck waiting for it
 forever, essentially leaking memory.
 Cancellations are also not processed until the delegate executes.
+
+`Latent::UntilDelegate` may be used as an alternative in latent mode.
+It is locked to the game thread, does not process parameters or return values,
+but responds to its awaiting coroutine being canceled or aborted even if the
+delegate never executes.
+It is technically available in async mode due to the usual feature parity
+between the two modes, but it's not as beneficial in that case.
+
+[UE5CoroGAS](GAS.md) has a specialized awaiter for delegates in BP tasks.
 
 #### Parameters and return values
 

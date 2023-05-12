@@ -37,6 +37,7 @@
 #include <tuple>
 #include "Async/TaskGraphInterfaces.h"
 #include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/Private.h"
 
 namespace UE5Coro::Private
 {
@@ -188,34 +189,6 @@ struct TAwaitTransform<P, TFuture<T>>
 	// co_awaiting a TFuture consumes it, use MoveTemp/std::move
 	TFutureAwaiter<T> operator()(TFuture<T>&) = delete;
 };
-
-template<typename T>
-constexpr bool TIsSparseDelegate = std::is_base_of_v<FSparseDelegate, T>;
-
-template<typename T>
-constexpr bool TIsDynamicDelegate =
-	std::is_base_of_v<FScriptDelegate, T> ||
-	std::is_base_of_v<FMulticastScriptDelegate, T> ||
-	// Sparse delegates are always dynamic multicast
-	TIsSparseDelegate<T>;
-
-template<typename T>
-constexpr bool TIsMulticastDelegate =
-#if ENGINE_MINOR_VERSION >= 1
-	std::is_base_of_v<TMulticastDelegateBase<FDefaultTSDelegateUserPolicy>, T> ||
-#endif
-	std::is_base_of_v<TMulticastDelegateBase<FDefaultDelegateUserPolicy>, T> ||
-	std::is_base_of_v<TMulticastScriptDelegate<>, T> ||
-	// Sparse delegates are always dynamic multicast
-	TIsSparseDelegate<T>;
-
-template<typename T>
-constexpr bool TIsDelegate =
-#if ENGINE_MINOR_VERSION >= 1
-	std::is_base_of_v<TDelegateBase<FDefaultTSDelegateUserPolicy>, T> ||
-#endif
-	std::is_base_of_v<TDelegateBase<FDefaultDelegateUserPolicy>, T> ||
-	TIsDynamicDelegate<T> || TIsMulticastDelegate<T>;
 
 template<typename>
 struct TDelegateAwaiterFor;

@@ -31,6 +31,7 @@
 
 #include "UE5Coro/LatentAwaiters.h"
 #include "Engine/World.h"
+#include "UE5CoroDelegateCallbackTarget.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
@@ -79,6 +80,40 @@ FLatentAwaiter GenericSeconds(double Seconds)
 	reinterpret_cast<double&>(State) = (GWorld->*GetTime)() + Seconds;
 	return FLatentAwaiter(State, &WaitUntilTime<GetTime>);
 }
+
+class [[nodiscard]] FUntilDelegateState
+	: public std::enable_shared_from_this<FUntilDelegateState>
+{
+	TStrongObjectPtr<UUE5CoroDelegateCallbackTarget> Target;
+	// This object is on the game thread, but the delegate might not be
+	std::atomic<bool> bExecuted = false;
+
+public:
+	explicit FUntilDelegateState(UUE5CoroDelegateCallbackTarget* Target)
+		: Target(Target) { }
+
+	void Init()
+	{
+		Target->Init([Weak = weak_from_this()](void*)
+		{
+			if (auto Strong = Weak.lock())
+				Strong->bExecuted = true;
+		});
+	}
+
+	static bool ShouldResume(void*& State, bool bCleanup)
+	{
+		auto& This = *static_cast<std::shared_ptr<FUntilDelegateState>*>(State);
+		if (UNLIKELY(bCleanup))
+		{
+			if (This->Target.IsValid())
+				This->Target->MarkAsGarbage();
+			delete &This;
+			return false;
+		}
+		return This->bExecuted;
+	}
+};
 }
 
 FLatentAwaiter Latent::NextTick()
@@ -100,6 +135,17 @@ FLatentAwaiter Latent::Until(std::function<bool()> Function)
 	checkf(Function, TEXT("Provided function is empty"));
 	return FLatentAwaiter(new std::function(std::move(Function)),
 	                      &WaitUntilPredicate);
+}
+
+std::tuple<FLatentAwaiter, UObject*> Private::UntilDelegateCore()
+{
+	checkf(IsInGameThread(), TEXT("")
+	       "Awaiting delegates this way is only available on the game thread. "
+	       "co_awaiting delegates directly works on any thread.");
+	auto* Target = NewObject<UUE5CoroDelegateCallbackTarget>();
+	auto* State = new auto(std::make_shared<FUntilDelegateState>(Target));
+	(*State)->Init();
+	return {FLatentAwaiter(State, &FUntilDelegateState::ShouldResume), Target};
 }
 
 FLatentAwaiter Latent::Seconds(double Seconds)

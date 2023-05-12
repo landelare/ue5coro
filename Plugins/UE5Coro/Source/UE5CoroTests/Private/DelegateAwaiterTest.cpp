@@ -34,6 +34,7 @@
 #include "TestWorld.h"
 #include "UE5CoroTestObject.h"
 #include "UE5Coro/AsyncAwaiters.h"
+#include "UE5Coro/LatentAwaiters.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
@@ -98,7 +99,7 @@ struct alignas(4096) FHighlyAlignedByte
 	uint8 Value;
 };
 
-template<bool bDynamic, bool bMulticast, typename... T>
+template<bool bDynamic, bool bMulticast, bool bLatentWrapper, typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
 	FTestWorld World;
@@ -116,11 +117,17 @@ void DoTest(FAutomationTestBase& Test)
 		typename TSelect<bDynamic, bMulticast>::FVoid Delegate;
 		World.Run(CORO
 		{
-			co_await Delegate;
+			if constexpr (bLatentWrapper)
+				co_await Latent::UntilDelegate(Delegate);
+			else
+				co_await Delegate;
 			bDone = true;
 		});
+		World.EndTick();
 		Test.TestFalse(TEXT("Not done yet"), bDone);
 		Invoke(Delegate);
+		if constexpr (bLatentWrapper)
+			World.Tick();
 		Test.TestTrue(TEXT("Done"), bDone);
 	}
 
@@ -129,18 +136,27 @@ void DoTest(FAutomationTestBase& Test)
 		typename TSelect<bDynamic, bMulticast>::FParams Delegate;
 		World.Run(CORO
 		{
-			auto&& [A, B] = co_await Delegate;
-			static_assert(!std::is_reference_v<decltype(A)>);
-			static_assert(std::is_lvalue_reference_v<decltype(B)>);
-			Test.TestEqual(TEXT("Param 1"), A, 1);
-			Test.TestEqual(TEXT("Param 2"), B, 2);
-			B = 3;
+			if constexpr (bLatentWrapper)
+				co_await Latent::UntilDelegate(Delegate);
+			else
+			{
+				auto&& [A, B] = co_await Delegate;
+				static_assert(!std::is_reference_v<decltype(A)>);
+				static_assert(std::is_lvalue_reference_v<decltype(B)>);
+				Test.TestEqual(TEXT("Param 1"), A, 1);
+				Test.TestEqual(TEXT("Param 2"), B, 2);
+				B = 3;
+			}
 			bDone = true;
 		});
+		World.EndTick();
 		Test.TestFalse(TEXT("Not done yet"), bDone);
 		int Two = 2;
 		Invoke(Delegate, 1, Two);
-		Test.TestEqual(TEXT("Reference writes back"), Two, 3);
+		if constexpr (bLatentWrapper)
+			World.Tick();
+		else
+			Test.TestEqual(TEXT("Reference writes back"), Two, 3);
 		Test.TestTrue(TEXT("Done"), bDone);
 	}
 
@@ -151,14 +167,21 @@ void DoTest(FAutomationTestBase& Test)
 			typename TSelect<bDynamic, bMulticast>::FRetVal Delegate;
 			World.Run(CORO
 			{
-				co_await Delegate;
+				if constexpr (bLatentWrapper)
+					co_await Latent::UntilDelegate(Delegate);
+				else
+					co_await Delegate;
 				bDone = true;
 				FUE5CoroTestConstructionChecker::bConstructed = false;
 			});
+			World.EndTick();
 			Test.TestFalse(TEXT("Not done yet"), bDone);
 			Invoke(Delegate);
-			Test.TestTrue(TEXT("Return value"),
-			              FUE5CoroTestConstructionChecker::bConstructed);
+			if constexpr (bLatentWrapper)
+				World.Tick();
+			else
+				Test.TestTrue(TEXT("Return value"),
+				              FUE5CoroTestConstructionChecker::bConstructed);
 			Test.TestTrue(TEXT("Done"), bDone);
 		}
 
@@ -167,21 +190,30 @@ void DoTest(FAutomationTestBase& Test)
 			typename TSelect<bDynamic, bMulticast>::FAll Delegate;
 			World.Run(CORO
 			{
-				auto&& [A, B] = co_await Delegate;
-				static_assert(!std::is_reference_v<decltype(A)>);
-				static_assert(std::is_lvalue_reference_v<decltype(B)>);
-				Test.TestEqual(TEXT("Param 1"), A, 1);
-				Test.TestEqual(TEXT("Param 2"), B, 2);
-				B = 3;
+				if constexpr (bLatentWrapper)
+					co_await Latent::UntilDelegate(Delegate);
+				else
+				{
+					auto&& [A, B] = co_await Delegate;
+					static_assert(!std::is_reference_v<decltype(A)>);
+					static_assert(std::is_lvalue_reference_v<decltype(B)>);
+					Test.TestEqual(TEXT("Param 1"), A, 1);
+					Test.TestEqual(TEXT("Param 2"), B, 2);
+					B = 3;
+				}
 				bDone = true;
 				FUE5CoroTestConstructionChecker::bConstructed = false;
 			});
+			World.EndTick();
 			Test.TestFalse(TEXT("Not done yet"), bDone);
 			int Two = 2;
 			Invoke(Delegate, 1, Two);
 			Test.TestTrue(TEXT("Return value"),
 			              FUE5CoroTestConstructionChecker::bConstructed);
-			Test.TestEqual(TEXT("Reference writes back"), Two, 3);
+			if constexpr (bLatentWrapper)
+				World.Tick();
+			else
+				Test.TestEqual(TEXT("Reference writes back"), Two, 3);
 			Test.TestTrue(TEXT("Done"), bDone);
 		}
 	}
@@ -194,13 +226,18 @@ void DoTest(FAutomationTestBase& Test)
 			auto* Object = NewObject<UUE5CoroTestObject>();
 			World.Run(CORO
 			{
-				co_await Object->SparseDelegate;
+				if constexpr (bLatentWrapper)
+					co_await Latent::UntilDelegate(Object->SparseDelegate);
+				else
+					co_await Object->SparseDelegate;
 				bDone = true;
 			});
 			World.EndTick();
 			Test.TestFalse(TEXT("Not done yet"), bDone);
 			Invoke(Object->SparseDelegate);
 			Object->SparseDelegate.Broadcast();
+			if constexpr (bLatentWrapper)
+				World.Tick();
 			Test.TestTrue(TEXT("Done"), bDone);
 		}
 
@@ -209,21 +246,39 @@ void DoTest(FAutomationTestBase& Test)
 			auto* Object = NewObject<UUE5CoroTestObject>();
 			World.Run(CORO
 			{
-				auto&& [A, B] = co_await Object->SparseParamsDelegate;
-				static_assert(!std::is_reference_v<decltype(A)>);
-				static_assert(std::is_lvalue_reference_v<decltype(B)>);
-				Test.TestEqual(TEXT("Param 1"), A, 1);
-				Test.TestEqual(TEXT("Param 2"), B, 2);
-				B = 3;
+				if constexpr (bLatentWrapper)
+					co_await Latent::UntilDelegate(Object->SparseParamsDelegate);
+				else
+				{
+					auto&& [A, B] = co_await Object->SparseParamsDelegate;
+					static_assert(!std::is_reference_v<decltype(A)>);
+					static_assert(std::is_lvalue_reference_v<decltype(B)>);
+					Test.TestEqual(TEXT("Param 1"), A, 1);
+					Test.TestEqual(TEXT("Param 2"), B, 2);
+					B = 3;
+				}
 				bDone = true;
 			});
 			World.EndTick();
 			Test.TestFalse(TEXT("Not done yet"), bDone);
 			int Two = 2;
 			Object->SparseParamsDelegate.Broadcast<int, int&>(1, Two);
-			Test.TestEqual(TEXT("Reference writes back"), Two, 3);
+			if constexpr (bLatentWrapper)
+				World.Tick();
+			else
+				Test.TestEqual(TEXT("Reference writes back"), Two, 3);
 			Test.TestTrue(TEXT("Done"), bDone);
 		}
+	}
+}
+
+template<int N, typename... T>
+void DoTests(FAutomationTestBase& Test)
+{
+	if constexpr (N < 8)
+	{
+		DoTest<(N & 4) != 0, (N & 2) != 0, (N & 1) != 0, T...>(Test);
+		DoTests<N + 1, T...>(Test);
 	}
 }
 }
@@ -276,18 +331,12 @@ bool FDelegateTestCore::RunTest(const FString& Parameters)
 
 bool FDelegateTestAsync::RunTest(const FString& Parameters)
 {
-	DoTest<false, false>(*this);
-	DoTest<false, true>(*this);
-	DoTest<true, false>(*this);
-	DoTest<true, true>(*this);
+	DoTests<0>(*this);
 	return true;
 }
 
 bool FDelegateTestLatent::RunTest(const FString& Parameters)
 {
-	DoTest<false, false, FLatentActionInfo>(*this);
-	DoTest<false, true, FLatentActionInfo>(*this);
-	DoTest<true, false, FLatentActionInfo>(*this);
-	DoTest<true, true, FLatentActionInfo>(*this);
+	DoTests<0, FLatentActionInfo>(*this);
 	return true;
 }
