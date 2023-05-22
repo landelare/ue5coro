@@ -227,7 +227,7 @@ void DoTest(FAutomationTestBase& Test)
 	{
 		FEventRef TestToCoro;
 		std::atomic<bool> bContinued = false;
-		TWeakObjectPtr Object(NewObject<UUE5CoroTestObject>());
+		TWeakObjectPtr<UUE5CoroTestObject> Object(NewObject<UUE5CoroTestObject>());
 		auto Coro = World.Run(CORO
 		{
 			co_await Async::MoveToNewThread();
