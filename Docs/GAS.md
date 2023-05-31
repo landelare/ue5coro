@@ -38,6 +38,8 @@ that may be freely changed at any time and defaults to replicated.
 * FCancellationGuard does **NOT** affect CanBeCanceled (but it may be overridden).
 Cancellations will be received and (unforced ones) deferred until the last guard
 goes out of scope.
+* See [below](#garbage-collection-considerations) for notes on unusual garbage
+collection behavior driven by GAS itself that might lead to forced cancellations.
 
 You'll need to call CommitAbility normally from the coroutine as appropriate.
 You're free to override any other method not marked `final`.
@@ -95,3 +97,35 @@ implementations.
 `UUE5CoroSimpleAbilityTask` broadcasts the delegate corresponding to the method.
 Self-cancel with `Latent::Cancel` to trigger Failed instead of Succeeded.
 * OnDestroy (e.g., from EndTask) will cancel the coroutine.
+* See [below](#garbage-collection-considerations) for notes on unusual garbage
+collection behavior driven by GAS itself that might lead to forced cancellations.
+
+# Garbage collection considerations
+
+GAS itself sometimes marks abilities and tasks as garbage.
+This is usually in response to EndAbility, EndTask, or other forms of
+engine-initiated cancellation, such as PIE ending.
+Notably, non-instanced gameplay abilities are not subject to this, since they
+run on the CDO.
+
+If GAS marks your object as garbage, that will prompt the latent action manager
+to remove its latent actions when it next ticks, including the one that drives
+the coroutine behind the scenes.
+Since the coroutine can no longer run in this case, it is force canceled,
+ignoring FCancellationGuards.
+`!IsValid(this)` will be observable, e.g., in destructors called on local
+variables inside the coroutine, or other guards such as ON_SCOPE_EXIT.
+`Latent::FOnObjectDestroyed` responds to this kind of forced cancellation.
+
+If the coroutine is not on the game thread when it's force canceled, the
+cancellation's processing is delayed until the next `co_await` as usual, but it
+is possible that `this` is deleted by the time that happens.
+
+To better align with the engine's expectations and match how BP abilites/tasks
+would behave, FAbilityCoroutine's cancellation processing slightly differs from
+a regular latent TCoroutine's.
+
+In case of a forced cancellation:
+* UUE5CoroGameplayAbility does not call EndAbility on itself.
+* UUE5CoroAbilityTask does not call EndTask, Succeeded, or Failed.
+* UUE5CoroSimpleAbilityTask doesn't Broadcast any of its delegates.
