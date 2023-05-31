@@ -50,6 +50,21 @@ You're responsible for interacting correctly with ExecuteAbility from BP.
 The BlueprintImplementableEvents for ActivateAbility(FromEvent) will not be
 called.
 
+### Task awaiter
+
+`UUE5CoroGameplayAbility::Task` takes a UObject* with a single
+BlueprintAssignable delegate and wraps it in an awaitable object.
+`UGameplayTask`s and `UBlueprintAsyncActionBase`s are automatically activated.
+
+This wrapper is locked to the game thread, responds to cancellations
+immediately, but also discards parameters.
+It is the preferred way to await single-delegate tasks from a gameplay ability
+coroutine.
+Consider using something like `Latent::UntilDelegate` instead of co_awaiting the
+delegate directly if you need to deal with multiple UPROPERTYs.
+co_awaiting the delegate is fully supported, but it can lead to memory leaks if
+it never activates.
+
 ## Ability tasks
 
 `UUE5CoroAbilityTask` lets you implement an ability task with a coroutine.

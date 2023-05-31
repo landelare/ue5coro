@@ -30,6 +30,8 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5CoroGAS/UE5CoroGameplayAbility.h"
+#include "GameplayTask.h"
+#include "Kismet/BlueprintAsyncActionBase.h"
 #include "UE5CoroTaskCallbackTarget.h"
 #include "UE5Coro/LatentAwaiters.h"
 
@@ -97,6 +99,13 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object)
 	FScriptDelegate Delegate;
 	Delegate.BindUFunction(Target, "Execute");
 	DelegateProp->AddDelegate(std::move(Delegate), Object);
+
+	// Activate some well-known base classes
+	if (auto* Task = Cast<UGameplayTask>(Object))
+		Task->ReadyForActivation();
+	else if (auto* Action = Cast<UBlueprintAsyncActionBase>(Object))
+		Action->Activate();
+
 	return FLatentAwaiter(new TStrongObjectPtr(Target), &ShouldResumeTask);
 }
 

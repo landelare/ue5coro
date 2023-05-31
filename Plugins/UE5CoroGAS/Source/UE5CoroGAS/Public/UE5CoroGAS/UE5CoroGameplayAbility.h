@@ -78,7 +78,9 @@ protected:
 
 	/** Given a UObject* with a single BlueprintAssignable UPROPERTY,
 	 *  the return value of this function lets you co_await that delegate safely,
-	 *  handling cancellations even if the delegate never Broadcasts. */
+	 *  handling cancellations even if the delegate never Broadcasts.<br>
+	 *  If the parameter is a UGameplayTask or UBlueprintAsyncActionBase, it
+	 *  will be activated before returning. */
 	UE5Coro::Private::FLatentAwaiter Task(UObject*);
 
 private:
