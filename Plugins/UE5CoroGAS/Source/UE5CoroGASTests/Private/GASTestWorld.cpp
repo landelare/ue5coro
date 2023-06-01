@@ -29,64 +29,36 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
+#include "GASTestWorld.h"
+#include "AbilitySystemComponent.h"
+#include "UE5CoroGASTestAvatar.h"
 
-#include "CoreMinimal.h"
-#include "UE5Coro/Definitions.h"
-#include <functional>
-#include "UE5Coro/AsyncCoroutine.h"
-#include "UE5Coro/UE5CoroSubsystem.h"
+using namespace UE5Coro::Private::Test;
 
-#define CORO [&](T...) -> FAsyncCoroutine
-#define CORO_R(Type) [&](T...) -> TCoroutine<Type>
-#define IF_CORO_LATENT if constexpr (sizeof...(T) == 1)
-#define IF_NOT_CORO_LATENT if constexpr (sizeof...(T) != 1)
-
-namespace UE5Coro::Private::Test
+FGASTestWorld::FGASTestWorld()
 {
-class FTestWorld
+	checkf(!bTestWorldActive,
+	       TEXT("Internal error: This test world type is not reentrant"));
+	bTestWorldActive = true;
+
+	Avatar = (*this)->SpawnActor<AUE5CoroGASTestAvatar>();
+	Controller = (*this)->SpawnActor<APlayerController>();
+	Controller->Possess(Avatar);
+	Tick();
+}
+
+FGASTestWorld::~FGASTestWorld()
 {
-	UWorld* World;
+	Avatar->Destroy();
+	Controller->Destroy();
+	bTestWorldActive = false;
+}
 
-	UWorld* PrevWorld;
-	decltype(GFrameCounter) OldFrameCounter;
-
-public:
-	FTestWorld();
-	~FTestWorld();
-
-	UWorld* operator->() const { return World; }
-
-	void Tick(float DeltaSeconds = 0.125);
-	void EndTick();
-
-	template<typename T>
-	std::invoke_result_t<T> Run(T Fn)
-	{
-		// Extend the lifetime of Fn's lambda captures until it's complete
-		auto* Copy = new T(std::move(Fn));
-		auto Coro = (*Copy)();
-		Coro.ContinueWith([=] { delete Copy; });
-		return Coro;
-	}
-
-	template<typename T>
-	std::invoke_result_t<T, FLatentActionInfo> Run(T Fn)
-	{
-		auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
-		auto LatentInfo = Sys->MakeLatentInfo();
-
-		auto* Copy = new T(std::move(Fn));
-		auto Coro = (*Copy)(LatentInfo);
-		Coro.ContinueWith([=] { delete Copy; });
-		return Coro;
-	}
-};
-
-class FTestHelper
+void FGASTestWorld::Run(UClass* Class)
 {
-public:
-	static void PumpGameThread(FTestWorld& World,
-	                           std::function<bool()> ExitCondition);
-};
+	auto* ASC = Avatar->GetAbilitySystemComponent();
+	FGameplayAbilitySpec Spec(Class);
+	ASC->GiveAbility(Spec);
+	ASC->TryActivateAbility(Spec.Handle);
+	EndTick();
 }

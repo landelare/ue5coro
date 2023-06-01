@@ -21,6 +21,11 @@
 			"Name": "UE5CoroGAS",
 			"Type": "Runtime",
 			"LoadingPhase": "PreDefault"
+		},
+		{
+			"Name": "UE5CoroGASTests",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PreDefault"
 		}
 	],
 	"Plugins": [
