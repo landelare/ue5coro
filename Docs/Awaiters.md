@@ -4,6 +4,10 @@ This page gives an overview of the various awaiters that come with the plugin.
 This is not meant to be an exhaustive documentation, read the comments in the
 header files for that.
 
+If you're not using the recommended `#include "UE5Coro.h"`, some of these
+features require an extra #include (usually `"UE5Coro/AsyncAwaiters.h"`) that's
+not immediately apparent.
+
 ## Aggregates
 
 UE5Coro::WhenAny and WhenAll let you combine any type of co_awaitable objects

@@ -56,8 +56,11 @@ edit TargetRules.cs in the engine instead so that this flag is true by default.
 
 `#include "UE5Coro.h"` gives you every functionality that UE5Coro provides,
 `#include "UE5CoroGAS.h"` gives you all the UE5CoroGAS functionality, etc.
+Using these meta-headers is the recommended and supported approach.
 You may opt to IWYU the various smaller headers, but no guidance is given as to
 which feature requires which header.
+IDEs most commonly used with Unreal Engine are known to fail to suggest the
+correct header for some features.
 
 Click these links for the detailed description of the main features provided
 by these plugins, or keep reading for a few highlights.
