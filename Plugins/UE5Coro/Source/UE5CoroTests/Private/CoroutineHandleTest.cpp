@@ -164,7 +164,7 @@ void DoTest(FAutomationTestBase& Test)
 
 		// Waiting itself has to run on another thread.
 		// In the latent case, not doing this would deadlock the game thread.
-		std::atomic<bool> bDone;
+		std::atomic<bool> bDone = false;
 		World.Run(CORO
 		{
 			co_await Async::MoveToNewThread();
