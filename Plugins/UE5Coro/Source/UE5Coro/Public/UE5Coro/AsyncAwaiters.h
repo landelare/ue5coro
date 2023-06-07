@@ -206,7 +206,10 @@ struct TAwaitTransform<P, T, std::enable_if_t<TIsDelegate<T>>>
 	static constexpr auto ExecutePtr(T)
 	{
 		if constexpr (TIsSparseDelegate<T>)
-			return &std::remove_pointer_t<decltype(std::declval<T>().Get())>::Broadcast;
+		{
+			using Ptr = decltype(std::declval<T>().GetShared().Get());
+			return &std::remove_pointer_t<Ptr>::Broadcast;
+		}
 		else if constexpr (TIsMulticastDelegate<T>)
 			return &T::Broadcast;
 		else

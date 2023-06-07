@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <map>
+#include <unordered_map>
 #include "TestWorld.h"
 #include "Misc/AutomationTest.h"
 #include "UE5CoroTestObject.h"

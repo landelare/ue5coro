@@ -33,6 +33,7 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
+#include <variant>
 #include "UE5Coro/AsyncCoroutine.h"
 
 class UUE5CoroAnimCallbackTarget;

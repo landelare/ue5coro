@@ -38,14 +38,14 @@ template<typename V>
 auto TCoroutine<>::FromResult(V&& Value)
 	-> TCoroutine<std::remove_cv_t<std::remove_reference_t<V>>>
 {
-	co_return Value;
+	co_return std::forward<V>(Value);
 }
 
 // TCoroutine<T> matches T exactly
 template<typename T>
 TCoroutine<T> TCoroutine<T>::FromResult(T Value)
 {
-	co_return Value;
+	co_return std::move(Value);
 }
 
 template<typename T>
