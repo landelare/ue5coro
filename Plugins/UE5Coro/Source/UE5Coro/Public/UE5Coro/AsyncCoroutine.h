@@ -207,6 +207,9 @@ class [[nodiscard]] UE5CORO_API FPromise
 protected:
 	std::shared_ptr<FPromiseExtras> Extras;
 	TArray<std::function<void(void*)>> OnCompleted;
+#if !PLATFORM_EXCEPTIONS_DISABLED
+	std::atomic<bool> bUnhandledException = false;
+#endif
 
 	explicit FPromise(std::shared_ptr<FPromiseExtras>, const TCHAR* PromiseType);
 	UE_NONCOPYABLE(FPromise);

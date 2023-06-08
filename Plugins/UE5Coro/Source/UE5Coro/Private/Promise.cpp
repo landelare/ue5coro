@@ -67,7 +67,11 @@ FPromise::~FPromise()
 	checkf(!Extras->Lock.TryLock(), TEXT("Internal error: lock not held"));
 	checkf(!Extras->IsComplete(),
 	       TEXT("Unexpected late/double coroutine destruction"));
+#if PLATFORM_EXCEPTIONS_DISABLED
 	Extras->bWasSuccessful = !GDestroyedEarly;
+#else
+	Extras->bWasSuccessful = !GDestroyedEarly && !bUnhandledException;
+#endif
 	GDestroyedEarly = false;
 
 	// The coroutine is considered completed NOW
@@ -164,6 +168,7 @@ void FPromise::unhandled_exception()
 #if PLATFORM_EXCEPTIONS_DISABLED
 	check(!"Exceptions are not supported");
 #else
+	bUnhandledException = true;
 	throw;
 #endif
 }

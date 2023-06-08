@@ -88,7 +88,8 @@ public:
 	bool Wait(uint32 WaitTimeMilliseconds = MAX_uint32,
 	          bool bIgnoreThreadIdleStats = false) const;
 
-	/** Returns if the coroutine has run to completion or faulted. */
+	/** Returns true if the coroutine has ended for any reason, including normal
+	 *  completion, cancellation, or an unhandled exception. */
 	[[nodiscard]] bool IsDone() const;
 
 	/** Returns true if the coroutine ran to completion successfully.

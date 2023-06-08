@@ -85,14 +85,18 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Generator unexpected exception"), false);
 	}
 
+	std::optional<TCoroutine<>> Coro;
 	try
 	{
 		auto Fn = [&]() -> TCoroutine<>
 		{
 			co_await stdcoro::suspend_never();
+			Coro = static_cast<TCoroutinePromise<void, FAsyncPromise>&>(
+				FPromise::Current()).get_return_object();
 			throw FTestException("async");
 		};
-		auto Coro = Fn();
+		Coro = std::nullopt;
+		Fn();
 		TestTrue(TEXT("Async unreachable code"), false);
 	}
 	catch (const FTestException& Ex)
@@ -103,16 +107,22 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 	{
 		TestTrue(TEXT("Async unexpected exception"), false);
 	}
+	TestTrue(TEXT("Handle captured"), Coro.has_value());
+	TestTrue(TEXT("Done"), Coro->IsDone());
+	TestFalse(TEXT("Not successful"), Coro->WasSuccessful());
 
 	try
 	{
 		auto Fn = [&](FLatentActionInfo) -> TCoroutine<>
 		{
 			co_await stdcoro::suspend_never();
+			Coro = static_cast<TCoroutinePromise<void, FLatentPromise>&>(
+				FPromise::Current()).get_return_object();
 			throw FTestException("latent");
 		};
 		FLatentActionInfo Info(0, 0, nullptr, NewObject<UUE5CoroTestObject>());
-		auto Coro = Fn(Info);
+		Coro = std::nullopt;
+		Fn(Info);
 		TestTrue(TEXT("Latent unreachable code"), false);
 	}
 	catch (const FTestException& Ex)
@@ -123,6 +133,9 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 	{
 		TestTrue(TEXT("Latent unexpected exception"), false);
 	}
+	TestTrue(TEXT("Handle captured"), Coro.has_value());
+	TestTrue(TEXT("Done"), Coro->IsDone());
+	TestFalse(TEXT("Not successful"), Coro->WasSuccessful());
 
 	// Check if FLatentPromise detached correctly
 	World.Tick();
