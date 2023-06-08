@@ -11,8 +11,11 @@
 		<DisplayString>{{{DebugPromiseType,sub}, ID={DebugID}, Name={DebugName,sub}}}</DisplayString>
 		<Expand>
 			<Item Name="[Promise type]" Optional="true">DebugPromiseType,sub</Item>
-			<Item Name="[Debug ID]" Optional="true">DebugID</Item>
+			<Item Name="DebugID" Optional="true">DebugID</Item>
 			<Item Name="DebugName" Optional="true">DebugName,su</Item>
+			<Item Name="bWasSuccessful" Optional="true">bWasSuccessful</Item>
+			<Item Name="[Lock held]" Optional="true">Lock.bFlag</Item>
+			<Item Name="[Promise or retval]" Optional="true">Promise</Item>
 		</Expand>
 	</Type>
 </AutoVisualizer>
