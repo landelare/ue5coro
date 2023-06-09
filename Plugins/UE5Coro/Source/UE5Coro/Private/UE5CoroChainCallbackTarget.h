@@ -56,7 +56,7 @@ public:
 
 	/** Signals the coroutine suspended with this linkage that it may resume. */
 	UFUNCTION()
-	void ExecuteLink(int32 Link);
+	void Core(int32 Link);
 
 #pragma region FTickableGameObject overrides
 	virtual ETickableTickType GetTickableTickType() const override;

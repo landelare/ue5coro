@@ -455,14 +455,14 @@ auto UE5Coro::Latent::UntilDelegate(T& Delegate)
 		if constexpr (TIsDynamicDelegate<T>)
 		{
 			FScriptDelegate D;
-			D.BindUFunction(Target, "Execute");
+			D.BindUFunction(Target, NAME_Core);
 			Delegate.Add(D);
 		}
 		else
-			Delegate.AddUFunction(Target, "Execute");
+			Delegate.AddUFunction(Target, NAME_Core);
 	}
 	else
-		Delegate.BindUFunction(Target, "Execute");
+		Delegate.BindUFunction(Target, NAME_Core);
 
 	return std::move(Awaiter);
 }

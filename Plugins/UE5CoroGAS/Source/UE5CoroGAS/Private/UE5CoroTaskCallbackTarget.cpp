@@ -31,7 +31,7 @@
 
 #include "UE5CoroTaskCallbackTarget.h"
 
-void UUE5CoroTaskCallbackTarget::Execute()
+void UUE5CoroTaskCallbackTarget::Core()
 {
 	bExecuted = true;
 }

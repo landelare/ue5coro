@@ -59,10 +59,11 @@ public:
 	std::function<void()> Callback;
 
 	UFUNCTION()
-	void RunCallback() { Callback(); }
-
-	UFUNCTION()
-	void Empty() { }
+	void Core()
+	{
+		if (Callback)
+			Callback();
+	}
 
 	virtual UWorld* GetWorld() const override { return GWorld; }
 

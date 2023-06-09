@@ -346,11 +346,11 @@ public:
 		if constexpr (TIsMulticastDelegate<T>)
 		{
 			FScriptDelegate Delegate;
-			Delegate.BindUFunction(Target, "Execute");
+			Delegate.BindUFunction(Target, NAME_Core);
 			InDelegate.Add(Delegate);
 		}
 		else
-			InDelegate.BindUFunction(Target, "Execute");
+			InDelegate.BindUFunction(Target, NAME_Core);
 	}
 	UE_NONCOPYABLE(TDynamicDelegateAwaiter);
 

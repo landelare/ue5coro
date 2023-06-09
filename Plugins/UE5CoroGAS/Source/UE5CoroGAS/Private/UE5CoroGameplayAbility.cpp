@@ -97,7 +97,7 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object)
 
 	auto* Target = NewObject<UUE5CoroTaskCallbackTarget>(this);
 	FScriptDelegate Delegate;
-	Delegate.BindUFunction(Target, "Execute");
+	Delegate.BindUFunction(Target, NAME_Core);
 	DelegateProp->AddDelegate(std::move(Delegate), Object);
 
 	// Activate some well-known base classes

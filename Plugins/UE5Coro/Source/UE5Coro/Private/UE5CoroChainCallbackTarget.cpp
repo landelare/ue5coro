@@ -47,7 +47,7 @@ void UUE5CoroChainCallbackTarget::Deactivate()
 {
 	check(IsInGameThread());
 	checkf(State, TEXT("Unexpected deactivation while not active"));
-	// Leave ExpectedLink stale for the check in ExecuteLink
+	// Leave ExpectedLink stale for the check in Core()
 	if (!State->Release())
 		State = nullptr; // The other side is not interested anymore
 }
@@ -59,7 +59,7 @@ int32 UUE5CoroChainCallbackTarget::GetExpectedLink() const
 	return ExpectedLink;
 }
 
-void UUE5CoroChainCallbackTarget::ExecuteLink(int32 Link)
+void UUE5CoroChainCallbackTarget::Core(int32 Link)
 {
 	check(IsInGameThread());
 	checkf(Link == ExpectedLink, TEXT("Unexpected linkage"));

@@ -80,7 +80,7 @@ bool FLatentCallbackTest::RunTest(const FString& Parameters)
 		bCanceled = false;
 		auto* Object = NewObject<UUE5CoroTestObject>();
 		Object->ObjectDestroyedTest(State, bAbnormal, bCanceled,
-		                            {0, 0, TEXT("Empty"), Object});
+		                            {0, 0, TEXT("Core"), Object});
 		World.EndTick();
 		TestEqual(TEXT("Initial state"), State, 1);
 		for (int i = 0; i < 10; ++i)
@@ -100,7 +100,7 @@ bool FLatentCallbackTest::RunTest(const FString& Parameters)
 		bCanceled = false;
 		auto* Object = NewObject<UUE5CoroTestObject>();
 		Object->ObjectDestroyedTest(State, bAbnormal, bCanceled,
-		                            {0, 0, TEXT("Empty"), Object});
+		                            {0, 0, TEXT("Core"), Object});
 		TestEqual(TEXT("Initial state"), State, 1);
 		auto& LAM = World->GetLatentActionManager();
 		LAM.RemoveActionsForObject(Object);
@@ -116,7 +116,7 @@ bool FLatentCallbackTest::RunTest(const FString& Parameters)
 		bCanceled = false;
 		auto* Object = NewObject<UUE5CoroTestObject>();
 		Object->ObjectDestroyedTest(State, bAbnormal, bCanceled,
-		                            {0, 0, TEXT("Empty"), Object});
+		                            {0, 0, TEXT("Core"), Object});
 		TestEqual(TEXT("Initial state"), State, 1);
 		Object->MarkAsGarbage();
 		CollectGarbage(RF_NoFlags);

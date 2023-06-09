@@ -65,13 +65,13 @@ public:
 	void CancelResume();
 
 #pragma region Callbacks
+	// These function names are chosen to match predefined FNames
 	UFUNCTION()
-	void NotifyCallback();
+	void Core(); // void
 	UFUNCTION()
-	void MontageCallbackBool(UAnimMontage* Montage, bool bInterrupted);
+	void BoolProperty(UAnimMontage* Montage, bool bInterrupted);
 	UFUNCTION()
-	void MontageCallbackNameAndPayload(
-		FName NotifyName, const FBranchingPointNotifyPayload& Payload);
+	void NameProperty(FName NotifyName, const FBranchingPointNotifyPayload& Payload);
 #pragma endregion
 
 #pragma region FTickableGameObject overrides

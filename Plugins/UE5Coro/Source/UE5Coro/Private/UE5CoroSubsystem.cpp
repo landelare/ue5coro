@@ -85,7 +85,7 @@ FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo(FTwoLives* State)
 	auto* Target = NewObject<UUE5CoroChainCallbackTarget>(this);
 	Target->Activate(Linkage, State);
 	ChainCallbackTargets.Add(Linkage, Target);
-	return {Linkage, Linkage, TEXT("ExecuteLink"), Target};
+	return {Linkage, Linkage, TEXT("Core"), Target};
 }
 
 void UUE5CoroSubsystem::Deinitialize()

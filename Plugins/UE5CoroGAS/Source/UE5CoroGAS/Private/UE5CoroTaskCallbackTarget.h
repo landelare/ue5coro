@@ -44,5 +44,5 @@ public:
 	bool bExecuted = false;
 
 	UFUNCTION()
-	void Execute();
+	void Core();
 };

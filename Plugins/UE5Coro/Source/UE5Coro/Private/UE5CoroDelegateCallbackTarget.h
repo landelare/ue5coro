@@ -48,5 +48,5 @@ public:
 	virtual void ProcessEvent(UFunction*, void*) override;
 
 	UFUNCTION()
-	void Execute();
+	void Core();
 };

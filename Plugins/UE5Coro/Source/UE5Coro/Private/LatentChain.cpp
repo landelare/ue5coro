@@ -54,6 +54,6 @@ bool FLatentChainAwaiter::await_resume()
 	// This function being called implies that there's a reference on State.
 	const int& UserData = static_cast<FTwoLives*>(State)->UserData;
 	checkf(UserData == 0 || UserData == 1, TEXT("Unexpected user data"));
-	// ExecuteLink sets this, otherwise it's 0. This is the only usage currently.
+	// Core() sets this, otherwise it's 0. This is the only usage currently.
 	return UserData == 1;
 }

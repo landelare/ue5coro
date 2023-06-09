@@ -74,7 +74,7 @@ void UUE5CoroAnimCallbackTarget::ListenForMontageEvent(UAnimInstance* Instance,
 	       TEXT("Internal error: anim montage event without anim instance"));
 	WeakInstance = Instance;
 	auto Callback = FOnMontageEnded::CreateUObject(
-		this, &ThisClass::MontageCallbackBool);
+		this, &ThisClass::BoolProperty);
 	if (bEnd)
 		Instance->Montage_SetEndDelegate(Callback, Montage);
 	else
@@ -98,7 +98,7 @@ void UUE5CoroAnimCallbackTarget::ListenForNotify(UAnimInstance* Instance,
 	auto& ExternalNotifyHandlers = Instance->*GExternalNotifyHandlersPtr;
 	FName HandlerName = *(TEXT("AnimNotify_") + NotifyName.ToString());
 	auto& Delegate = ExternalNotifyHandlers.FindOrAdd(HandlerName);
-	Delegate.AddUObject(this, &ThisClass::NotifyCallback);
+	Delegate.AddUObject(this, &ThisClass::Core);
 }
 
 void UUE5CoroAnimCallbackTarget::ListenForPlayMontageNotify(
@@ -119,7 +119,7 @@ void UUE5CoroAnimCallbackTarget::ListenForPlayMontageNotify(
 
 	(bEnd ? Instance->OnPlayMontageNotifyEnd
 	      : Instance->OnPlayMontageNotifyBegin)
-		.AddDynamic(this, &ThisClass::MontageCallbackNameAndPayload);
+		.AddDynamic(this, &ThisClass::NameProperty);
 }
 
 void UUE5CoroAnimCallbackTarget::RequestResume(FPromise& InPromise)
@@ -139,8 +139,16 @@ void UUE5CoroAnimCallbackTarget::CancelResume()
 	Promise = nullptr;
 }
 
-void UUE5CoroAnimCallbackTarget::MontageCallbackBool(UAnimMontage* Montage,
-                                                     bool bInterrupted)
+void UUE5CoroAnimCallbackTarget::Core()
+{
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: expected notify callback on game thread"));
+
+	Result = true; // This is for the void awaiter
+	TryResume();
+}
+
+void UUE5CoroAnimCallbackTarget::BoolProperty(UAnimMontage*, bool bInterrupted)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Internal error: expected montage callback on game thread"));
@@ -149,7 +157,7 @@ void UUE5CoroAnimCallbackTarget::MontageCallbackBool(UAnimMontage* Montage,
 	TryResume();
 }
 
-void UUE5CoroAnimCallbackTarget::MontageCallbackNameAndPayload(
+void UUE5CoroAnimCallbackTarget::NameProperty(
 	FName NotifyName, const FBranchingPointNotifyPayload& Payload)
 {
 	checkf(IsInGameThread(),
@@ -167,15 +175,6 @@ void UUE5CoroAnimCallbackTarget::MontageCallbackNameAndPayload(
 		Result = &Payload;
 	else
 		Result = FPayloadTuple(NotifyName, &Payload);
-	TryResume();
-}
-
-void UUE5CoroAnimCallbackTarget::NotifyCallback()
-{
-	checkf(IsInGameThread(),
-	       TEXT("Internal error: expected notify callback on game thread"));
-
-	Result = true; // This is for the void awaiter
 	TryResume();
 }
 

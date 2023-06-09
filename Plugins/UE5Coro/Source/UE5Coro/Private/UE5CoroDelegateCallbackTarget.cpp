@@ -44,7 +44,7 @@ void UUE5CoroDelegateCallbackTarget::ProcessEvent(UFunction*, void* Parms)
 	MarkAsGarbage(); // Prevent further calls from dynamic delegates
 }
 
-void UUE5CoroDelegateCallbackTarget::Execute()
+void UUE5CoroDelegateCallbackTarget::Core()
 {
 	check(!"Internal error: This function should never run");
 }

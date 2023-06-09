@@ -216,7 +216,7 @@ void DoTest(FAutomationTestBase& Test)
 			// Unconditionally move to the GT, ContinueWithWeak is on a UObject
 			co_await Async::MoveToGameThread();
 		});
-		Coro.ContinueWithWeak(Object.Get(), &UUE5CoroTestObject::RunCallback);
+		Coro.ContinueWithWeak(Object.Get(), &UUE5CoroTestObject::Core);
 		Test.TestFalse(TEXT("Not triggered yet"), CoroToTest->Wait(0));
 		TestToCoro->Trigger();
 		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
