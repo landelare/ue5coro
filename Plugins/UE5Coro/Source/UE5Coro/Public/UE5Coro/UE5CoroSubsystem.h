@@ -49,7 +49,7 @@ public:
 	bool Release(); // Dangerous! Only call externally exactly once!
 
 	// Generic implementation for FLatentAwaiter
-	static bool ShouldResume(void*& State, bool bCleanup);
+	static bool ShouldResume(void* State, bool bCleanup);
 };
 }
 

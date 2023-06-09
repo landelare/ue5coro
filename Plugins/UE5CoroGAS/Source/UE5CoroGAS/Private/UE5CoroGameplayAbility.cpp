@@ -187,7 +187,7 @@ void UUE5CoroGameplayAbility::CoroutineStarting(TAbilityPromise<ThisClass>* Prom
 	Activations->Add(GCurrentPredictionKey, Promise);
 }
 
-bool UUE5CoroGameplayAbility::ShouldResumeTask(void*& State, bool bCleanup)
+bool UUE5CoroGameplayAbility::ShouldResumeTask(void* State, bool bCleanup)
 {
 	auto* Ptr = static_cast<TStrongObjectPtr<UUE5CoroTaskCallbackTarget>*>(State);
 	if (UNLIKELY(bCleanup))

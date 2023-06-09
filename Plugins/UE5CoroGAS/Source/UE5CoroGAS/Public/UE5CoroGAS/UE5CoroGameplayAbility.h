@@ -98,5 +98,5 @@ private:
 
 	void CoroutineStarting(UE5Coro::Private::TAbilityPromise<ThisClass>*);
 
-	static bool ShouldResumeTask(void*&, bool);
+	static bool ShouldResumeTask(void*, bool);
 };

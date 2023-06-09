@@ -38,13 +38,13 @@ using namespace UE5Coro::Private;
 
 namespace
 {
-bool WaitUntilFrame(void*& State, bool)
+bool WaitUntilFrame(void* State, bool)
 {
 	return GFrameCounter >= reinterpret_cast<uint64>(State);
 }
 
 template<auto GetTime>
-bool WaitUntilTime(void*& State, bool bCleanup)
+bool WaitUntilTime(void* State, bool bCleanup)
 {
 	// Don't attempt to access GWorld in this case, it could be nullptr
 	if (UNLIKELY(bCleanup))
@@ -56,7 +56,7 @@ bool WaitUntilTime(void*& State, bool bCleanup)
 	return (GWorld->*GetTime)() >= TargetTime;
 }
 
-bool WaitUntilPredicate(void*& State, bool bCleanup)
+bool WaitUntilPredicate(void* State, bool bCleanup)
 {
 	auto* Function = static_cast<std::function<bool()>*>(State);
 	if (UNLIKELY(bCleanup))
@@ -101,7 +101,7 @@ public:
 		});
 	}
 
-	static bool ShouldResume(void*& State, bool bCleanup)
+	static bool ShouldResume(void* State, bool bCleanup)
 	{
 		auto& This = *static_cast<std::shared_ptr<FUntilDelegateState>*>(State);
 		if (UNLIKELY(bCleanup))

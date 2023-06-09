@@ -47,7 +47,7 @@ bool FTwoLives::Release()
 	return true;
 }
 
-bool FTwoLives::ShouldResume(void*& State, bool bCleanup)
+bool FTwoLives::ShouldResume(void* State, bool bCleanup)
 {
 	auto* This = static_cast<FTwoLives*>(State);
 	if (UNLIKELY(bCleanup))

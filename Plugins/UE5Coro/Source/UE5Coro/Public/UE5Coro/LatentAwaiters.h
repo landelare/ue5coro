@@ -315,10 +315,10 @@ class [[nodiscard]] UE5CORO_API FLatentAwaiter // not TAwaiter
 
 protected:
 	void* State;
-	bool (*Resume)(void*& State, bool bCleanup);
+	bool (*Resume)(void* State, bool bCleanup);
 
 public:
-	explicit FLatentAwaiter(void* State, bool (*Resume)(void*&, bool)) noexcept
+	explicit FLatentAwaiter(void* State, bool (*Resume)(void*, bool)) noexcept
 		: State(State), Resume(Resume) { }
 	FLatentAwaiter(const FLatentAwaiter&) = delete;
 	FLatentAwaiter(FLatentAwaiter&&) noexcept;

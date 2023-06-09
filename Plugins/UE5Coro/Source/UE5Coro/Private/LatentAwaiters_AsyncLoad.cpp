@@ -107,7 +107,7 @@ using FLatentLoader = TLatentLoader<FStreamableManager, FSoftObjectPath>;
 using FPrimaryLoader = TLatentLoader<UAssetManager&, FPrimaryAssetId>;
 
 template<typename T>
-bool ShouldResume(void*& Loader, bool bCleanup)
+bool ShouldResume(void* Loader, bool bCleanup)
 {
 	auto* This = static_cast<T*>(Loader);
 

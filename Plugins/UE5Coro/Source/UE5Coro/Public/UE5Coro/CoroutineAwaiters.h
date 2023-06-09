@@ -68,7 +68,7 @@ public:
 };
 
 template<typename T>
-bool ShouldResumeLatentCoroutine(void*& State, bool bCleanup)
+bool ShouldResumeLatentCoroutine(void* State, bool bCleanup)
 {
 	auto* This = static_cast<TCoroutine<T>*>(State);
 	if (UNLIKELY(bCleanup))
