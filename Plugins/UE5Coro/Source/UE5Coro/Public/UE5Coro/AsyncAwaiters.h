@@ -85,6 +85,10 @@ UE5CORO_API Private::FNewThreadAwaiter MoveToNewThread(
 
 namespace UE5Coro::Private
 {
+// Bits used to identify a kind of thread, without the scheduling flags
+constexpr auto ThreadTypeMask = ENamedThreads::ThreadIndexMask |
+                                ENamedThreads::ThreadPriorityMask;
+
 class [[nodiscard]] UE5CORO_API FAsyncAwaiter : public TAwaiter<FAsyncAwaiter>
 {
 	ENamedThreads::Type Thread;

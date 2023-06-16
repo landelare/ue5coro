@@ -35,13 +35,26 @@
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
 
+namespace
+{
+ENamedThreads::Type ThreadForRequest(const FHttpRequestRef& Request)
+{
+#if ENGINE_MINOR_VERSION >= 3
+	if (Request->GetDelegateThreadPolicy() ==
+	    EHttpRequestDelegateThreadPolicy::CompleteOnHttpThread)
+		return ENamedThreads::UnusedAnchor;
+#endif
+	return FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
+}
+}
+
 FHttpAwaiter Http::ProcessAsync(FHttpRequestRef Request)
 {
 	return FHttpAwaiter(std::move(Request));
 }
 
 FHttpAwaiter::FState::FState(FHttpRequestRef&& Request)
-	: Thread(FTaskGraphInterface::Get().GetCurrentThreadIfKnown())
+	: Thread(ThreadForRequest(Request))
 	, Request(std::move(Request))
 {
 }
@@ -83,12 +96,15 @@ void FHttpAwaiter::Suspend(FPromise& Promise)
 
 void FHttpAwaiter::FState::Resume()
 {
-	// Don't needlessly dispatch AsyncTasks to the GT from the GT
-	ensureMsgf(IsInGameThread(),
+	// The default HTTP thread policy is to resume on the GT
+	ensureMsgf(Thread == ENamedThreads::UnusedAnchor || IsInGameThread(),
 	           TEXT("Internal error: expected HTTP callback on the game thread"));
 	// leave bSuspended true to prevent any further suspensions (not co_awaits)
 
-	if (Thread == ENamedThreads::GameThread)
+	// Fast path if the target thread is the current thread
+	if (auto ThisThread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
+	    Thread == ENamedThreads::UnusedAnchor || // Indicates HTTP thread
+	    (Thread & ThreadTypeMask) == (ThisThread & ThreadTypeMask))
 		Promise->Resume();
 	else
 		AsyncTask(Thread, [Promise = Promise] { Promise->Resume(); });

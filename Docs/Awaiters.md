@@ -352,6 +352,23 @@ resumes your coroutine when the request is done (including errors).
 Unlike OnProcessRequestComplete() this does **not** force you back on the game
 thread, but you can start and finish there if you wish of course.
 
+In Unreal Engine 5.3, the request's built-in delegate thread policy is
+respected, and CompleteOnHttpThread will resume the coroutine on the HTTP thread
+if the request completed asynchronously (and there is a HTTP thread on your
+platform).
+If it didn't, the coroutine resumes on the same kind of thread it started on.
+co_awaiting an already-complete request continues synchronously.
+
 The return type of this function is copyable, thread-safe, supports one
 concurrent co_await across all copies, and any number of sequential ones after
 that.
+
+The type of the co_await expression is `TTuple<FHttpResponsePtr, bool>`.
+The bool indicates success, and is retrieved from
+FHttpRequestCompleteDelegate's `bConnectedSuccessfully` parameter.
+The tuple can be used as is, or more conveniently with structured bindings:
+```c++
+using namespace UE5Coro::Http;
+
+auto [Response, bConnectedSuccessfully] = co_await ProcessAsync(Request);
+```

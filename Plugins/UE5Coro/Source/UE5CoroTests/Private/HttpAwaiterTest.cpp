@@ -57,6 +57,9 @@ void DoTest(FAutomationTestBase& Test)
 {
 	FTestWorld World;
 
+	// Unsuccessful requests up to 5.2 have responses, 5.3 changed it to nullptr
+	constexpr bool bExpectResponse = ENGINE_MINOR_VERSION <= 2;
+
 	std::atomic<bool> bDone = false;
 	World.Run(CORO
 	{
@@ -68,11 +71,11 @@ void DoTest(FAutomationTestBase& Test)
 		auto AwaiterCopy = Awaiter;
 		auto [Response, bSuccess] = co_await AwaiterCopy;
 		Test.TestFalse(TEXT("Success"), bSuccess);
-		Test.TestTrue(TEXT("Response"), static_cast<bool>(Response));
+		Test.TestEqual(TEXT("Response"), !!Response, bExpectResponse);
 		bSuccess = true;
 		Tie(Response, bSuccess) = co_await Awaiter;
 		Test.TestFalse(TEXT("Success"), bSuccess);
-		Test.TestTrue(TEXT("Response"), static_cast<bool>(Response));
+		Test.TestEqual(TEXT("Response"), !!Response, bExpectResponse);
 		bDone = true;
 	});
 	FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
@@ -90,7 +93,7 @@ void DoTest(FAutomationTestBase& Test)
 		auto [Response, bSuccess] = co_await Http::ProcessAsync(Request);
 		Test.TestFalse(TEXT("Not in game thread 2"), IsInGameThread());
 		Test.TestFalse(TEXT("Success"), bSuccess);
-		Test.TestTrue(TEXT("Response"), static_cast<bool>(Response));
+		Test.TestEqual(TEXT("Response"), !!Response, bExpectResponse);
 		FPlatformMisc::MemoryBarrier();
 		bDone = true;
 	});
@@ -107,6 +110,25 @@ void DoTest(FAutomationTestBase& Test)
 		co_await Latent::NextTick(); // Run() requires some co_await
 	});
 	World.Tick(); // Nothing to test here besides not crashing
+
+	// CompleteOnHttpThread is broken in 5.3.0.
+	// This test case passes if the HTTP thread is ticked properly.
+#if false && ENGINE_MINOR_VERSION >= 3
+	bDone = false;
+	World.Run(CORO
+	{
+		auto Request = FHttpModule::Get().CreateRequest();
+		Request->SetDelegateThreadPolicy(
+			EHttpRequestDelegateThreadPolicy::CompleteOnHttpThread);
+		Request->SetURL(TEXT(".invalid"));
+		Request->SetTimeout(0.01);
+		co_await Http::ProcessAsync(Request);
+		FPlatformMisc::MemoryBarrier();
+		Test.TestFalse(TEXT("Not GT"), IsInGameThread());
+		bDone = true;
+	});
+	FTestHelper::PumpGameThread(World, [&bDone] { return bDone.load(); });
+#endif
 }
 }
 

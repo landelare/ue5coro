@@ -63,10 +63,6 @@ public:
 
 bool FAsyncAwaiter::await_ready()
 {
-	// Bits used to identify a kind of thread, without the scheduling flags
-	constexpr auto Mask = ENamedThreads::ThreadIndexMask |
-	                      ENamedThreads::ThreadPriorityMask;
-
 	// This needs to be scheduled after the coroutine's completion regardless of
 	// the target thread
 	if (ResumeAfter.has_value() && !ResumeAfter->IsDone())
@@ -74,7 +70,7 @@ bool FAsyncAwaiter::await_ready()
 
 	// Don't move threads if we're already on the target thread
 	auto ThisThread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
-	return (ThisThread & Mask) == (Thread & Mask);
+	return (ThisThread & ThreadTypeMask) == (Thread & ThreadTypeMask);
 }
 
 void FAsyncAwaiter::Suspend(FPromise& Promise)
