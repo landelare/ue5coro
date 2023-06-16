@@ -33,6 +33,7 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
+#include "Delegates/DelegateBase.h"
 
 /******************************************************************************
  *          This file only contains private implementation details.           *
@@ -52,9 +53,9 @@ constexpr bool TIsDynamicDelegate =
 
 template<typename T>
 constexpr bool TIsMulticastDelegate =
-	std::is_base_of_v<TMulticastDelegateBase<FDefaultDelegateUserPolicy>, T> ||
+	std::is_base_of_v<FDefaultDelegateUserPolicy::FMulticastDelegateExtras, T> ||
 #if ENGINE_MINOR_VERSION >= 1
-	std::is_base_of_v<TMulticastDelegateBase<FDefaultTSDelegateUserPolicy>, T> ||
+	std::is_base_of_v<FDefaultTSDelegateUserPolicy::FMulticastDelegateExtras, T> ||
 #endif
 	std::is_base_of_v<TMulticastScriptDelegate<>, T> ||
 	// Sparse delegates are always dynamic multicast
@@ -62,9 +63,9 @@ constexpr bool TIsMulticastDelegate =
 
 template<typename T>
 constexpr bool TIsDelegate =
-	std::is_base_of_v<TDelegateBase<FDefaultDelegateUserPolicy>, T> ||
+	std::is_base_of_v<FDefaultDelegateUserPolicy::FDelegateExtras, T> ||
 #if ENGINE_MINOR_VERSION >= 1
-	std::is_base_of_v<TDelegateBase<FDefaultTSDelegateUserPolicy>, T> ||
+	std::is_base_of_v<FDefaultTSDelegateUserPolicy::FDelegateExtras, T> ||
 #endif
 	TIsDynamicDelegate<T> || TIsMulticastDelegate<T>;
 }
