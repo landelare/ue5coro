@@ -50,12 +50,7 @@ struct TWeak<T*> : std::bool_constant<std::is_convertible_v<T*, const UObject*>>
 	using ptr = std::enable_if_t<TWeak::value, T*>;
 	static strong Strengthen(const weak& Weak)
 	{
-		// Doing this correctly would require locking the private critical
-		// section of UGCObjectReferencer. For most usages, this won't matter.
-		// If you're hitting this ensure, either make the coroutine finish on
-		// the GT, or use ContinueWith (non-Weak) with your own threading code.
-		ensureMsgf(IsInGameThread(),
-		           TEXT("Warning: UObjects are inherently not thread safe"));
+		FGCScopeGuard _;
 		// There's no API to convert a weak ptr to a strong one...
 		return strong(Weak.Get()); // relying on C++17 mandatory RVO
 	}
