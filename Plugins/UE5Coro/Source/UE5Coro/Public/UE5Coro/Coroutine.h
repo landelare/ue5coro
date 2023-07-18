@@ -57,7 +57,6 @@ class UE5CORO_API TCoroutine<>
 {
 	template<typename, typename>
 	friend class Private::TCoroutinePromise;
-	friend UE5CORO_API uint32 GetTypeHash(const TCoroutine<>&) noexcept; // ADL
 	friend std::hash<TCoroutine<>>;
 
 protected:
@@ -188,6 +187,8 @@ static_assert(sizeof(TCoroutine<int>) == sizeof(TCoroutine<>));
 static_assert(std::totally_ordered<TCoroutine<>>);
 static_assert(std::totally_ordered_with<TCoroutine<>, TCoroutine<int>>);
 #endif
+
+UE5CORO_API uint32 GetTypeHash(const TCoroutine<>&) noexcept; // ADL
 }
 
 /** USTRUCT wrapper for TCoroutine<>. */
