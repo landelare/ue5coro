@@ -107,6 +107,14 @@ void DoTest(FAutomationTestBase& Test,
 		// Instanced force cancels (2), non-instanced is a regular cancel (2->3)
 		Test.TestEqual(TEXT("Canceled"), State, bInstanced ? 2 : 3);
 	}
+
+	{
+		FGASTestWorld World;
+		UUE5CoroGASTestGameplayAbility::Reset();
+		Test.TestEqual(TEXT("Clean"), State, 0);
+		World.Run(UUE5CoroGASTestGameplayAbility::StaticClass());
+	} // Force cancel by destroying the world
+	Test.TestEqual(TEXT("Canceled"), State, 2);
 }
 }
 
