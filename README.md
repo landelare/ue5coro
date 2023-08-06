@@ -50,9 +50,10 @@ The UE5Coro plugin containing core functionality is enabled by default.
 Reference the `"UE5Coro"` module from your Build.cs as you would any other
 module and `#include "UE5Coro.h"`.
 
-If you'd like to use the additional GAS integration from UE5CoroGAS, you'll
-need to manually enable that plugin and also reference `"UE5CoroGAS"` in your
-Build.cs, then `#include "UE5CoroGAS.h"`.
+Other plugins, such as UE5CoroAI, UE5CoroGAS need to be manually enabled and
+referenced normally: e.g., `"UE5CoroAI"` in Build.cs, `#include "UE5CoroAI.h"`
+in your code.
+All UE5Coro plugins follow this pattern of providing a single header.
 
 Using these meta-headers is the recommended and supported approach.
 You may opt to IWYU the various smaller headers, but no guidance is given as to
