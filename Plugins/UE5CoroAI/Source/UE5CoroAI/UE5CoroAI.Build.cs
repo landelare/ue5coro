@@ -39,6 +39,7 @@ public class UE5CoroAI : UE5CoroModuleRules
 		PublicDependencyModuleNames.AddRange(new[]
 		{
 			"AIModule",
+			"GameplayTasks",
 			"UE5Coro",
 		});
 	}

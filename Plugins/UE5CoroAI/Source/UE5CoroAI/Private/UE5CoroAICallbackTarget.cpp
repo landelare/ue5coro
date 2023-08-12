@@ -29,7 +29,47 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
+#include "UE5CoroAICallbackTarget.h"
+#include "Tasks/AITask_MoveTo.h"
 
-#include "UE5Coro/Definitions.h"
-#include "UE5CoroAI/AIAwaiters.h"
+auto UUE5CoroAICallbackTarget::SetTask(UAITask_MoveTo* InTask) -> ThisClass*
+{
+	checkf(InTask, TEXT("Internal error: Setting up null task"));
+	checkf(Task.IsExplicitlyNull(),
+	       TEXT("Internal error: reused AI callback target"));
+	Task = InTask;
+
+	struct UTaskBinder final : UAITask_MoveTo
+	{
+		void Bind(UUE5CoroAICallbackTarget* Target)
+		{
+			OnMoveFinished.AddDynamic(Target, &UUE5CoroAICallbackTarget::Core);
+			OnRequestFailed.AddDynamic(Target, &UUE5CoroAICallbackTarget::Error);
+		}
+	};
+	auto* UnlockedTask = std::launder(reinterpret_cast<UTaskBinder*>(InTask));
+	UnlockedTask->Bind(this);
+	UnlockedTask->ReadyForActivation();
+	return this;
+}
+
+auto UUE5CoroAICallbackTarget::GetResult() const
+	-> std::optional<EPathFollowingResult::Type>
+{
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: polling AI callback off the game thread"));
+	if (Task.IsStale() && !Result.has_value())
+		return EPathFollowingResult::Aborted; // Invent a result if the task died
+	return Result;
+}
+
+void UUE5CoroAICallbackTarget::Core(
+	TEnumAsByte<EPathFollowingResult::Type> InResult, AAIController*)
+{
+	Result = InResult;
+}
+
+void UUE5CoroAICallbackTarget::Error()
+{
+	Core(EPathFollowingResult::Aborted, nullptr);
+}

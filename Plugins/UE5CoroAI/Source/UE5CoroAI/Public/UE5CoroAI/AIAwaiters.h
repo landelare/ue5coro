@@ -31,5 +31,46 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
-#include "UE5CoroAI/AIAwaiters.h"
+#if !UE5CORO_CPP20
+#error UE5CoroAI does not support C++17.
+#endif
+#include <optional>
+#include "AITypes.h"
+#include "Tasks/AITask_MoveTo.h"
+#include "UE5Coro/LatentAwaiters.h"
+
+namespace UE5Coro::Private
+{
+class FMoveToAwaiter;
+}
+
+namespace UE5Coro::AI
+{
+template<typename T>
+concept TGoal = std::same_as<T, FVector> || std::same_as<T, AActor*>;
+
+/** Issues a "move to" command to the specified controller, resumes the awaiting
+ *  coroutine once it finishes.<br>
+ *  The result of the co_await expression is EPathFollowingResult. */
+UE5COROAI_API Private::FMoveToAwaiter AIMoveTo(
+	AAIController* Controller, TGoal auto Target, float AcceptanceRadius = -1,
+	EAIOptionFlag::Type StopOnOverlap = EAIOptionFlag::Default,
+	EAIOptionFlag::Type AcceptPartialPath = EAIOptionFlag::Default,
+	bool bUsePathfinding = true, bool bLockAILogic = true,
+	bool bUseContinuousGoalTracking = false,
+	EAIOptionFlag::Type ProjectGoalOnNavigation = EAIOptionFlag::Default);
+}
+
+namespace UE5Coro::Private
+{
+class [[nodiscard]] UE5COROAI_API FMoveToAwaiter : public FLatentAwaiter
+{
+public:
+	explicit FMoveToAwaiter(UAITask_MoveTo*);
+	EPathFollowingResult::Type await_resume() noexcept;
+};
+
+static_assert(sizeof(FMoveToAwaiter) == sizeof(FLatentAwaiter));
+}

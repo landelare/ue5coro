@@ -31,5 +31,29 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
-#include "UE5CoroAI/AIAwaiters.h"
+#include <optional>
+#include "Navigation/PathFollowingComponent.h"
+#include "UE5CoroAICallbackTarget.generated.h"
+
+UCLASS(Hidden)
+class UUE5CoroAICallbackTarget : public UObject
+{
+	GENERATED_BODY()
+
+	TWeakObjectPtr<class UAITask_MoveTo> Task = nullptr;
+	std::optional<EPathFollowingResult::Type> Result;
+
+public:
+	ThisClass* SetTask(UAITask_MoveTo*);
+	std::optional<EPathFollowingResult::Type> GetResult() const;
+
+private:
+	UFUNCTION()
+	void Core(TEnumAsByte<EPathFollowingResult::Type> Result,
+	          AAIController* AIController);
+
+	UFUNCTION()
+	void Error();
+};
