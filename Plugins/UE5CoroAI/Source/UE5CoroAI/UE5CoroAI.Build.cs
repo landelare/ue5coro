@@ -40,6 +40,7 @@ public class UE5CoroAI : UE5CoroModuleRules
 		{
 			"AIModule",
 			"GameplayTasks",
+			"NavigationSystem",
 			"UE5Coro",
 		});
 	}

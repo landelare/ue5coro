@@ -44,6 +44,7 @@
 namespace UE5Coro::Private
 {
 class FMoveToAwaiter;
+class FSimpleMoveToAwaiter;
 }
 
 namespace UE5Coro::AI
@@ -61,6 +62,13 @@ UE5COROAI_API Private::FMoveToAwaiter AIMoveTo(
 	bool bUsePathfinding = true, bool bLockAILogic = true,
 	bool bUseContinuousGoalTracking = false,
 	EAIOptionFlag::Type ProjectGoalOnNavigation = EAIOptionFlag::Default);
+
+/** Performs similar behavior to UAIBlueprintHelperLibrary's SimpleMoveTo,
+ *  such as injecting components into the controller, issues a "move to"
+ *  command, and resumes the awaiting coroutine once it finishes.<br>
+ *  The result of the co_await expression is FPathFollowingResult. */
+UE5COROAI_API auto SimpleMoveTo(AController* Controller, TGoal auto Target)
+	-> Private::FSimpleMoveToAwaiter;
 }
 
 namespace UE5Coro::Private
@@ -72,5 +80,24 @@ public:
 	EPathFollowingResult::Type await_resume() noexcept;
 };
 
+class [[nodiscard]] UE5COROAI_API FSimpleMoveToAwaiter : public FLatentAwaiter
+{
+	struct FComplexData
+	{
+		FAIRequestID RequestID;
+		TWeakObjectPtr<UPathFollowingComponent> PathFollow;
+		FDelegateHandle Handle;
+		std::optional<FPathFollowingResult> Result;
+		void RequestFinished(FAIRequestID, const FPathFollowingResult&);
+	};
+	static bool ShouldResume(void* State, bool bCleanup);
+
+public:
+	explicit FSimpleMoveToAwaiter(EPathFollowingResult::Type);
+	explicit FSimpleMoveToAwaiter(UPathFollowingComponent*, FAIRequestID);
+	FPathFollowingResult await_resume() noexcept;
+};
+
 static_assert(sizeof(FMoveToAwaiter) == sizeof(FLatentAwaiter));
+static_assert(sizeof(FSimpleMoveToAwaiter) == sizeof(FLatentAwaiter));
 }

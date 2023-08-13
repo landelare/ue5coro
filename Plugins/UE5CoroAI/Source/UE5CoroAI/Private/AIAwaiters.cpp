@@ -31,6 +31,7 @@
 
 #include "UE5CoroAI/AIAwaiters.h"
 #include "AIController.h"
+#include "NavigationSystem.h"
 #include "UE5CoroAICallbackTarget.h"
 
 using namespace UE5Coro;
@@ -71,6 +72,48 @@ EPathFollowingResult::Type FMoveToAwaiter::await_resume() noexcept
 	return *(*Target)->GetResult();
 }
 
+void FSimpleMoveToAwaiter::FComplexData::RequestFinished(
+	FAIRequestID InID, const FPathFollowingResult& InResult)
+{
+	if (RequestID == InID)
+		Result = InResult;
+}
+
+bool FSimpleMoveToAwaiter::ShouldResume(void* State, bool bCleanup)
+{
+	auto* Data = static_cast<FComplexData*>(State);
+	if (UNLIKELY(bCleanup))
+	{
+		if (auto* Component = Data->PathFollow.Get())
+			Component->OnRequestFinished.Remove(Data->Handle);
+		delete Data;
+		return false;
+	}
+	return Data->Result.has_value();
+}
+
+FSimpleMoveToAwaiter::FSimpleMoveToAwaiter(EPathFollowingResult::Type Result)
+	: FLatentAwaiter(new FComplexData{.Result = {Result}}, &ShouldResume)
+{
+}
+
+FSimpleMoveToAwaiter::FSimpleMoveToAwaiter(UPathFollowingComponent* PFC,
+                                           FAIRequestID ID)
+	: FLatentAwaiter(new FComplexData{.RequestID = ID, .PathFollow = PFC},
+	                 &ShouldResume)
+{
+	auto* Data = static_cast<FComplexData*>(State);
+	Data->Handle = PFC->OnRequestFinished.AddRaw(Data,
+	                                             &FComplexData::RequestFinished);
+}
+
+FPathFollowingResult FSimpleMoveToAwaiter::await_resume() noexcept
+{
+	auto* Data = static_cast<FComplexData*>(State);
+	checkf(Data->Result.has_value(), TEXT("Internal error: spurious wakeup"));
+	return *Data->Result;
+}
+
 FMoveToAwaiter AI::AIMoveTo(AAIController* Controller, TGoal auto Target,
                             float AcceptanceRadius,
                             EAIOptionFlag::Type StopOnOverlap,
@@ -107,3 +150,93 @@ template UE5COROAI_API FMoveToAwaiter AI::AIMoveTo(
 	AAIController*, AActor*, float, EAIOptionFlag::Type, EAIOptionFlag::Type,
 	bool, bool, bool, EAIOptionFlag::Type);
 
+FSimpleMoveToAwaiter AI::SimpleMoveTo(AController* Controller, TGoal auto Target)
+{
+	checkf(IsInGameThread(),
+	       TEXT("This method may only be called from the game thread"));
+	checkf(IsValid(Controller), TEXT("Attempting to move invalid controller"));
+	checkf(IsValid(Controller->GetPawn()),
+	       TEXT("Attempting to move invalid pawn"));
+	checkf(IsValid(Target), TEXT("Attempting to move to invalid target"));
+
+	auto* World = Controller->GetWorld();
+	auto* NS1 = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	checkf(IsValid(NS1), TEXT("Cannot perform move without navigation system"));
+
+	// This recreates InitNavigationControl's component injection
+	UPathFollowingComponent* PathFollow;
+	if (auto* AIC = Cast<AAIController>(Controller); IsValid(AIC))
+		PathFollow = AIC->GetPathFollowingComponent();
+	else
+	{
+		PathFollow = Controller->FindComponentByClass<UPathFollowingComponent>();
+		if (!IsValid(PathFollow))
+		{
+			PathFollow = NewObject<UPathFollowingComponent>(Controller);
+			PathFollow->RegisterComponentWithWorld(Controller->GetWorld());
+			// The original does not call AddInstanceComponent
+			PathFollow->Initialize();
+		}
+	}
+
+	// Fail instantly if the PFC can't be used
+	if (!IsValid(PathFollow) || !PathFollow->IsPathFollowingAllowed())
+		return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
+
+	FVector From = Controller->GetNavAgentLocation();
+	FVector To;
+	if constexpr (std::is_same_v<decltype(Target), AActor*>)
+		To = Target->GetActorLocation();
+	else
+		To = Target;
+
+	bool bAlreadyThere = PathFollow->HasReached(
+		To, EPathFollowingReachMode::OverlapAgentAndGoal);
+
+	// Abort the previous move if there was any
+	constexpr auto Flags = FPathFollowingResultFlags::ForcedScript |
+	                       FPathFollowingResultFlags::NewRequest;
+	if (PathFollow->GetStatus() != EPathFollowingStatus::Idle)
+		PathFollow->AbortMove(*NS1, Flags, FAIRequestID::AnyRequest,
+		                      bAlreadyThere ? EPathFollowingVelocityMode::Reset
+		                                    : EPathFollowingVelocityMode::Keep);
+
+	// Early exits for immediate failures/successes
+	ANavigationData* NavData = NS1->GetNavDataForProps(
+		Controller->GetNavAgentPropertiesRef(), From);
+	if (!IsValid(NavData))
+		return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
+
+	if (bAlreadyThere)
+	{
+		PathFollow->RequestMoveWithImmediateFinish(EPathFollowingResult::Success);
+		return FSimpleMoveToAwaiter(EPathFollowingResult::Success);
+	}
+
+	FPathFindingQuery Query(Controller, *NavData, From, To);
+	// Not calling FindPathAsync to match the original
+	FPathFindingResult Result = NS1->FindPathSync(Query);
+	if (Result.IsSuccessful())
+	{
+		if constexpr (std::is_same_v<decltype(Target), AActor*>)
+			// Matching the hardcoded constant from UAIBlueprintHelperLibrary
+			Result.Path->SetGoalActorObservation(*Target, 100);
+		FAIRequestID ID = PathFollow->RequestMove(FAIMoveRequest(To), Result.Path);
+
+		// The interesting case
+		return FSimpleMoveToAwaiter(PathFollow, ID);
+	}
+
+	if (PathFollow->GetStatus() != EPathFollowingStatus::Idle)
+	{
+		PathFollow->RequestMoveWithImmediateFinish(EPathFollowingResult::Invalid);
+		return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
+	}
+
+	return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
+}
+
+template UE5COROAI_API FSimpleMoveToAwaiter AI::SimpleMoveTo(AController*,
+                                                             FVector);
+template UE5COROAI_API FSimpleMoveToAwaiter AI::SimpleMoveTo(AController*,
+                                                             AActor*);
