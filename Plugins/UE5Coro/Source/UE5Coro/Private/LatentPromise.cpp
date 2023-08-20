@@ -155,7 +155,7 @@ public:
 void FLatentPromise::CreateLatentAction()
 {
 	// We're still scanning for the world, so use what we have right now
-	auto* WorldNow = World ? World : GWorld;
+	auto* WorldNow = IsValid(World) ? World : GWorld;
 	auto* Sys = WorldNow->GetSubsystem<UUE5CoroSubsystem>();
 	CreateLatentAction(Sys->MakeLatentInfo());
 }
@@ -173,7 +173,7 @@ void FLatentPromise::CreateLatentAction(FLatentActionInfo&& LatentInfo)
 void FLatentPromise::Init()
 {
 	// Last resort if we got this far without a world
-	if (!World)
+	if (!IsValid(World))
 	{
 		World = GWorld;
 		checkf(World, TEXT("Could not determine world for latent coroutine"));
@@ -300,6 +300,8 @@ FInitialSuspend FLatentPromise::initial_suspend()
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent coroutines may only be started on the game thread"));
+	checkf(IsValid(World),
+	       TEXT("Internal error: latent coroutine has invalid/stale world"));
 
 	auto& LAM = World->GetLatentActionManager();
 	auto* Pending = static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine);

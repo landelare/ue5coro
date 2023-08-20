@@ -46,6 +46,8 @@ FPredictionKey GCurrentPredictionKey;
 // Workaround for member IsTemplate being unreliable in destructors
 bool IsTemplate(UObject* Object)
 {
+	// Deliberately not using IsValid here
+	checkf(Object, TEXT("Internal error: corrupted object"));
 	// Outer is explicitly not checked, it might be destroyed already
 	return Object->HasAnyFlags(RF_ArchetypeObject | RF_ClassDefaultObject);
 }
@@ -78,7 +80,7 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object)
 {
 	checkf(IsInGameThread(),
 	       TEXT("This method is only available on the game thread"));
-	checkf(Object, TEXT("Attempting to await null object"));
+	checkf(IsValid(Object), TEXT("Attempting to await invalid object"));
 	// Find BlueprintAssignable properties
 	auto* Class = Object->GetClass();
 	FProperty* Property = nullptr;
@@ -100,7 +102,7 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object)
 	Delegate.BindUFunction(Target, NAME_Core);
 	DelegateProp->AddDelegate(std::move(Delegate), Object);
 
-	// Activate some well-known base classes
+	// Activate some well-known base classes (IsValid was checked above)
 	if (auto* Task = Cast<UGameplayTask>(Object))
 		Task->ReadyForActivation();
 	else if (auto* Action = Cast<UBlueprintAsyncActionBase>(Object))

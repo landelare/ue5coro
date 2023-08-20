@@ -410,7 +410,7 @@ template<typename... T>
 void FLatentPromise::Init(const UObject* WorldContext, T&... Args)
 {
 	// Keep trying to find a world from the UObjects passed in
-	if (!World && WorldContext)
+	if (!World && IsValid(WorldContext))
 		World = WorldContext->GetWorld(); // null is fine
 
 	Init(Args...);
