@@ -270,3 +270,7 @@ TCoroutine<> UMyExampleClass::DontDoThisAtHome(UObject* Dangerous)
     SomeMemberVariable++; // Even `this` could be GC'd by now!
 }
 ```
+
+### Pending kill
+
+UE5Coro supports both `gc.PendingKillEnabled` 1 and the more modern setting of 0.
