@@ -78,6 +78,10 @@ number of results without having to allocate and go through a temporary TArray.
 * [Overview of built-in awaiters](Docs/Awaiters.md) that you can use with async
 coroutines.
 
+### UE5CoroAI
+
+* [AI module and navigation system](Docs/AI.md) integration.
+
 ### UE5CoroGAS
 
 * [Gameplay Ability System](Docs/GAS.md) integration.
