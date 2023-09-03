@@ -88,7 +88,7 @@ struct FLatentChain<true, bInfo, Type, Types...>
 	static void Call(auto&& Fn, FLatentActionInfo LatentInfo, auto&&... Args)
 	{
 		FLatentChain<false, bInfo, Types...>::Call(
-			std::bind_front(std::move(Fn), GWorld),
+			std::bind_front(std::move(Fn), &*GWorld),
 			LatentInfo,
 			TForwardRef<decltype(Args)>(Args)...);
 	}
@@ -180,7 +180,7 @@ Private::FLatentChainAwaiter ChainEx(F&& Function, A&&... Args)
 
 	auto [LatentInfo, Done] = Private::MakeLatentInfo();
 	std::bind(std::forward<F>(Function),
-	          std::forward<A>(Args)...)(GWorld, LatentInfo);
+	          std::forward<A>(Args)...)(&*GWorld, LatentInfo);
 	return Private::FLatentChainAwaiter(Done);
 }
 }

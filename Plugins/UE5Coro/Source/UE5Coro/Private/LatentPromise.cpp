@@ -155,7 +155,7 @@ public:
 void FLatentPromise::CreateLatentAction()
 {
 	// We're still scanning for the world, so use what we have right now
-	auto* WorldNow = IsValid(World) ? World : GWorld;
+	auto* WorldNow = IsValid(World) ? World : &*GWorld;
 	auto* Sys = WorldNow->GetSubsystem<UUE5CoroSubsystem>();
 	CreateLatentAction(Sys->MakeLatentInfo());
 }
@@ -175,7 +175,7 @@ void FLatentPromise::Init()
 	// Last resort if we got this far without a world
 	if (!IsValid(World))
 	{
-		World = GWorld;
+		World = &*GWorld;
 		checkf(World, TEXT("Could not determine world for latent coroutine"));
 	}
 

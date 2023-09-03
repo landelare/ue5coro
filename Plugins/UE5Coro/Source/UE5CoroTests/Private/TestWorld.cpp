@@ -40,7 +40,7 @@ FTestWorld::FTestWorld()
 	check(IsInGameThread());
 	auto& WorldContext = GEngine->CreateNewWorldContext(EWorldType::Game);
 	WorldContext.SetCurrentWorld(World);
-	PrevWorld = GWorld;
+	PrevWorld = &*GWorld;
 	OldFrameCounter = GFrameCounter;
 	GWorld = World;
 	World->InitializeActorsForPlay(FURL());
