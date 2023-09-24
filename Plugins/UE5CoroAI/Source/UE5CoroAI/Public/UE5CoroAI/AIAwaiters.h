@@ -43,6 +43,7 @@
 
 namespace UE5Coro::Private
 {
+class FPathFindingAwaiter;
 class FMoveToAwaiter;
 class FSimpleMoveToAwaiter;
 }
@@ -51,6 +52,14 @@ namespace UE5Coro::AI
 {
 template<typename T>
 concept TGoal = std::same_as<T, FVector> || std::same_as<T, AActor*>;
+
+/** Starts an async pathfinding operation, resumes the awaiting coroutine once
+ *  it finishes.<br>
+ *  The result of the co_await expression is
+ *  TTuple<ENavigationQueryResult::Type, FNavPathSharedPtr>. */
+UE5COROAI_API Private::FPathFindingAwaiter FindPath(
+	UObject* WorldContextObject, const FPathFindingQuery& Query,
+	EPathFindingMode::Type Mode = EPathFindingMode::Regular);
 
 /** Issues a "move to" command to the specified controller, resumes the awaiting
  *  coroutine once it finishes.<br>
@@ -73,6 +82,13 @@ UE5COROAI_API auto SimpleMoveTo(AController* Controller, TGoal auto Target)
 
 namespace UE5Coro::Private
 {
+class [[nodiscard]] UE5COROAI_API FPathFindingAwaiter : public FLatentAwaiter
+{
+public:
+	explicit FPathFindingAwaiter(void*);
+	TTuple<ENavigationQueryResult::Type, FNavPathSharedPtr> await_resume();
+};
+
 class [[nodiscard]] UE5COROAI_API FMoveToAwaiter : public FLatentAwaiter
 {
 public:
@@ -98,6 +114,7 @@ public:
 	FPathFollowingResult await_resume() noexcept;
 };
 
+static_assert(sizeof(FPathFindingAwaiter) == sizeof(FLatentAwaiter));
 static_assert(sizeof(FMoveToAwaiter) == sizeof(FLatentAwaiter));
 static_assert(sizeof(FSimpleMoveToAwaiter) == sizeof(FLatentAwaiter));
 }

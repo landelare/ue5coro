@@ -40,6 +40,28 @@ using namespace UE5Coro::Private;
 
 namespace
 {
+struct FFindPathState
+{
+	TWeakObjectPtr<UNavigationSystemV1> NS1;
+	uint32 QueryID;
+	TTuple<ENavigationQueryResult::Type, FNavPathSharedPtr> Result;
+};
+using FFindPathSharedPtr = TSharedPtr<FFindPathState, ESPMode::NotThreadSafe>;
+
+bool ShouldResumeFindPath(void* State, bool bCleanup)
+{
+	auto* This = static_cast<FFindPathSharedPtr*>(State);
+	if (UNLIKELY(bCleanup))
+	{
+		if (auto* NS1 = (*This)->NS1.Get();
+		    NS1 && (*This)->QueryID != INVALID_NAVQUERYID)
+			NS1->AbortAsyncFindPathRequest((*This)->QueryID);
+		delete This;
+	}
+
+	return (*This)->QueryID == INVALID_NAVQUERYID;
+}
+
 bool ShouldResumeMoveTo(void* State, bool bCleanup)
 {
 	auto* Target = static_cast<TStrongObjectPtr<UUE5CoroAICallbackTarget>*>(State);
@@ -57,6 +79,21 @@ constexpr bool IsValid(const FVector&)
 	return true;
 }
 }
+
+FPathFindingAwaiter::FPathFindingAwaiter(void* State)
+	: FLatentAwaiter(State, &ShouldResumeFindPath)
+{
+}
+
+auto FPathFindingAwaiter::await_resume()
+	-> TTuple<ENavigationQueryResult::Type, FNavPathSharedPtr>
+{
+	auto* This = static_cast<FFindPathSharedPtr*>(State);
+	checkf((*This)->QueryID == INVALID_NAVQUERYID,
+	       TEXT("Internal error: spurious resume"));
+	return (*This)->Result;
+}
+
 
 FMoveToAwaiter::FMoveToAwaiter(UAITask_MoveTo* Task)
 	: FLatentAwaiter(new TStrongObjectPtr(NewObject<UUE5CoroAICallbackTarget>()
@@ -112,6 +149,30 @@ FPathFollowingResult FSimpleMoveToAwaiter::await_resume() noexcept
 	auto* Data = static_cast<FComplexData*>(State);
 	checkf(Data->Result.has_value(), TEXT("Internal error: spurious wakeup"));
 	return *Data->Result;
+}
+
+FPathFindingAwaiter AI::FindPath(UObject* WorldContextObject,
+                                 const FPathFindingQuery& Query,
+                                 EPathFindingMode::Type Mode)
+{
+	checkf(IsValid(WorldContextObject), TEXT("Invalid WCO supplied"));
+	auto* World = WorldContextObject->GetWorld();
+	checkf(IsValid(World), TEXT("Invalid world from WCO"));
+	auto* NS1 = CastChecked<UNavigationSystemV1>(World->GetNavigationSystem());
+	auto State = MakeShared<FFindPathState, ESPMode::NotThreadSafe>();
+	auto Delegate = FNavPathQueryDelegate::CreateLambda(
+		[State](uint32 QueryID, ENavigationQueryResult::Type Result,
+		        FNavPathSharedPtr Path)
+		{
+			checkf(QueryID == State->QueryID,
+			       TEXT("Internal error: QueryID mismatch"));
+			State->Result = {Result, std::move(Path)};
+			State->QueryID = INVALID_NAVQUERYID;
+		});
+	State->NS1 = NS1;
+	State->QueryID = NS1->FindPathAsync(Query.NavAgentProperties, Query,
+	                                    Delegate, Mode);
+	return FPathFindingAwaiter(new FFindPathSharedPtr(std::move(State)));
 }
 
 FMoveToAwaiter AI::AIMoveTo(AAIController* Controller, TGoal auto Target,
