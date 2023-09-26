@@ -29,20 +29,66 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include "CoreMinimal.h"
-#include "UE5Coro/Definitions.h"
-#include "UE5Coro/AggregateAwaiters.h"
-#include "UE5Coro/AnimationAwaiters.h"
-#include "UE5Coro/AsyncAwaiters.h"
-#include "UE5Coro/Cancellation.h"
-#include "UE5Coro/Coroutine.h"
-#include "UE5Coro/CoroutineAwaiters.h"
-#include "UE5Coro/Generator.h"
-#include "UE5Coro/HttpAwaiters.h"
-#include "UE5Coro/LatentAwaiters.h"
-#include "UE5Coro/LatentCallbacks.h"
-#include "UE5Coro/LatentTimeline.h"
-#include "UE5Coro/TaskAwaiters.h"
 #include "UE5Coro/Threading.h"
+
+using namespace UE5Coro;
+using namespace UE5Coro::Private;
+
+FAwaitableSemaphore::FAwaitableSemaphore(int Capacity, int InitialCount)
+	: Capacity(Capacity), Count(InitialCount)
+{
+	checkf(Capacity > 0 && InitialCount >= 0 && InitialCount <= Capacity,
+	       TEXT("Initial semaphore values out of range"));
+}
+
+#if UE5CORO_DEBUG
+FAwaitableSemaphore::~FAwaitableSemaphore()
+{
+	ensureMsgf(!Awaiters,
+	           TEXT("Awaitable semaphore destroyed with active awaiters"));
+}
+#endif
+
+void FAwaitableSemaphore::Unlock(int InCount)
+{
+	checkf(InCount > 0, TEXT("Invalid count"));
+	Lock.lock();
+	verifyf((Count += InCount) <= Capacity,
+	        TEXT("Semaphore unlocked above maximum"));
+	TryResumeAll();
+}
+
+bool FAwaitableSemaphore::await_ready()
+{
+	Lock.lock();
+	if (Count > 0)
+	{
+		verifyf(--Count >= 0, TEXT("Internal error: semaphore went negative"));
+		Lock.unlock();
+		return true;
+	}
+	else // Leave it locked
+		return false;
+}
+
+void FAwaitableSemaphore::Suspend(FPromise& Promise)
+{
+	checkf(!Lock.try_lock(), TEXT("Internal error: suspension without lock"));
+	Awaiters = new FAwaitingPromise{&Promise, Awaiters};
+	Lock.unlock();
+}
+
+void FAwaitableSemaphore::TryResumeAll()
+{
+	checkf(!Lock.try_lock(), TEXT("Internal error: resuming without lock held"));
+	while (Awaiters && Count > 0)
+	{
+		auto* Node = std::exchange(Awaiters, Awaiters->Next);
+		verifyf(--Count >= 0, TEXT("Internal error: semaphore went negative"));
+		Lock.unlock();
+		Node->Promise->Resume();
+		delete Node;
+		Lock.lock();
+	}
+	Lock.unlock();
+}

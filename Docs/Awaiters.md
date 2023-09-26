@@ -8,6 +8,13 @@ If you're not using the recommended `#include "UE5Coro.h"`, some of these
 features require an extra #include (usually `"UE5Coro/AsyncAwaiters.h"`) that's
 not immediately apparent.
 
+Awaiters by necessity expose various snake_case functions as public, such as
+`await_ready`, `await_suspend`, or `await_resume`.
+Calling these manually instead of through `co_await` is undefined behavior.
+
+Calling other methods that are inherited from `Private` base classes and aren't
+explicitly documented to be callable is also undefined behavior. 
+
 ## Aggregates
 
 UE5Coro::WhenAny and WhenAll let you combine any type of co_awaitable objects
@@ -42,6 +49,19 @@ WhenAny or Race finish early.
 The return values of these functions are copyable and allow one concurrent
 co_await across all copies.
 Once the initial co_await has finished, further ones continue synchronously.
+
+## Threading primitives
+
+UE5Coro::FAwaitableEvent and UE5Coro::FAwaitableSemaphore provide awaitable
+versions of these well-known threading primitives.
+They're directly co_awaitable, which uses up an auto-reset event, or locks a
+semaphore once.
+A separate mutex is not provided, FAwaitableSemaphore defaults to being a mutex.
+
+Awaiters are resumed in an unspecified order, e.g., fairness is not guaranteed.
+Events resume coroutines on the thread they're Trigger()ed, semaphores might
+resume on the last thread that Unlock()ed them or an earlier thread if multiple
+unlocks happen in quick succession.
 
 ## Async awaiters
 
@@ -100,6 +120,24 @@ It is technically available in async mode due to the usual feature parity
 between the two modes, but it's not as beneficial in that case.
 
 [UE5CoroGAS](GAS.md) has a specialized awaiter for delegates in BP tasks.
+
+Many engine functions copy the delegate that's passed in, preventing a direct
+co_await:
+```c++
+TDelegate<void()> Delegate;
+SomeEngineFunction(Delegate); // Delegate's unbound state gets copied
+co_await Delegate; // The delegate is only bound here
+```
+
+Other features may be used as a workaround so that the delegate is bound before
+it is copied, such as:
+```c++
+FAwaitableEvent Event;
+TDelegate<void()> Delegate;
+Delegate.BindWeakLambda(this, [&]{Event.Trigger();});
+SomeEngineFunction(Delegate);
+co_await Event;
+```
 
 #### Parameters and return values
 
