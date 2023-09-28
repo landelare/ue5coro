@@ -33,8 +33,8 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
-#include <shared_mutex>
 #include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/Private.h"
 
 namespace UE5Coro
 {
@@ -52,7 +52,7 @@ class UE5CORO_API FAwaitableEvent final
 {
 	const EEventMode Mode;
 
-	std::shared_mutex Lock;
+	Private::FMutex Lock;
 	bool bActive;
 	Private::FAwaitingPromise* Awaiters = nullptr;
 
@@ -90,7 +90,7 @@ class UE5CORO_API FAwaitableSemaphore final
 	: public Private::TAwaiter<FAwaitableSemaphore>
 {
 	const int Capacity;
-	std::shared_mutex Lock;
+	Private::FMutex Lock;
 	int Count;
 	Private::FAwaitingPromise* Awaiters = nullptr;
 

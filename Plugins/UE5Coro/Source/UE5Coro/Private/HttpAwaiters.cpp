@@ -69,29 +69,24 @@ FHttpAwaiter::FHttpAwaiter(FHttpRequestRef&& Request)
 
 bool FHttpAwaiter::await_ready()
 {
-	State->Lock.Lock();
+	std::unique_lock _(State->Lock);
 
 	// Skip suspension if the request finished first
 	if (State->Result.has_value())
-	{
-		State->Lock.Unlock();
 		return true;
-	}
-	else
-	{
-		// State->Lock is deliberately left locked
-		checkf(!State->bSuspended, TEXT("Attempted second concurrent co_await"));
-		State->bSuspended = true;
-		return false;
-	}
+
+	_.release(); // Carry the lock into Suspend()
+	checkf(!State->bSuspended, TEXT("Attempted second concurrent co_await"));
+	State->bSuspended = true;
+	return false;
 }
 
 void FHttpAwaiter::Suspend(FPromise& Promise)
 {
 	// This should be locked from await_ready
-	checkf(!State->Lock.TryLock(), TEXT("Internal error: lock wasn't taken"));
+	checkf(!State->Lock.try_lock(), TEXT("Internal error: lock wasn't taken"));
 	State->Promise = &Promise;
-	State->Lock.Unlock();
+	State->Lock.unlock();
 }
 
 void FHttpAwaiter::FState::Resume()
@@ -114,11 +109,11 @@ void FHttpAwaiter::FState::RequestComplete(FHttpRequestPtr,
                                            FHttpResponsePtr Response,
                                            bool bConnectedSuccessfully)
 {
-	UE::TScopeLock _(Lock);
+	std::unique_lock _(Lock);
 	Result = {std::move(Response), bConnectedSuccessfully};
 	if (bSuspended)
 	{
-		_.Unlock();
+		_.unlock();
 		Resume();
 	}
 }

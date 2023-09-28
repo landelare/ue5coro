@@ -44,24 +44,24 @@ int FAggregateAwaiter::GetResumerIndex() const
 bool FAggregateAwaiter::await_ready()
 {
 	checkf(Data, TEXT("Attempting to await moved-from aggregate awaiter"));
-	Data->Lock.Lock();
+	Data->Lock.lock();
 	checkf(!Data->Promise, TEXT("Attempting to reuse aggregate awaiter"));
 
 	// Unlock if ready and resume immediately by returning true,
 	// otherwise carry the lock to await_suspend/Suspend
 	bool bReady = Data->Count <= 0;
 	if (bReady)
-		Data->Lock.Unlock();
+		Data->Lock.unlock();
 	return bReady;
 }
 
 void FAggregateAwaiter::Suspend(FPromise& Promise)
 {
-	checkf(!Data->Lock.TryLock(), TEXT("Internal error: lock was not taken"));
+	checkf(!Data->Lock.try_lock(), TEXT("Internal error: lock was not taken"));
 	checkf(!Data->Promise, TEXT("Attempting to reuse aggregate awaiter"));
 
 	Data->Promise = &Promise;
-	Data->Lock.Unlock();
+	Data->Lock.unlock();
 }
 
 FRaceAwaiter UE5Coro::Race(TArray<TCoroutine<>> Array)
@@ -80,7 +80,7 @@ FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
 		{
 			// Must be limited in scope because ContinueWith may be synchronous
 			// and the lock is not recursive
-			UE::TScopeLock _(Data->Lock);
+			std::scoped_lock _(Data->Lock);
 			if (Data->Index != -1) // Did a coroutine finish during this loop?
 				return; // Don't bother asking the others, they've all canceled
 			Coro = &Data->Handles[i];
@@ -88,7 +88,7 @@ FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
 
 		Coro->ContinueWith([Data = Data, i]
 		{
-			UE::TScopeLock _(Data->Lock);
+			std::unique_lock _(Data->Lock);
 
 			// Nothing to do if this wasn't the first one
 			if (Data->Index != -1)
@@ -101,7 +101,7 @@ FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
 
 			if (auto* Promise = Data->Promise)
 			{
-				_.Unlock();
+				_.unlock();
 				Promise->Resume();
 			}
 		});
@@ -110,10 +110,10 @@ FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
 
 bool FRaceAwaiter::await_ready()
 {
-	Data->Lock.Lock();
+	Data->Lock.lock();
 	if (Data->Index != -1)
 	{
-		Data->Lock.Unlock();
+		Data->Lock.unlock();
 		return true;
 	}
 	else
@@ -123,10 +123,10 @@ bool FRaceAwaiter::await_ready()
 void FRaceAwaiter::Suspend(FPromise& Promise)
 {
 	// Expecting a lock from await_ready
-	checkf(!Data->Lock.TryLock(), TEXT("Internal error: lock not held"));
+	checkf(!Data->Lock.try_lock(), TEXT("Internal error: lock not held"));
 	checkf(!Data->Promise, TEXT("Unexpected double race await"));
 	Data->Promise = &Promise;
-	Data->Lock.Unlock();
+	Data->Lock.unlock();
 }
 
 int FRaceAwaiter::await_resume() noexcept

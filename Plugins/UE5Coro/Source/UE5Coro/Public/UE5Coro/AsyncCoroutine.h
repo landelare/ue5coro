@@ -41,7 +41,7 @@
 #include <functional>
 #define UE5CORO_PRIVATE_SUPPRESS_COROUTINE_INL
 #include "UE5Coro/Coroutine.h"
-#include "Misc/SpinLock.h"
+#include "UE5Coro/Private.h"
 
 namespace UE5Coro::Private
 {
@@ -152,7 +152,7 @@ public:
 	// This could be read from another thread
 	std::atomic<bool> bWasSuccessful = false;
 
-	UE::FSpinLock Lock;
+	FMutex Lock;
 	union
 	{
 		FPromise* Promise; // nullptr once destroyed
@@ -324,7 +324,7 @@ public:
 	~TCoroutinePromise()
 	{
 		auto* ExtrasT = static_cast<TPromiseExtras<T>*>(this->Extras.get());
-		ExtrasT->Lock.Lock(); // This will be held until the end of ~FPromise
+		ExtrasT->Lock.lock(); // This will be held until the end of ~FPromise
 		checkf(ExtrasT->Promise, TEXT("Unexpected double promise destruction"));
 		ExtrasT->ReturnValuePtr = &ExtrasT->ReturnValue;
 	}
@@ -332,7 +332,7 @@ public:
 	void return_value(T Value)
 	{
 		auto* ExtrasT = static_cast<TPromiseExtras<T>*>(this->Extras.get());
-		UE::TScopeLock _(ExtrasT->Lock);
+		std::scoped_lock _(ExtrasT->Lock);
 		check(!ExtrasT->IsComplete()); // Completion is after a value is returned
 		ExtrasT->ReturnValue = std::move(Value);
 	}
@@ -356,7 +356,7 @@ public:
 	~TCoroutinePromise()
 	{
 		// This will be held until the end of ~FPromise
-		this->Extras->Lock.Lock();
+		this->Extras->Lock.lock();
 		checkf(this->Extras->Promise,
 		       TEXT("Unexpected double promise destruction"));
 		this->Extras->ReturnValuePtr = nullptr;
@@ -373,10 +373,10 @@ public:
 template<typename T, typename F>
 void FPromiseExtras::ContinueWith(F Fn)
 {
-	UE::TScopeLock _(Lock);
+	std::unique_lock _(Lock);
 	if (IsComplete()) // Already completed?
 	{
-		_.Unlock();
+		_.unlock();
 		if constexpr (std::is_void_v<T>)
 			Fn();
 		else // T is controlled by TCoroutine<T>, safe to cast

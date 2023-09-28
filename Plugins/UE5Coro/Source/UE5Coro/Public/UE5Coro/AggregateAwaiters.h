@@ -34,8 +34,8 @@
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
 #include <memory>
-#include "Misc/SpinLock.h"
 #include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/Private.h"
 
 namespace UE5Coro::Private
 {
@@ -93,7 +93,7 @@ class [[nodiscard]] UE5CORO_API FAggregateAwaiter
 {
 	struct FData
 	{
-		UE::FSpinLock Lock;
+		FMutex Lock;
 		int Count;
 		int Index = -1;
 		FPromise* Promise = nullptr;
@@ -144,7 +144,7 @@ class [[nodiscard]] UE5CORO_API FRaceAwaiter : public TAwaiter<FRaceAwaiter>
 {
 	struct FData
 	{
-		UE::FSpinLock Lock;
+		FMutex Lock;
 		TArray<TCoroutine<>> Handles;
 		int Index = -1;
 		FPromise* Promise = nullptr;
@@ -197,12 +197,12 @@ UE5Coro::TCoroutine<> UE5Coro::Private::FAggregateAwaiter::Consume(
 
 	ON_SCOPE_EXIT
 	{
-		UE::TScopeLock _(Data->Lock);
+		std::unique_lock _(Data->Lock);
 		if (--Data->Count != 0)
 			return;
 		Data->Index = Index; // Mark that this index was the one reaching 0
 		auto* Promise = Data->Promise;
-		_.Unlock();
+		_.unlock();
 
 		// Not co_awaited yet if this is nullptr, await_ready deals with this
 		if (Promise != nullptr)

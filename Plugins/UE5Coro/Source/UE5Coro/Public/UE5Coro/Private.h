@@ -33,6 +33,8 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
+#include <mutex>
+#include <shared_mutex>
 #include "Delegates/DelegateBase.h"
 
 /******************************************************************************
@@ -41,6 +43,15 @@
 
 namespace UE5Coro::Private
 {
+// On Windows, both std::mutex and std::shared_mutex are SRWLOCKs, but mutex
+// has extra padding for ABI compatibility. Prefer shared_mutex for now.
+#ifdef _MSVC_STL_VERSION
+using FMutex = std::conditional_t<sizeof(std::shared_mutex) < sizeof(std::mutex),
+                                  std::shared_mutex, std::mutex>;
+#else
+using FMutex = std::mutex;
+#endif
+
 template<typename T>
 constexpr bool TIsSparseDelegate = std::is_base_of_v<FSparseDelegate, T>;
 

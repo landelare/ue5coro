@@ -35,7 +35,6 @@
 #include "UE5Coro/Definitions.h"
 #include <optional>
 #include "Interfaces/IHttpRequest.h"
-#include "Misc/SpinLock.h"
 #include "UE5Coro/AsyncCoroutine.h"
 
 namespace UE5Coro::Private
@@ -59,7 +58,7 @@ class [[nodiscard]] UE5CORO_API FHttpAwaiter : public TAwaiter<FHttpAwaiter>
 	{
 		const ENamedThreads::Type Thread;
 		const FHttpRequestRef Request;
-		UE::FSpinLock Lock;
+		FMutex Lock;
 		FPromise* Promise = nullptr;
 		bool bSuspended = false;
 		// end Lock
