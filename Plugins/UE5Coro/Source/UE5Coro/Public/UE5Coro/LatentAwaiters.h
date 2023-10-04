@@ -101,6 +101,22 @@ UE5CORO_API Private::FLatentAwaiter RealSeconds(double);
  *  This is affected by pause only, NOT time dilation. */
 UE5CORO_API Private::FLatentAwaiter AudioSeconds(double);
 
+/** Resumes the coroutine when world time reaches the provided value.<br>
+ *  This is affected by both pause and time dilation. */
+UE5CORO_API Private::FLatentAwaiter UntilTime(double);
+
+/** Resumes the coroutine when unpaused world time reaches the provided value.<br>
+ *  This is affected by time dilation only, NOT pause. */
+UE5CORO_API Private::FLatentAwaiter UntilUnpausedTime(double);
+
+/** Resumes the coroutine when real world time reaches the provided value.<br>
+ *  This is not affected by pause or time dilation. */
+UE5CORO_API Private::FLatentAwaiter UntilRealTime(double);
+
+/** Resumes the coroutine when audio world time reaches the provided value.<br>
+ *  This is affected by pause only, NOT time dilation. */
+UE5CORO_API Private::FLatentAwaiter UntilAudioTime(double);
+
 #pragma endregion
 
 #pragma region Chain

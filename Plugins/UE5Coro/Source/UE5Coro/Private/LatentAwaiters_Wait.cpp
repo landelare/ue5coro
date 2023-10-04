@@ -68,16 +68,22 @@ bool WaitUntilPredicate(void* State, bool bCleanup)
 	return (*Function)();
 }
 
-template<auto GetTime>
-FLatentAwaiter GenericSeconds(double Seconds)
+template<auto GetTime, bool bTimeIsOffset>
+FLatentAwaiter GenericUntil(double Time)
 {
 #if ENABLE_NAN_DIAGNOSTIC
-	if (FMath::IsNaN(Seconds))
+	if (FMath::IsNaN(Time))
 		logOrEnsureNanError(TEXT("Latent wait started with NaN time"));
 #endif
 
+	if constexpr (bTimeIsOffset)
+		Time += (GWorld->*GetTime)();
+
+	ensureMsgf((GWorld->*GetTime)() <= Time,
+	           TEXT("Latent wait will finish immediately"));
+
 	void* State = nullptr;
-	reinterpret_cast<double&>(State) = (GWorld->*GetTime)() + Seconds;
+	reinterpret_cast<double&>(State) = Time;
 	return FLatentAwaiter(State, &WaitUntilTime<GetTime>);
 }
 
@@ -150,20 +156,40 @@ std::tuple<FLatentAwaiter, UObject*> Private::UntilDelegateCore()
 
 FLatentAwaiter Latent::Seconds(double Seconds)
 {
-	return GenericSeconds<&UWorld::GetTimeSeconds>(Seconds);
+	return GenericUntil<&UWorld::GetTimeSeconds, true>(Seconds);
 }
 
 FLatentAwaiter Latent::UnpausedSeconds(double Seconds)
 {
-	return GenericSeconds<&UWorld::GetUnpausedTimeSeconds>(Seconds);
+	return GenericUntil<&UWorld::GetUnpausedTimeSeconds, true>(Seconds);
 }
 
 FLatentAwaiter Latent::RealSeconds(double Seconds)
 {
-	return GenericSeconds<&UWorld::GetRealTimeSeconds>(Seconds);
+	return GenericUntil<&UWorld::GetRealTimeSeconds, true>(Seconds);
 }
 
 FLatentAwaiter Latent::AudioSeconds(double Seconds)
 {
-	return GenericSeconds<&UWorld::GetAudioTimeSeconds>(Seconds);
+	return GenericUntil<&UWorld::GetAudioTimeSeconds, true>(Seconds);
+}
+
+FLatentAwaiter Latent::UntilTime(double Seconds)
+{
+	return GenericUntil<&UWorld::GetTimeSeconds, false>(Seconds);
+}
+
+FLatentAwaiter Latent::UntilUnpausedTime(double Seconds)
+{
+	return GenericUntil<&UWorld::GetUnpausedTimeSeconds, false>(Seconds);
+}
+
+FLatentAwaiter Latent::UntilRealTime(double Seconds)
+{
+	return GenericUntil<&UWorld::GetRealTimeSeconds, false>(Seconds);
+}
+
+FLatentAwaiter Latent::UntilAudioTime(double Seconds)
+{
+	return GenericUntil<&UWorld::GetAudioTimeSeconds, false>(Seconds);
 }

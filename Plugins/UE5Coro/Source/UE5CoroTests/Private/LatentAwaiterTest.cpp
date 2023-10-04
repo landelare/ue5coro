@@ -138,6 +138,40 @@ void DoTest(FAutomationTestBase& Test)
 		World.Tick(1);
 		Test.TestEqual(TEXT("Seconds 2"), State, 2);
 	}
+
+	{
+		int State = 0;
+		int RealState = 0;
+		World.Run(CORO
+		{
+			State = 1;
+			auto Time = World->GetTimeSeconds();
+			co_await Latent::UntilTime(Time + 1);
+			State = 2;
+		});
+		World.Run(CORO
+		{
+			RealState = 1;
+			auto Time = World->GetRealTimeSeconds();
+			co_await Latent::UntilRealTime(Time + 1);
+			RealState = 2;
+		});
+		World.EndTick();
+		UGameplayStatics::SetGlobalTimeDilation(GWorld, 0.1);
+		Test.TestEqual(TEXT("UntilTime 1-1"), State, 1);
+		Test.TestEqual(TEXT("UntilRealTime 1-1"), RealState, 1);
+		World.Tick(0.95);
+		Test.TestEqual(TEXT("UntilTime 1-2"), State, 1);
+		Test.TestEqual(TEXT("UntilRealTime 1-2"), RealState, 1);
+		World.Tick(0.1); // Crossing 1.0s here
+		GWorld->bDebugPauseExecution = false;
+		Test.TestEqual(TEXT("UntilTime 1-3"), State, 1);
+		Test.TestEqual(TEXT("UntilRealTime 2"), RealState, 2);
+		UGameplayStatics::SetGlobalTimeDilation(GWorld, 1);
+		// The dilated coroutine only had around 0.1 seconds, let it complete
+		World.Tick(1);
+		Test.TestEqual(TEXT("UntilTime 2"), State, 2);
+	}
 }
 }
 
