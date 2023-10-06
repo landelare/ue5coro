@@ -262,7 +262,7 @@ public:
 
 class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
 {
-	UWorld* World = nullptr;
+	FWeakObjectPtr Context = nullptr; // Owning object or world, best approximation
 	void* PendingLatentCoroutine = nullptr;
 	enum ELatentFlags
 	{
@@ -409,9 +409,10 @@ FLatentPromise::FLatentPromise(std::shared_ptr<FPromiseExtras> Extras,
 template<typename... T>
 void FLatentPromise::Init(const UObject* WorldContext, T&... Args)
 {
-	// Keep trying to find a world from the UObjects passed in
-	if (!World && IsValid(WorldContext))
-		World = WorldContext->GetWorld(); // null is fine
+	// Scan the UObjects passed in, looking for the first one with a world
+	if (Context.IsExplicitlyNull() && IsValid(WorldContext) &&
+	    IsValid(WorldContext->GetWorld()))
+		Context = WorldContext; // null is fine
 
 	Init(Args...);
 }
@@ -422,6 +423,11 @@ void FLatentPromise::Init(FLatentActionInfo LatentInfo, T&... Args)
 	// The static_assert on coroutine_traits prevents this
 	check(!PendingLatentCoroutine);
 	CreateLatentAction(std::move(LatentInfo));
+
+	// The latent info's CallbackTarget has the highest priority as a context
+	if (auto* Target = LatentInfo.CallbackTarget.Get();
+	    IsValid(Target) && IsValid(Target->GetWorld()))
+		Context = FWeakObjectPtr(LatentInfo.CallbackTarget);
 
 	Init(Args...);
 }

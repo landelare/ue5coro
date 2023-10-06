@@ -155,8 +155,14 @@ public:
 void FLatentPromise::CreateLatentAction()
 {
 	// We're still scanning for the world, so use what we have right now
-	auto* WorldNow = IsValid(World) ? World : &*GWorld;
+	UWorld* WorldNow = nullptr;
+	if (!Context.IsExplicitlyNull())
+		WorldNow = Context.Get()->GetWorld();
+	if (!IsValid(WorldNow))
+		WorldNow = &*GWorld;
+
 	auto* Sys = WorldNow->GetSubsystem<UUE5CoroSubsystem>();
+	checkf(IsValid(Sys), TEXT("Internal error: couldn't find UE5Coro subsystem"));
 	CreateLatentAction(Sys->MakeLatentInfo());
 }
 
@@ -173,11 +179,11 @@ void FLatentPromise::CreateLatentAction(FLatentActionInfo&& LatentInfo)
 void FLatentPromise::Init()
 {
 	// Last resort if we got this far without a world
-	if (!IsValid(World))
-	{
-		World = &*GWorld;
-		checkf(World, TEXT("Could not determine world for latent coroutine"));
-	}
+	if (Context.IsExplicitlyNull())
+		Context = &*GWorld;
+
+	checkf(Context.IsValid() && IsValid(Context.Get()->GetWorld()),
+	       TEXT("Could not determine world for latent coroutine"));
 
 	// Handle being forced to latent without a FLatentActionInfo
 	if (!PendingLatentCoroutine)
@@ -300,10 +306,10 @@ FInitialSuspend FLatentPromise::initial_suspend()
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent coroutines may only be started on the game thread"));
-	checkf(IsValid(World),
-	       TEXT("Internal error: latent coroutine has invalid/stale world"));
+	checkf(Context.IsValid() && IsValid(Context.Get()->GetWorld()),
+	       TEXT("Internal error: latent coroutine starts in invalid/stale world"));
 
-	auto& LAM = World->GetLatentActionManager();
+	auto& LAM = Context->GetWorld()->GetLatentActionManager();
 	auto* Pending = static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine);
 	auto& LatentInfo = Pending->GetLatentInfo();
 
