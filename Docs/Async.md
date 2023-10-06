@@ -95,9 +95,18 @@ or required) takes `FLatentActionInfo` or `FForceLatentCoroutine`, the coroutine
 is running in "latent mode".
 The world will be fetched from the first UObject* parameter that returns a valid
 pointer from GetWorld() with GWorld used as a last resort fallback.
-
+If there's a FLatentActionInfo parameter, its callback target will be used with
+the highest priority.
 The latent info will be registered with that world's latent action manager,
 there's no need to call FLatentActionManager::AddNewAction().
+
+The detected world context (most often `this` for non-static member UFUNCTIONs)
+will act as the latent action's owner, and the coroutine will enjoy a measure of
+lifetime tracking and protection from the latent action manager, mostly
+eliminating the need to check the validity of `this` after each `co_await`.
+There are still situations where the coroutine can resume on an invalid object,
+e.g., if the owning object was destroyed and the destructors of the coroutine's
+local variables are being run as a response.
 
 The output exec pin will fire in BP when the coroutine co_returns (most often
 this happens naturally as control leaves the scope of the function), but you can

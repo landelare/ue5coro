@@ -309,13 +309,13 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	checkf(Context.IsValid() && IsValid(Context.Get()->GetWorld()),
 	       TEXT("Internal error: latent coroutine starts in invalid/stale world"));
 
-	auto& LAM = Context->GetWorld()->GetLatentActionManager();
+	auto* Owner = Context.Get();
+	auto& LAM = Owner->GetWorld()->GetLatentActionManager();
 	auto* Pending = static_cast<FPendingLatentCoroutine*>(PendingLatentCoroutine);
 	auto& LatentInfo = Pending->GetLatentInfo();
 
 	// Don't let the coroutine run and clean up if this is a duplicate
-	if (LAM.FindExistingAction<FPendingLatentCoroutine>(
-			LatentInfo.CallbackTarget, LatentInfo.UUID))
+	if (LAM.FindExistingAction<FPendingLatentCoroutine>(Owner, LatentInfo.UUID))
 		return {FInitialSuspend::Destroy};
 
 	// Also refuse to run if there's no callback target
@@ -323,7 +323,12 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	                TEXT("Not starting latent coroutine with invalid target")))
 		return {FInitialSuspend::Destroy};
 
-	LAM.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, Pending);
+	// Make the latent action owned by the context instead of the callback
+	// target to provide a better match for the "latent `this` protection"
+	// offered by FLatentActionManager.
+	// These will usually be the same object for latent UFUNCTIONs, but
+	// FForceLatentCoroutine uses UUE5CoroSubsystem as a helper callback target.
+	LAM.AddNewAction(Owner, LatentInfo.UUID, Pending);
 
 	// Let the coroutine start immediately on its calling thread
 	return {FInitialSuspend::Resume};
