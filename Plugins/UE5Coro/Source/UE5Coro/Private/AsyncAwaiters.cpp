@@ -40,14 +40,18 @@ namespace
 struct FAutoStartResumeRunnable final : FRunnable
 {
 	FPromise& Promise;
+	std::atomic<FRunnableThread*> Thread;
 
 	explicit FAutoStartResumeRunnable(FPromise& Promise,
 	                                  EThreadPriority Priority, uint64 Affinity,
 	                                  EThreadCreateFlags Flags)
-		: Promise(Promise)
+		: Promise(Promise), Thread(nullptr)
 	{
-		FRunnableThread::Create(this, TEXT("UE5Coro::Async::MoveToNewThread"),
-		                        0, Priority, Affinity, Flags);
+		// This has to start as nullptr and get overwritten
+		Thread = FRunnableThread::Create(this,
+		                                 TEXT("UE5Coro::Async::MoveToNewThread"),
+		                                 0, Priority, Affinity, Flags);
+		checkf(Thread, TEXT("Internal error: could not create thread"));
 	}
 
 	virtual uint32 Run() override
@@ -56,7 +60,17 @@ struct FAutoStartResumeRunnable final : FRunnable
 		return 0;
 	}
 
-	virtual void Exit() override { delete this; }
+	virtual void Exit() override
+	{
+		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this]
+		{
+			while (!Thread.load())
+				FPlatformProcess::Yield();
+			Thread.load()->WaitForCompletion();
+			delete Thread;
+			delete this;
+		});
+	}
 };
 }
 
