@@ -132,15 +132,15 @@ void UUE5CoroGameplayAbility::ActivateAbility(
 	       TEXT("Did you implement ExecuteAbility with a coroutine?"));
 
 #if UE5CORO_CPP20
-	Coroutine.ContinueWithWeak(this, [=, this]
+	Coroutine.ContinueWithWeak(this, [=, ActorInfoCopy = *ActorInfo, this]
 #else
-	Coroutine.ContinueWithWeak(this, [=]
+	Coroutine.ContinueWithWeak(this, [=, ActorInfoCopy = *ActorInfo]
 #endif
 	{
 		checkf(IsInGameThread(),
 		       TEXT("Internal error: Expected to continue on the game thread"));
 		GCoroutineEnded = true;
-		EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateAbilityEnd,
+		EndAbility(Handle, &ActorInfoCopy, ActivationInfo, bReplicateAbilityEnd,
 		           !Coroutine.WasSuccessful());
 		checkf(!GCoroutineEnded, TEXT("Internal error: unexpected state"));
 	});

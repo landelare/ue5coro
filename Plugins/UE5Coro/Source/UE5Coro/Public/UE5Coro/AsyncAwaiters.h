@@ -305,9 +305,7 @@ public:
 		TTuple<T...> Values(std::forward<T>(Args)...);
 		Result = &Values; // This exposes a pointer to a local, but...
 		TryResumeOnce(); // ...it's only read by await_resume, right here
-#if UE5CORO_DEBUG
-		Result = nullptr;
-#endif
+		// The coroutine might have completed, destroying this object
 		return R();
 	}
 
@@ -326,11 +324,7 @@ class [[nodiscard]] TDynamicDelegateAwaiter : public FDelegateAwaiter
 	                                   TDecayedPayload<A...>&, void>;
 	using FPayload = std::conditional_t<std::is_void_v<R>, TDecayedPayload<A...>,
 	                                    TDecayedPayload<A..., R>>;
-	union
-	{
-		TDecayedPayload<A...>* Result; // Missing R, for the coroutine
-		FPayload* Payload = nullptr; // With R, for the delegate
-	};
+	TDecayedPayload<A...>* Result; // Missing R, for the coroutine
 
 public:
 	template<typename T>
@@ -343,8 +337,9 @@ public:
 			// This matches the hack in TBaseUFunctionDelegateInstance::Execute
 			Result = static_cast<TDecayedPayload<A...>*>(Params);
 			TryResumeOnce();
+			// The coroutine might have completed, deleting the awaiter
 			if constexpr (!std::is_void_v<R>)
-				Payload->template get<sizeof...(A)>() = R();
+				static_cast<FPayload*>(Params)->template get<sizeof...(A)>() = R();
 		});
 
 		if constexpr (TIsMulticastDelegate<T>)
