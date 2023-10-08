@@ -65,10 +65,17 @@ unlocks happen in quick succession.
 
 ## Async awaiters
 
-The UE5Coro::Async namespace contains awaiters that let you conveniently move
+The UE5Coro\:\:Async namespace contains awaiters that let you conveniently move
 execution between various named threads, notably between the game thread and
 everything else.
 See UE5Coro\:\:Tasks for support of the more modern UE\:\:Tasks system.
+
+Async\:\:Yield, Async\:\:PlatformSeconds, and Async\:\:UntilPlatformTime resume
+the coroutine on the same kind of thread that it was on (game thread to game
+thread, render thread to render thread, background thread to background thread,
+etc.).
+Async\:\:PlatformSecondsAnyThread and Async\:\:UntilPlatformTime resume the
+coroutine on an unspecified thread, and are marginally more efficient.
 
 The return values of these functions are copyable, thread-safe, and allow any
 number of concurrent co_awaits.

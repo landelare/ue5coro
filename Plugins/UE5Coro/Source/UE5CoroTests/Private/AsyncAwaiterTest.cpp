@@ -48,6 +48,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncInLatentTest, "UE5Coro.Async.Latent",
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncStressTest, "UE5Coro.Async.Stress",
+                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags::MediumPriority |
+                                 EAutomationTestFlags::ProductFilter)
+
 namespace
 {
 template<typename... T>
@@ -133,6 +138,27 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		Test.TestTrue(TEXT("Triggered"), CoroToTest->Wait());
 	}
+
+	{
+		std::atomic<int> State = 0;
+		World.Run(CORO
+		{
+			co_await UE5Coro::Async::PlatformSecondsAnyThread(0.05);
+			++State;
+			co_await UE5Coro::Async::PlatformSecondsAnyThread(0.05);
+			++State;
+		});
+		Test.TestEqual(TEXT("Initial state"), State, 0);
+		auto Start = FPlatformTime::Seconds();
+		FPlatformProcess::Sleep(0.07);
+		Test.TestTrue(TEXT("Sleep is reliable 1"),
+		              FPlatformTime::Seconds() >= Start + 0.05);
+		Test.TestTrue(TEXT("State has increased"), State >= 1);
+		FPlatformProcess::Sleep(0.05);
+		Test.TestTrue(TEXT("Sleep is reliable 2"),
+		              FPlatformTime::Seconds() >= Start + 0.1);
+		Test.TestEqual(TEXT("Final state"), State, 2);
+	}
 }
 }
 
@@ -145,5 +171,41 @@ bool FAsyncAwaiterTest::RunTest(const FString& Parameters)
 bool FAsyncInLatentTest::RunTest(const FString& Parameters)
 {
 	DoTest<FLatentActionInfo>(*this);
+	return true;
+}
+
+bool FAsyncStressTest::RunTest(const FString& Parameters)
+{
+	FTestWorld World;
+
+	std::atomic<int> Count = 0;
+	World.Run([&]() -> TCoroutine<>
+	{
+		TArray<FAsyncTimeAwaiter> Awaiters;
+		auto GetValue = [](int i)
+		{
+			// Map hashes to -0.001..0.001
+			auto Div = 1000 *
+			           static_cast<double>(std::numeric_limits<size_t>::max());
+			return (static_cast<double>(std::hash<int>()(i)) / Div * 2 - 1);
+		};
+		for (int i = 0; i < 1000; ++i)
+		{
+			Awaiters.Add(Async::PlatformSecondsAnyThread(GetValue(i)));
+			if (i > 500)
+				co_await Async::PlatformSecondsAnyThread(GetValue(-i));
+			++Count;
+		}
+		for (auto& Awaiter : Awaiters)
+		{
+			co_await Awaiter;
+			++Count;
+		}
+	});
+	while (Count < 2000)
+		;
+	FPlatformProcess::Sleep(0.01);
+	TestEqual(TEXT("Final count"), Count, 2000);
+
 	return true;
 }

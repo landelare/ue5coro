@@ -43,6 +43,7 @@ namespace UE5Coro::Private
 {
 class FAsyncAwaiter;
 class FAsyncPromise;
+class FAsyncTimeAwaiter;
 class FAsyncYieldAwaiter;
 class FLatentPromise;
 class FNewThreadAwaiter;
@@ -81,6 +82,28 @@ UE5CORO_API Private::FNewThreadAwaiter MoveToNewThread(
 	EThreadPriority Priority = TPri_Normal,
 	uint64 Affinity = FPlatformAffinity::GetNoAffinityMask(),
 	EThreadCreateFlags Flags = EThreadCreateFlags::None);
+
+/** Resumes the coroutine after the specified amount of time has elapsed, based
+ *  on FPlatformTime.<br>
+ *  The coroutine will resume on the same kind of named thread as it was running
+ *  on when it was suspended. */
+UE5CORO_API Private::FAsyncTimeAwaiter PlatformSeconds(double Seconds);
+
+/** Resumes the coroutine after the specified amount of time has elapsed, based
+ *  on FPlatformTime.<br>
+ *  The coroutine will resume on an unspecified worker thread. */
+UE5CORO_API Private::FAsyncTimeAwaiter PlatformSecondsAnyThread(double Seconds);
+
+/** Resumes the coroutine after FPlatformTime::Seconds has reached the specified
+ *  amount.<br>
+ *  The coroutine will resume on the same kind of named thread as it was running
+ *  on when it was suspended. */
+UE5CORO_API Private::FAsyncTimeAwaiter UntilPlatformTime(double Time);
+
+/** Resumes the coroutine after FPlatformTime::Seconds has reached the specified
+ *  amount.<br>
+ *  The coroutine will resume on an unspecified worker thread. */
+UE5CORO_API Private::FAsyncTimeAwaiter UntilPlatformTimeAnyThread(double Time);
 }
 
 namespace UE5Coro::Private
@@ -103,6 +126,38 @@ public:
 
 	bool await_ready();
 	void Suspend(FPromise&);
+};
+
+class [[nodiscard]] UE5CORO_API FAsyncTimeAwaiter
+	: public TAwaiter<FAsyncTimeAwaiter>
+{
+	friend class FTimerThread;
+
+	const double TargetTime;
+	union FState
+	{
+		bool bAnyThread; // Before suspension
+		ENamedThreads::Type Thread; // After suspension
+		explicit FState(bool bAnyThread) : bAnyThread(bAnyThread) { }
+	} U;
+	std::atomic<FPromise*> Promise = nullptr;
+
+public:
+	explicit FAsyncTimeAwaiter(double TargetTime, bool bAnyThread)
+		: TargetTime(TargetTime), U(bAnyThread) { }
+	FAsyncTimeAwaiter(const FAsyncTimeAwaiter&);
+	~FAsyncTimeAwaiter();
+
+	bool await_ready();
+	void Suspend(FPromise&);
+
+	bool operator<(const FAsyncTimeAwaiter& Other) const noexcept
+	{
+		return TargetTime < Other.TargetTime;
+	}
+
+private:
+	void Resume();
 };
 
 class [[nodiscard]] UE5CORO_API FAsyncYieldAwaiter

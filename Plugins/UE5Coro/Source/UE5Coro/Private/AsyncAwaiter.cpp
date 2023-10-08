@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5Coro/AsyncAwaiters.h"
+#include "TimerThread.h"
 
 using namespace UE5Coro::Private;
 
@@ -84,6 +85,39 @@ void FAsyncAwaiter::Suspend(FPromise& Promise)
 		ResumeAfter->ContinueWith([Task] { Task->Unlock(); });
 	else
 		Task->Unlock();
+}
+
+FAsyncTimeAwaiter::FAsyncTimeAwaiter(const FAsyncTimeAwaiter& Other)
+	: TargetTime(Other.TargetTime), U(Other.U)
+{
+}
+
+FAsyncTimeAwaiter::~FAsyncTimeAwaiter()
+{
+	if (UNLIKELY(Promise))
+		FTimerThread::Get().TryUnregister(this);
+}
+
+bool FAsyncTimeAwaiter::await_ready()
+{
+	return FPlatformTime::Seconds() >= TargetTime;
+}
+
+void FAsyncTimeAwaiter::Suspend(FPromise& InPromise)
+{
+	checkf(!Promise, TEXT("Internal error: double resume"));
+	if (U.bAnyThread)
+		U.Thread = ENamedThreads::AnyThread;
+	else
+		U.Thread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
+	Promise = &InPromise;
+	FTimerThread::Get().Register(this);
+}
+
+void FAsyncTimeAwaiter::Resume()
+{
+	checkf(Promise, TEXT("Internal error: spurious resume without suspension"));
+	AsyncTask(U.Thread, [this] { Promise.exchange(nullptr)->Resume(); });
 }
 
 void FAsyncYieldAwaiter::Suspend(FPromise& Promise)

@@ -96,6 +96,26 @@ FNewThreadAwaiter Async::MoveToNewThread(EThreadPriority Priority,
 	return FNewThreadAwaiter(Priority, Affinity, Flags);
 }
 
+FAsyncTimeAwaiter Async::PlatformSeconds(double Seconds)
+{
+	return FAsyncTimeAwaiter(FPlatformTime::Seconds() + Seconds, false);
+}
+
+FAsyncTimeAwaiter Async::PlatformSecondsAnyThread(double Seconds)
+{
+	return FAsyncTimeAwaiter(FPlatformTime::Seconds() + Seconds, true);
+}
+
+FAsyncTimeAwaiter Async::UntilPlatformTime(double Time)
+{
+	return FAsyncTimeAwaiter(Time, false);
+}
+
+FAsyncTimeAwaiter Async::UntilPlatformTimeAnyThread(double Time)
+{
+	return FAsyncTimeAwaiter(Time, true);
+}
+
 void FNewThreadAwaiter::Suspend(FPromise& Promise)
 {
 	new FAutoStartResumeRunnable(Promise, Priority, Affinity, Flags);
