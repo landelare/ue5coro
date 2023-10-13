@@ -15,6 +15,10 @@ Calling these manually instead of through `co_await` is undefined behavior.
 Calling other methods that are inherited from `Private` base classes and aren't
 explicitly documented to be callable is also undefined behavior. 
 
+## Coroutines
+
+`TCoroutine` is co_awaitable, see [this page](Async.md#other-coroutines).
+
 ## Aggregates
 
 UE5Coro::WhenAny and WhenAll let you combine any type of co_awaitable objects
