@@ -116,13 +116,9 @@ class [[nodiscard]] UE5CORO_API FAsyncAwaiter : public TAwaiter<FAsyncAwaiter>
 {
 	ENamedThreads::Type Thread;
 
-protected:
-	std::optional<TCoroutine<>> ResumeAfter;
-
 public:
-	explicit FAsyncAwaiter(ENamedThreads::Type Thread,
-	                       std::optional<TCoroutine<>> ResumeAfter)
-		: Thread(Thread), ResumeAfter(std::move(ResumeAfter)) { }
+	explicit FAsyncAwaiter(ENamedThreads::Type Thread)
+		: Thread(Thread) { }
 
 	bool await_ready();
 	void Suspend(FPromise&);

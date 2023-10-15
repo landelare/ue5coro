@@ -192,9 +192,8 @@ caller when the callee coroutine finishes for any reason, **including**
 The return type of co_awaiting TCoroutine&lt;T&gt; is T.
 If the coroutine completed without co_returning a value, the result will be T().
 
-Async coroutines try to resume on a similar thread as they were on when co_await
-was issued (game thread to game thread, render thread to render thread, etc.),
-latent coroutines resume on the next tick after the callee ended.
+Async coroutines resume on the thread where the awaited coroutine finished.
+Latent coroutines resume on the next tick after the callee ended.
 co_awaiting a coroutine that's already complete will not release the current
 thread and will continue running with the result obtained synchronously.
 

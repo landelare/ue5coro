@@ -41,30 +41,25 @@
 namespace UE5Coro::Private
 {
 template<typename T>
-class TAsyncCoroutineAwaiter : public FAsyncAwaiter
+class TAsyncCoroutineAwaiter : public TAwaiter<TAsyncCoroutineAwaiter<T>>
 {
+	TCoroutine<T> Antecedent;
+
 public:
 	explicit TAsyncCoroutineAwaiter(TCoroutine<T> Antecedent)
-		: FAsyncAwaiter(FTaskGraphInterface::Get().GetCurrentThreadIfKnown(),
-		                std::move(Antecedent)) { }
+		: Antecedent(std::move(Antecedent)) { }
 
-	// Prevent surprises with `co_await SomeCoroutine();` by making a copy.
-	// This cannot be moved as there could be another TCoroutine still owning it
+	void Suspend(FPromise& Promise)
+	{
+		Antecedent.ContinueWith([&Promise] { Promise.Resume(); });
+	}
+
 	T await_resume()
 	{
-		auto& Coro = static_cast<TCoroutine<T>&>(*ResumeAfter);
-		checkf(Coro.IsDone(), TEXT("Internal error: resuming too early"));
-		return Coro.GetResult();
+		checkf(Antecedent.IsDone(), TEXT("Internal error: resuming too early"));
+		if constexpr (!std::is_void_v<T>)
+			return Antecedent.GetResult();
 	}
-};
-
-template<>
-class TAsyncCoroutineAwaiter<void> : public FAsyncAwaiter
-{
-public:
-	explicit TAsyncCoroutineAwaiter(TCoroutine<> Antecedent)
-		: FAsyncAwaiter(FTaskGraphInterface::Get().GetCurrentThreadIfKnown(),
-		                std::move(Antecedent)) { }
 };
 
 template<typename T>
