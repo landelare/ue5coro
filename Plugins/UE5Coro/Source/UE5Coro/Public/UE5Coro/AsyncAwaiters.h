@@ -65,6 +65,12 @@ UE5CORO_API Private::FAsyncAwaiter MoveToThread(ENamedThreads::Type);
  *  the game thread. */
 UE5CORO_API Private::FAsyncAwaiter MoveToGameThread();
 
+/** Convenience function to resume on the same kind of named thread that this
+ *  function was called on.<br>
+ *  co_await MoveToSimilarThread() is not useful. The return value should be
+ *  stored to "remember" the original thread, then co_awaited later. */
+UE5CORO_API Private::FAsyncAwaiter MoveToSimilarThread();
+
 /** Always suspends the coroutine and resumes it on the same kind of named
  *  thread that it's currently running on, or AnyThread otherwise.<br>
  *  The return value of this function is reusable and always refers to the

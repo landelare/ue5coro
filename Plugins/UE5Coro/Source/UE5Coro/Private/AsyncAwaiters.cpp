@@ -84,6 +84,11 @@ FAsyncAwaiter Async::MoveToGameThread()
 	return FAsyncAwaiter(ENamedThreads::GameThread);
 }
 
+FAsyncAwaiter Async::MoveToSimilarThread()
+{
+	return FAsyncAwaiter(FTaskGraphInterface::Get().GetCurrentThreadIfKnown());
+}
+
 FAsyncYieldAwaiter Async::Yield()
 {
 	return {};

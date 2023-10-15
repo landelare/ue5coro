@@ -140,6 +140,24 @@ void DoTest(FAutomationTestBase& Test)
 	}
 
 	{
+		FEventRef CoroToTest;
+		std::atomic<bool> bMovedOut = false;
+		std::atomic<bool> bMovedIn = false;
+		World.Run(CORO
+		{
+			auto Return = Async::MoveToSimilarThread();
+			co_await Async::MoveToNewThread();
+			bMovedOut = !IsInGameThread();
+			co_await Return;
+			bMovedIn = IsInGameThread();
+			CoroToTest->Trigger();
+		});
+		FTestHelper::PumpGameThread(World, [&] { return CoroToTest->Wait(0); });
+		Test.TestTrue(TEXT("Moved out"), bMovedOut);
+		Test.TestTrue(TEXT("Moved back in"), bMovedIn);
+	}
+
+	{
 		std::atomic<int> State = 0;
 		World.Run(CORO
 		{
