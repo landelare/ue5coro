@@ -102,7 +102,7 @@ void FHttpAwaiter::FState::Resume()
 	    (Thread & ThreadTypeMask) == (ThisThread & ThreadTypeMask))
 		Promise->Resume();
 	else
-		AsyncTask(Thread, [Promise = Promise] { Promise->Resume(); });
+		AsyncTask(Thread, [Promise2 = Promise] { Promise2->Resume(); });
 }
 
 void FHttpAwaiter::FState::RequestComplete(FHttpRequestPtr,

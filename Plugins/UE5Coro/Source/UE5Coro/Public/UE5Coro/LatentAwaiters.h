@@ -33,6 +33,9 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
+#if UE5CORO_CPP20
+#include <concepts>
+#endif
 #include <functional>
 #include "Engine/StreamableManager.h"
 #include "UE5Coro/AsyncCoroutine.h"

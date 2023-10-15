@@ -79,6 +79,6 @@ namespace UE5Coro::Private
 {
 template<typename T>
 bool TAbilityPromise<T>::bCalledFromActivate = false;
-template UE5COROGAS_API struct TAbilityPromise<UUE5CoroAbilityTask>;
-template UE5COROGAS_API struct TAbilityPromise<UUE5CoroGameplayAbility>;
+template struct UE5COROGAS_API TAbilityPromise<UUE5CoroAbilityTask>;
+template struct UE5COROGAS_API TAbilityPromise<UUE5CoroGameplayAbility>;
 }

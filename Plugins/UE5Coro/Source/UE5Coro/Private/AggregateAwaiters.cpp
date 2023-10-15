@@ -86,20 +86,20 @@ FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
 			Coro = &Data->Handles[i];
 		}
 
-		Coro->ContinueWith([Data = Data, i]
+		Coro->ContinueWith([Data2 = Data, i]
 		{
-			std::unique_lock _(Data->Lock);
+			std::unique_lock _(Data2->Lock);
 
 			// Nothing to do if this wasn't the first one
-			if (Data->Index != -1)
+			if (Data2->Index != -1)
 				return;
-			Data->Index = i;
+			Data2->Index = i;
 
-			for (int j = 0; j < Data->Handles.Num(); ++j)
+			for (int j = 0; j < Data2->Handles.Num(); ++j)
 				if (j != i) // Cancel the others
-					Data->Handles[j].Cancel();
+					Data2->Handles[j].Cancel();
 
-			if (auto* Promise = Data->Promise)
+			if (auto* Promise = Data2->Promise)
 			{
 				_.unlock();
 				Promise->Resume();

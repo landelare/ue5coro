@@ -189,7 +189,9 @@ FMoveToAwaiter AI::AIMoveTo(AAIController* Controller, TGoal auto Target,
 	checkf(IsValid(Target), TEXT("Attempting to move to invalid target"));
 #if ENABLE_NAN_DIAGNOSTIC
 	if (FMath::IsNaN(AcceptanceRadius))
+	{
 		logOrEnsureNanError(TEXT("AsyncMoveTo started with NaN radius"));
+	}
 #endif
 
 	FVector Vector;

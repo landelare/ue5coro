@@ -46,11 +46,15 @@ TCoroutine<> CommonTimeline(double From, double To, double Length,
 {
 #if ENABLE_NAN_DIAGNOSTIC
 	if (FMath::IsNaN(From) || FMath::IsNaN(To) || FMath::IsNaN(Length))
+	{
 		logOrEnsureNanError(TEXT("Latent timeline started with NaN parameter"));
+	}
 	// Not a NaN right now but it could lead to one after division
 	if (Length < SMALL_NUMBER)
+	{
 		logOrEnsureNanError(
 			TEXT("Latent timeline started with very short length"));
+	}
 #endif
 	// Clamp negative and small lengths to something that can be divided by
 	Length = FMath::Max(Length, SMALL_NUMBER); // UE_SMALL_NUMBER is not in 5.0
@@ -69,7 +73,9 @@ TCoroutine<> CommonTimeline(double From, double To, double Length,
 #if ENABLE_NAN_DIAGNOSTIC
 			// Incredibly high Time values could cause this to go wrong
 			if (UNLIKELY(!FMath::IsFinite(Value)))
+			{
 				logOrEnsureNanError(TEXT("Latent timeline derailed"));
+			}
 #endif
 			Fn(Value);
 			if (Time == Length) // This hard == will work due to Min()

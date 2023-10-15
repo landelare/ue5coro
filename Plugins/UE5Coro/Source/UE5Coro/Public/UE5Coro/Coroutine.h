@@ -33,6 +33,10 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
+#if UE5CORO_CPP20
+#include <compare>
+#include <concepts>
+#endif
 #include <memory>
 #include "CoroutinePrivate.inl"
 #include "Coroutine.generated.h"

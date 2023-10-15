@@ -73,7 +73,9 @@ FLatentAwaiter GenericUntil(double Time)
 {
 #if ENABLE_NAN_DIAGNOSTIC
 	if (FMath::IsNaN(Time))
+	{
 		logOrEnsureNanError(TEXT("Latent wait started with NaN time"));
+	}
 #endif
 
 	if constexpr (bTimeIsOffset)
