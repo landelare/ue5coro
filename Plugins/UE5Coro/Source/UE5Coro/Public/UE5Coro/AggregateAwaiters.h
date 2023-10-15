@@ -35,6 +35,7 @@
 #include "UE5Coro/Definitions.h"
 #include <memory>
 #include "UE5Coro/AsyncCoroutine.h"
+#include "UE5Coro/CoroutineAwaiters.h"
 #include "UE5Coro/Private.h"
 
 namespace UE5Coro::Private
@@ -61,11 +62,18 @@ concept TAggregateAwaitable =
 namespace UE5Coro
 {
 /** co_awaits all parameters, resumes its own awaiting coroutine when the first
- *  one of them finishes.
+ *  one of them finishes.<br>
  *  The result of the co_await expression is the index of the parameter that
  *  finished first. */
 template<UE5CORO_PRIVATE_AWAITABLE... T>
 Private::FAnyAwaiter WhenAny(T&&...);
+
+#if UE5CORO_CPP20
+/** Resumes the awaiting coroutine when all other coroutines have completed.<br>
+ *  The result of the co_await expression is the index of the parameter that
+ *  finished first. */
+UE5CORO_API Private::FAnyAwaiter WhenAny(const TArray<TCoroutine<>>&);
+#endif
 
 /** co_awaits all coroutines in the array.
  *  The first one to finish cancels the others and resumes the caller.
@@ -84,6 +92,11 @@ Private::FRaceAwaiter Race(TCoroutine<T>... Args);
  *  of them finish. */
 template<UE5CORO_PRIVATE_AWAITABLE... T>
 Private::FAllAwaiter WhenAll(T&&...);
+
+#if UE5CORO_CPP20
+/** Resumes the awaiting coroutine when all other coroutines have completed. */
+UE5CORO_API Private::FAllAwaiter WhenAll(const TArray<TCoroutine<>>&);
+#endif
 }
 
 namespace UE5Coro::Private
@@ -117,6 +130,9 @@ public:
 		int Idx = 0;
 		(Consume(Data, Idx++, std::forward<T>(Awaiters)), ...);
 	}
+
+	template<typename T>
+	explicit FAggregateAwaiter(T, const TArray<TCoroutine<>>& Coroutines);
 
 	bool await_ready();
 	void Suspend(FPromise&);

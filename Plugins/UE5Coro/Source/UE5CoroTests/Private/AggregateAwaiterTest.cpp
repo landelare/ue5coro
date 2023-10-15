@@ -34,6 +34,7 @@
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/AggregateAwaiters.h"
 #include "UE5Coro/CoroutineAwaiters.h"
+#include "UE5Coro/Threading.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;
@@ -232,6 +233,57 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestEqual(TEXT("State"), State, 2);
 		Test.TestEqual(TEXT("Return value"), Coro.GetResult(), 1);
 	}
+
+#if UE5CORO_CPP20
+	{
+		int State = 0;
+		FAwaitableEvent Event(EEventMode::ManualReset);
+		World.Run(CORO
+		{
+			TArray<TCoroutine<>> Coros;
+			for (int i = 0; i < 10; ++i)
+				Coros.Add(World.Run(CORO
+				{
+					++State;
+					co_await Event;
+					++State;
+				}));
+			Test.TestEqual(TEXT("Initial state inside"), State, 10);
+			co_await WhenAll(Coros);
+			Test.TestEqual(TEXT("Final state inside"), State, 20);
+			++State;
+		});
+		Test.TestEqual(TEXT("Initial state outside"), State, 10);
+		Event.Trigger();
+		Test.TestEqual(TEXT("Final state outside"), State, 21);
+	}
+
+	{
+		int State = 0;
+		FAwaitableEvent Event(EEventMode::AutoReset);
+		World.Run(CORO
+		{
+			TArray<TCoroutine<>> Coros;
+			for (int i = 0; i < 10; ++i)
+				Coros.Add(World.Run(CORO
+				{
+					++State;
+					co_await Event;
+					++State;
+				}));
+			Test.TestEqual(TEXT("Initial state inside"), State, 10);
+			co_await WhenAny(Coros);
+			Test.TestEqual(TEXT("Final state inside"), State, 11);
+			++State;
+		});
+		Test.TestEqual(TEXT("Initial state outside"), State, 10);
+		for (int i = 0; i < 10; ++i)
+		{
+			Event.Trigger();
+			Test.TestEqual(TEXT("State outside"), State, i + 12);
+		}
+	}
+#endif
 }
 }
 

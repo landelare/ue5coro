@@ -41,6 +41,18 @@ int FAggregateAwaiter::GetResumerIndex() const
 	return Data->Index;
 }
 
+template<typename T>
+FAggregateAwaiter::FAggregateAwaiter(T All, const TArray<TCoroutine<>>& Coroutines)
+	: Data(std::make_shared<FData>(All.value ? Coroutines.Num() : !!Coroutines.Num()))
+{
+	for (int i = 0; i < Coroutines.Num(); ++i)
+		Consume(Data, i, Coroutines[i]);
+}
+template UE5CORO_API FAggregateAwaiter::FAggregateAwaiter(
+	std::false_type, const TArray<TCoroutine<>>&);
+template UE5CORO_API FAggregateAwaiter::FAggregateAwaiter(
+	std::true_type, const TArray<TCoroutine<>>&);
+
 bool FAggregateAwaiter::await_ready()
 {
 	checkf(Data, TEXT("Attempting to await moved-from aggregate awaiter"));
@@ -64,10 +76,24 @@ void FAggregateAwaiter::Suspend(FPromise& Promise)
 	Data->Lock.unlock();
 }
 
+#if UE5CORO_CPP20
+FAnyAwaiter UE5Coro::WhenAny(const TArray<TCoroutine<>>& Coroutines)
+{
+	return FAnyAwaiter(std::false_type(), Coroutines);
+}
+#endif
+
 FRaceAwaiter UE5Coro::Race(TArray<TCoroutine<>> Array)
 {
 	return FRaceAwaiter(std::move(Array));
 }
+
+#if UE5CORO_CPP20
+FAllAwaiter UE5Coro::WhenAll(const TArray<TCoroutine<>>& Coroutines)
+{
+	return FAllAwaiter(std::true_type(), Coroutines);
+}
+#endif
 
 FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
 	: Data(std::make_shared<FData>(std::move(Array)))
