@@ -29,19 +29,18 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-using UnrealBuildTool;
+#include "UE5Coro.h"
+#include "UE5CoroAI/AIAwaiters.h"
 
-public class UE5CoroAITests : UE5CoroModuleRules
+using namespace UE5Coro;
+using namespace UE5Coro::AI;
+
+TCoroutine<> UE5CoroAICompileTest()
 {
-	public UE5CoroAITests(ReadOnlyTargetRules Target)
-		: base(Target)
-	{
-		PublicDependencyModuleNames.AddRange(new[]
-		{
-			"NavigationSystem",
-			"UE5Coro",
-			"UE5CoroAI",
-			"UE5CoroTests",
-		});
-	}
+	FPathFindingQuery Query;
+	co_await FindPath(nullptr, Query);
+	co_await AIMoveTo(nullptr, FVector());
+	co_await AIMoveTo(nullptr, static_cast<AActor*>(nullptr));
+	co_await SimpleMoveTo(nullptr, FVector());
+	co_await SimpleMoveTo(nullptr, static_cast<AActor*>(nullptr));
 }
