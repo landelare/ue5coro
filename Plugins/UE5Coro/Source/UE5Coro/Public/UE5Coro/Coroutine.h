@@ -187,7 +187,7 @@ public:
 };
 
 static_assert(sizeof(TCoroutine<int>) == sizeof(TCoroutine<>));
-#if UE5CORO_CPP20
+#if UE5CORO_CPP20 && !UE5CORO_PRIVATE_LIBCPP_IS_BROKEN
 static_assert(std::totally_ordered<TCoroutine<>>);
 static_assert(std::totally_ordered_with<TCoroutine<>, TCoroutine<int>>);
 #endif

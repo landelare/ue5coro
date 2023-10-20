@@ -47,10 +47,19 @@ namespace UE5Coro::Private
 {
 	namespace stdcoro = ::std::experimental;
 }
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wdeprecated-experimental-coroutine"
+#endif
 #else
 #error UE5Coro requires C++20 or the Coroutines TS for C++17.
 #endif
 
 #ifndef UE5CORO_DEBUG
 #define UE5CORO_DEBUG (UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT)
+#endif
+
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 16000
+#define UE5CORO_PRIVATE_LIBCPP_IS_BROKEN 1
+#else
+#define UE5CORO_PRIVATE_LIBCPP_IS_BROKEN 0
 #endif

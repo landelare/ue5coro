@@ -55,7 +55,7 @@ public:
 
 static_assert(sizeof(FLatentAwaiter) == sizeof(FLatentChainAwaiter));
 
-#if UE5CORO_CPP20
+#if UE5CORO_CPP20 && !UE5CORO_PRIVATE_LIBCPP_IS_BROKEN
 template<typename T>
 concept TWorldContext = std::same_as<std::decay_t<T>, UObject*> ||
                         std::same_as<std::decay_t<T>, const UObject*> ||
@@ -134,7 +134,7 @@ struct FLatentChain<bWorld, bInfo, Type, Types...>
 
 namespace UE5Coro::Latent
 {
-#if UE5CORO_CPP20
+#if UE5CORO_CPP20 && !UE5CORO_PRIVATE_LIBCPP_IS_BROKEN
 
 #if defined(_MSC_VER) && _MSC_VER < 1930
 #define UE5CORO_PRIVATE_LATENT_CHAIN_IS_OK 0

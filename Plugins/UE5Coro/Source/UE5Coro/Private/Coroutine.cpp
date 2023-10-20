@@ -81,7 +81,11 @@ bool TCoroutine<>::operator==(const TCoroutine<>& Other) const noexcept
 auto TCoroutine<>::operator<=>(const TCoroutine<>& Other) const noexcept
 	-> std::strong_ordering
 {
+#if UE5CORO_PRIVATE_LIBCPP_IS_BROKEN
+	return Extras.get() <=> Other.Extras.get();
+#else
 	return Extras <=> Other.Extras;
+#endif
 }
 #else
 bool TCoroutine<>::operator!=(const TCoroutine<>& Other) const noexcept

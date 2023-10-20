@@ -124,7 +124,7 @@ UE5CORO_API Private::FLatentAwaiter UntilAudioTime(double);
 
 #pragma region Chain
 
-#if UE5CORO_CPP20
+#if UE5CORO_CPP20 && !UE5CORO_PRIVATE_LIBCPP_IS_BROKEN
 /** Resumes the coroutine once the chained static latent action has finished,
  *  with automatic parameter matching.<br>
  *  The result of the co_await expression is true if the chained latent action
