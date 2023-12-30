@@ -50,9 +50,6 @@ class FSimpleMoveToAwaiter;
 
 namespace UE5Coro::AI
 {
-template<typename T>
-concept TGoal = std::same_as<T, FVector> || std::same_as<T, AActor*>;
-
 /** Starts an async pathfinding operation, resumes the awaiting coroutine once
  *  it finishes.<br>
  *  The result of the co_await expression is
@@ -65,7 +62,18 @@ UE5COROAI_API Private::FPathFindingAwaiter FindPath(
  *  coroutine once it finishes.<br>
  *  The result of the co_await expression is EPathFollowingResult. */
 UE5COROAI_API Private::FMoveToAwaiter AIMoveTo(
-	AAIController* Controller, TGoal auto Target, float AcceptanceRadius = -1,
+	AAIController* Controller, FVector Target, float AcceptanceRadius = -1,
+	EAIOptionFlag::Type StopOnOverlap = EAIOptionFlag::Default,
+	EAIOptionFlag::Type AcceptPartialPath = EAIOptionFlag::Default,
+	bool bUsePathfinding = true, bool bLockAILogic = true,
+	bool bUseContinuousGoalTracking = false,
+	EAIOptionFlag::Type ProjectGoalOnNavigation = EAIOptionFlag::Default);
+
+/** Issues a "move to" command to the specified controller, resumes the awaiting
+ *  coroutine once it finishes.<br>
+ *  The result of the co_await expression is EPathFollowingResult. */
+UE5COROAI_API Private::FMoveToAwaiter AIMoveTo(
+	AAIController* Controller, AActor* Target, float AcceptanceRadius = -1,
 	EAIOptionFlag::Type StopOnOverlap = EAIOptionFlag::Default,
 	EAIOptionFlag::Type AcceptPartialPath = EAIOptionFlag::Default,
 	bool bUsePathfinding = true, bool bLockAILogic = true,
@@ -76,7 +84,14 @@ UE5COROAI_API Private::FMoveToAwaiter AIMoveTo(
  *  such as injecting components into the controller, issues a "move to"
  *  command, and resumes the awaiting coroutine once it finishes.<br>
  *  The result of the co_await expression is FPathFollowingResult. */
-UE5COROAI_API auto SimpleMoveTo(AController* Controller, TGoal auto Target)
+UE5COROAI_API auto SimpleMoveTo(AController* Controller, FVector Target)
+	-> Private::FSimpleMoveToAwaiter;
+
+/** Performs similar behavior to UAIBlueprintHelperLibrary's SimpleMoveTo,
+ *  such as injecting components into the controller, issues a "move to"
+ *  command, and resumes the awaiting coroutine once it finishes.<br>
+ *  The result of the co_await expression is FPathFollowingResult. */
+UE5COROAI_API auto SimpleMoveTo(AController* Controller, AActor* Target)
 	-> Private::FSimpleMoveToAwaiter;
 }
 

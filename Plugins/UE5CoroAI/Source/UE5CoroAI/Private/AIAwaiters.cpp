@@ -40,6 +40,9 @@ using namespace UE5Coro::Private;
 
 namespace
 {
+template<typename T>
+concept TGoal = std::same_as<T, FVector> || std::same_as<T, AActor*>;
+
 struct FFindPathState
 {
 	TWeakObjectPtr<UNavigationSystemV1> NS1;
@@ -77,6 +80,124 @@ bool ShouldResumeMoveTo(void* State, bool bCleanup)
 constexpr bool IsValid(const FVector&)
 {
 	return true;
+}
+
+FMoveToAwaiter AIMoveToCore(AAIController* Controller, TGoal auto Target,
+                            float AcceptanceRadius,
+                            EAIOptionFlag::Type StopOnOverlap,
+                            EAIOptionFlag::Type AcceptPartialPath,
+                            bool bUsePathfinding, bool bLockAILogic,
+                            bool bUseContinuousGoalTracking,
+                            EAIOptionFlag::Type ProjectGoalOnNavigation)
+{
+	checkf(IsInGameThread(),
+	       TEXT("This method may only be called from the game thread"));
+	checkf(IsValid(Controller), TEXT("Attempting to move invalid controller"));
+	checkf(IsValid(Target), TEXT("Attempting to move to invalid target"));
+#if ENABLE_NAN_DIAGNOSTIC
+	if (FMath::IsNaN(AcceptanceRadius))
+	{
+		logOrEnsureNanError(TEXT("AsyncMoveTo started with NaN radius"));
+	}
+#endif
+
+	FVector Vector;
+	AActor* Actor;
+	if constexpr (std::convertible_to<decltype(Target), FVector>)
+		std::tie(Vector, Actor) = std::tuple(Target, nullptr);
+	else
+		std::tie(Vector, Actor) = std::tuple(FVector::ZeroVector, Target);
+	return FMoveToAwaiter(UAITask_MoveTo::AIMoveTo(
+		Controller, Vector, Actor, AcceptanceRadius, StopOnOverlap,
+		AcceptPartialPath, bUsePathfinding, bLockAILogic,
+		bUseContinuousGoalTracking, ProjectGoalOnNavigation));
+}
+
+FSimpleMoveToAwaiter SimpleMoveToCore(AController* Controller, TGoal auto Target)
+{
+	checkf(IsInGameThread(),
+	       TEXT("This method may only be called from the game thread"));
+	checkf(IsValid(Controller), TEXT("Attempting to move invalid controller"));
+	checkf(IsValid(Controller->GetPawn()),
+	       TEXT("Attempting to move invalid pawn"));
+	checkf(IsValid(Target), TEXT("Attempting to move to invalid target"));
+
+	auto* World = Controller->GetWorld();
+	auto* NS1 = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	checkf(IsValid(NS1), TEXT("Cannot perform move without navigation system"));
+
+	// This recreates InitNavigationControl's component injection
+	UPathFollowingComponent* PathFollow;
+	if (auto* AIC = Cast<AAIController>(Controller); IsValid(AIC))
+		PathFollow = AIC->GetPathFollowingComponent();
+	else
+	{
+		PathFollow = Controller->FindComponentByClass<UPathFollowingComponent>();
+		if (!IsValid(PathFollow))
+		{
+			PathFollow = NewObject<UPathFollowingComponent>(Controller);
+			PathFollow->RegisterComponentWithWorld(Controller->GetWorld());
+			// The original does not call AddInstanceComponent
+			PathFollow->Initialize();
+		}
+	}
+
+	// Fail instantly if the PFC can't be used
+	if (!IsValid(PathFollow) || !PathFollow->IsPathFollowingAllowed())
+		return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
+
+	FVector From = Controller->GetNavAgentLocation();
+	FVector To;
+	if constexpr (std::convertible_to<decltype(Target), AActor*>)
+		To = Target->GetActorLocation();
+	else
+		To = Target;
+
+	bool bAlreadyThere = PathFollow->HasReached(
+		To, EPathFollowingReachMode::OverlapAgentAndGoal);
+
+	// Abort the previous move if there was any
+	constexpr auto Flags = FPathFollowingResultFlags::ForcedScript |
+	                       FPathFollowingResultFlags::NewRequest;
+	if (PathFollow->GetStatus() != EPathFollowingStatus::Idle)
+		PathFollow->AbortMove(*NS1, Flags, FAIRequestID::AnyRequest,
+		                      bAlreadyThere ? EPathFollowingVelocityMode::Reset
+		                                    : EPathFollowingVelocityMode::Keep);
+
+	// Early exits for immediate failures/successes
+	ANavigationData* NavData = NS1->GetNavDataForProps(
+		Controller->GetNavAgentPropertiesRef(), From);
+	if (!IsValid(NavData))
+		return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
+
+	if (bAlreadyThere)
+	{
+		PathFollow->RequestMoveWithImmediateFinish(EPathFollowingResult::Success);
+		return FSimpleMoveToAwaiter(EPathFollowingResult::Success);
+	}
+
+	FPathFindingQuery Query(Controller, *NavData, From, To);
+	// Not calling FindPathAsync to match the original
+	FPathFindingResult Result = NS1->FindPathSync(Query);
+	if (Result.IsSuccessful())
+	{
+		if constexpr (std::convertible_to<decltype(Target), AActor*>)
+			// Matching the hardcoded constant from UAIBlueprintHelperLibrary
+			Result.Path->SetGoalActorObservation(*Target, 100);
+		FAIRequestID ID = PathFollow->RequestMove(FAIMoveRequest(To),
+		                                          Result.Path);
+
+		// The interesting case
+		return FSimpleMoveToAwaiter(PathFollow, ID);
+	}
+
+	if (PathFollow->GetStatus() != EPathFollowingStatus::Idle)
+	{
+		PathFollow->RequestMoveWithImmediateFinish(EPathFollowingResult::Invalid);
+		return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
+	}
+
+	return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
 }
 }
 
@@ -175,7 +296,7 @@ FPathFindingAwaiter AI::FindPath(UObject* WorldContextObject,
 	return FPathFindingAwaiter(new FFindPathSharedPtr(std::move(State)));
 }
 
-FMoveToAwaiter AI::AIMoveTo(AAIController* Controller, TGoal auto Target,
+FMoveToAwaiter AI::AIMoveTo(AAIController* Controller, FVector Target,
                             float AcceptanceRadius,
                             EAIOptionFlag::Type StopOnOverlap,
                             EAIOptionFlag::Type AcceptPartialPath,
@@ -183,123 +304,30 @@ FMoveToAwaiter AI::AIMoveTo(AAIController* Controller, TGoal auto Target,
                             bool bUseContinuousGoalTracking,
                             EAIOptionFlag::Type ProjectGoalOnNavigation)
 {
-	checkf(IsInGameThread(),
-	       TEXT("This method may only be called from the game thread"));
-	checkf(IsValid(Controller), TEXT("Attempting to move invalid controller"));
-	checkf(IsValid(Target), TEXT("Attempting to move to invalid target"));
-#if ENABLE_NAN_DIAGNOSTIC
-	if (FMath::IsNaN(AcceptanceRadius))
-	{
-		logOrEnsureNanError(TEXT("AsyncMoveTo started with NaN radius"));
-	}
-#endif
-
-	FVector Vector;
-	AActor* Actor;
-	if constexpr (std::is_same_v<decltype(Target), FVector>)
-		std::tie(Vector, Actor) = std::tuple(Target, nullptr);
-	else
-		std::tie(Vector, Actor) = std::tuple(FVector::ZeroVector, Target);
-	return FMoveToAwaiter(UAITask_MoveTo::AIMoveTo(
-		Controller, Vector, Actor, AcceptanceRadius, StopOnOverlap,
-		AcceptPartialPath, bUsePathfinding, bLockAILogic,
-		bUseContinuousGoalTracking, ProjectGoalOnNavigation));
+	return AIMoveToCore(Controller, Target, AcceptanceRadius, StopOnOverlap,
+	                    AcceptPartialPath, bUsePathfinding, bLockAILogic,
+	                    bUseContinuousGoalTracking, ProjectGoalOnNavigation);
 }
 
-template UE5COROAI_API FMoveToAwaiter AI::AIMoveTo(
-	AAIController*, FVector, float, EAIOptionFlag::Type, EAIOptionFlag::Type,
-	bool, bool, bool, EAIOptionFlag::Type);
-template UE5COROAI_API FMoveToAwaiter AI::AIMoveTo(
-	AAIController*, AActor*, float, EAIOptionFlag::Type, EAIOptionFlag::Type,
-	bool, bool, bool, EAIOptionFlag::Type);
-
-FSimpleMoveToAwaiter AI::SimpleMoveTo(AController* Controller, TGoal auto Target)
+FMoveToAwaiter AI::AIMoveTo(AAIController* Controller, AActor* Target,
+                            float AcceptanceRadius,
+                            EAIOptionFlag::Type StopOnOverlap,
+                            EAIOptionFlag::Type AcceptPartialPath,
+                            bool bUsePathfinding, bool bLockAILogic,
+                            bool bUseContinuousGoalTracking,
+                            EAIOptionFlag::Type ProjectGoalOnNavigation)
 {
-	checkf(IsInGameThread(),
-	       TEXT("This method may only be called from the game thread"));
-	checkf(IsValid(Controller), TEXT("Attempting to move invalid controller"));
-	checkf(IsValid(Controller->GetPawn()),
-	       TEXT("Attempting to move invalid pawn"));
-	checkf(IsValid(Target), TEXT("Attempting to move to invalid target"));
-
-	auto* World = Controller->GetWorld();
-	auto* NS1 = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
-	checkf(IsValid(NS1), TEXT("Cannot perform move without navigation system"));
-
-	// This recreates InitNavigationControl's component injection
-	UPathFollowingComponent* PathFollow;
-	if (auto* AIC = Cast<AAIController>(Controller); IsValid(AIC))
-		PathFollow = AIC->GetPathFollowingComponent();
-	else
-	{
-		PathFollow = Controller->FindComponentByClass<UPathFollowingComponent>();
-		if (!IsValid(PathFollow))
-		{
-			PathFollow = NewObject<UPathFollowingComponent>(Controller);
-			PathFollow->RegisterComponentWithWorld(Controller->GetWorld());
-			// The original does not call AddInstanceComponent
-			PathFollow->Initialize();
-		}
-	}
-
-	// Fail instantly if the PFC can't be used
-	if (!IsValid(PathFollow) || !PathFollow->IsPathFollowingAllowed())
-		return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
-
-	FVector From = Controller->GetNavAgentLocation();
-	FVector To;
-	if constexpr (std::is_same_v<decltype(Target), AActor*>)
-		To = Target->GetActorLocation();
-	else
-		To = Target;
-
-	bool bAlreadyThere = PathFollow->HasReached(
-		To, EPathFollowingReachMode::OverlapAgentAndGoal);
-
-	// Abort the previous move if there was any
-	constexpr auto Flags = FPathFollowingResultFlags::ForcedScript |
-	                       FPathFollowingResultFlags::NewRequest;
-	if (PathFollow->GetStatus() != EPathFollowingStatus::Idle)
-		PathFollow->AbortMove(*NS1, Flags, FAIRequestID::AnyRequest,
-		                      bAlreadyThere ? EPathFollowingVelocityMode::Reset
-		                                    : EPathFollowingVelocityMode::Keep);
-
-	// Early exits for immediate failures/successes
-	ANavigationData* NavData = NS1->GetNavDataForProps(
-		Controller->GetNavAgentPropertiesRef(), From);
-	if (!IsValid(NavData))
-		return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
-
-	if (bAlreadyThere)
-	{
-		PathFollow->RequestMoveWithImmediateFinish(EPathFollowingResult::Success);
-		return FSimpleMoveToAwaiter(EPathFollowingResult::Success);
-	}
-
-	FPathFindingQuery Query(Controller, *NavData, From, To);
-	// Not calling FindPathAsync to match the original
-	FPathFindingResult Result = NS1->FindPathSync(Query);
-	if (Result.IsSuccessful())
-	{
-		if constexpr (std::is_same_v<decltype(Target), AActor*>)
-			// Matching the hardcoded constant from UAIBlueprintHelperLibrary
-			Result.Path->SetGoalActorObservation(*Target, 100);
-		FAIRequestID ID = PathFollow->RequestMove(FAIMoveRequest(To), Result.Path);
-
-		// The interesting case
-		return FSimpleMoveToAwaiter(PathFollow, ID);
-	}
-
-	if (PathFollow->GetStatus() != EPathFollowingStatus::Idle)
-	{
-		PathFollow->RequestMoveWithImmediateFinish(EPathFollowingResult::Invalid);
-		return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
-	}
-
-	return FSimpleMoveToAwaiter(EPathFollowingResult::Invalid);
+	return AIMoveToCore(Controller, Target, AcceptanceRadius, StopOnOverlap,
+	                    AcceptPartialPath, bUsePathfinding, bLockAILogic,
+	                    bUseContinuousGoalTracking, ProjectGoalOnNavigation);
 }
 
-template UE5COROAI_API FSimpleMoveToAwaiter AI::SimpleMoveTo(AController*,
-                                                             FVector);
-template UE5COROAI_API FSimpleMoveToAwaiter AI::SimpleMoveTo(AController*,
-                                                             AActor*);
+FSimpleMoveToAwaiter AI::SimpleMoveTo(AController* Controller, FVector Target)
+{
+	return SimpleMoveToCore(Controller, Target);
+}
+
+FSimpleMoveToAwaiter AI::SimpleMoveTo(AController* Controller, AActor* Target)
+{
+	return SimpleMoveToCore(Controller, Target);
+}
