@@ -61,6 +61,9 @@ TCoroutine<> CommonTimeline(double From, double To, double Length,
 
 	checkf(IsInGameThread(),
 	       TEXT("Latent coroutines may only be started on the game thread"));
+	checkf(GWorld,
+	       TEXT("This function may only be used in the context of a world"));
+
 	double Start = (GWorld->*GetTime)();
 	for (;;)
 	{

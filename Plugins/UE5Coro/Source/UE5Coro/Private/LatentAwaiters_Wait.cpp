@@ -53,6 +53,7 @@ bool WaitUntilTime(void* State, bool bCleanup)
 	static_assert(sizeof(void*) >= sizeof(double),
 	              "32-bit platforms are not supported");
 	auto& TargetTime = reinterpret_cast<double&>(State);
+	checkf(GWorld, TEXT("Internal error: Latent poll outside of a world"));
 	return (GWorld->*GetTime)() >= TargetTime;
 }
 
@@ -77,6 +78,10 @@ FLatentAwaiter GenericUntil(double Time)
 		logOrEnsureNanError(TEXT("Latent wait started with NaN time"));
 	}
 #endif
+	checkf(IsInGameThread(),
+	       TEXT("Latent awaiters may only be used on the game thread"));
+	checkf(GWorld,
+	       TEXT("This function may only be used in the context of a world"));
 
 	if constexpr (bTimeIsOffset)
 		Time += (GWorld->*GetTime)();

@@ -90,6 +90,7 @@ struct FLatentChain<true, bInfo, Type, Types...>
 {
 	static void Call(auto&& Fn, FLatentActionInfo LatentInfo, auto&&... Args)
 	{
+		checkf(GWorld, TEXT("Could not chain latent action: no world found"));
 		FLatentChain<false, bInfo, Types...>::Call(
 			std::bind_front(std::move(Fn), &*GWorld),
 			LatentInfo,
@@ -150,6 +151,8 @@ template<typename... FnParams>
 UE5CORO_PRIVATE_LATENT_CHAIN_BUG_MSG
 Private::FLatentChainAwaiter Chain(auto (*Function)(FnParams...), auto&&... Args)
 {
+	checkf(IsInGameThread(),
+	       TEXT("Latent awaiters may only be used on the game thread"));
 	auto [LatentInfo, Done] = Private::MakeLatentInfo();
 	Private::FLatentChain<true, true, FnParams...>::Call(
 		Function,
@@ -163,6 +166,8 @@ UE5CORO_PRIVATE_LATENT_CHAIN_BUG_MSG
 Private::FLatentChainAwaiter Chain(auto (Class::*Function)(FnParams...),
                                    Class* Object, auto&&... Args)
 {
+	checkf(IsInGameThread(),
+	       TEXT("Latent awaiters may only be used on the game thread"));
 	auto [LatentInfo, Done] = Private::MakeLatentInfo();
 	Private::FLatentChain<true, true, FnParams...>::Call(
 		std::bind_front(Function, Object),
@@ -178,6 +183,11 @@ Private::FLatentChainAwaiter Chain(auto (Class::*Function)(FnParams...),
 template<typename F, typename... A>
 Private::FLatentChainAwaiter ChainEx(F&& Function, A&&... Args)
 {
+	checkf(IsInGameThread(),
+	       TEXT("Latent awaiters may only be used on the game thread"));
+	if constexpr ((... || (std::is_placeholder_v<std::decay_t<A>> == 1)))
+		checkf(GWorld,
+		       TEXT("Could not chain latent action: no world found for _1"));
 	static_assert((... || (std::is_placeholder_v<std::decay_t<A>> == 2)),
 	              "The _2 parameter for LatentInfo is mandatory");
 
