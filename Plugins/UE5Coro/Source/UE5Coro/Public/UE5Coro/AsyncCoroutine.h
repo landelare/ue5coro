@@ -439,6 +439,9 @@ void FLatentPromise::Init(T& First, A&... Args)
 	// Convert UObject& to UObject* for world context
 	if constexpr (std::is_convertible_v<T&, const UObject&>)
 		Init(static_cast<const UObject*>(std::addressof(First)), Args...);
+	// Do the UObject* cast if overload resolution finds this function somehow
+	else if constexpr (std::is_convertible_v<T, const UObject*>)
+		Init<A...>(static_cast<const UObject*>(First), Args...);
 	else
 		Init(Args...);
 }
