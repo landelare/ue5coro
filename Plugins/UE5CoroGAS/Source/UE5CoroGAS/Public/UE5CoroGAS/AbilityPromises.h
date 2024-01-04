@@ -69,8 +69,10 @@ class [[nodiscard]] UE5COROGAS_API FAbilityPromise
 	using Super = TCoroutinePromise;
 	static FLatentActionInfo MakeLatentInfo(UObject&);
 
-public:
+protected:
 	explicit FAbilityPromise(UObject&);
+
+public:
 	GAS::FAbilityCoroutine get_return_object() noexcept;
 	FFinalSuspend final_suspend() noexcept;
 };

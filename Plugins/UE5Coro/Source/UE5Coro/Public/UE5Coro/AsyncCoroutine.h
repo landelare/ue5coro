@@ -240,11 +240,12 @@ class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise
 {
 	virtual bool IsEarlyDestroy() const override;
 
-public:
+protected:
 	template<typename... A>
 	explicit FAsyncPromise(std::shared_ptr<FPromiseExtras> InExtras, A&&...)
 		: FPromise(std::move(InExtras), TEXT("Async")) { }
 
+public:
 	FInitialSuspend initial_suspend() noexcept
 	{
 		return {FInitialSuspend::Resume};
@@ -280,12 +281,12 @@ class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
 	template<typename T, typename... A> void Init(T&, A&...);
 
 protected:
+	template<typename... T>
+	explicit FLatentPromise(std::shared_ptr<FPromiseExtras>, T&&...);
 	virtual ~FLatentPromise() override;
 	virtual bool IsEarlyDestroy() const override;
 
 public:
-	template<typename... T>
-	explicit FLatentPromise(std::shared_ptr<FPromiseExtras>, T&&...);
 	virtual void ThreadSafeDestroy() override;
 
 	virtual void Resume(bool bBypassCancellationHolds = false) override;
