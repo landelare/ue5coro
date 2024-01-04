@@ -154,14 +154,13 @@ public:
 
 void FLatentPromise::CreateLatentAction()
 {
-	// We're still scanning for the world, so use what we have right now
-	UWorld* WorldNow = nullptr;
-	if (!Context.IsExplicitlyNull())
-		WorldNow = Context.Get()->GetWorld();
-	if (!IsValid(WorldNow))
-		WorldNow = &*GWorld;
+	checkf(IsInGameThread(),
+	       TEXT("Latent coroutines may only be started on the game thread"));
+	checkf(Context.IsValid() && IsValid(Context.Get()->GetWorld()),
+	       TEXT("Could not determine world for latent coroutine"));
 
-	auto* Sys = WorldNow->GetSubsystem<UUE5CoroSubsystem>();
+	auto* World = Context.Get()->GetWorld();
+	auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
 	checkf(IsValid(Sys), TEXT("Internal error: couldn't find UE5Coro subsystem"));
 	CreateLatentAction(Sys->MakeLatentInfo());
 }
@@ -178,10 +177,7 @@ void FLatentPromise::CreateLatentAction(FLatentActionInfo&& LatentInfo)
 
 void FLatentPromise::Init()
 {
-	// Last resort if we got this far without a world
-	if (Context.IsExplicitlyNull())
-		Context = &*GWorld;
-
+	// Provide a valid world context parameter to your coroutine if this gets hit!
 	checkf(Context.IsValid() && IsValid(Context.Get()->GetWorld()),
 	       TEXT("Could not determine world for latent coroutine"));
 
