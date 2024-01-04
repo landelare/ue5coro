@@ -48,8 +48,8 @@ FLatentActionInfo FAbilityPromise::MakeLatentInfo(UObject& Task)
 	return {0, DummyId++, TEXT("None"), &Task};
 }
 
-FAbilityPromise::FAbilityPromise(UObject& Target)
-	: Super(Target, MakeLatentInfo(Target))
+FAbilityPromise::FAbilityPromise(UObject& Target, UWorld* MaybeWorld)
+	: Super(Target, MaybeWorld, MakeLatentInfo(Target))
 {
 	checkf(IsInGameThread(),
 	       TEXT("Internal error: Expected to start on the game thread"));
@@ -67,18 +67,37 @@ FFinalSuspend FAbilityPromise::final_suspend() noexcept
 }
 
 template<typename T>
-TAbilityPromise<T>::TAbilityPromise(T& Target)
-	: FAbilityPromise(Target)
+void TAbilityPromise<T>::Init(T& Target)
 {
 	checkf(bCalledFromActivate, TEXT("Do not call Execute coroutines directly!"));
 	bCalledFromActivate = false;
 	Target.CoroutineStarting(this);
 }
 
+UWorld* FAbilityPromise::TryGetWorld(FGameplayAbilitySpecHandle Handle,
+                                     const FGameplayAbilityActorInfo* ActorInfo,
+                                     FGameplayAbilityActivationInfo ActivationInfo,
+                                     const FGameplayEventData* TriggerEventData)
+{
+	// UAbilitySystemComponent::InternalTryActivateAbility should prevent these
+	checkf(ActorInfo, TEXT("Expected ability activation with valid actor info"));
+	checkf(IsValid(ActorInfo->OwnerActor.Get()),
+	       TEXT("Expected ability activation with valid owner"));
+	checkf(IsValid(ActorInfo->AvatarActor.Get()),
+	       TEXT("Expected ability activation with valid avatar"));
+
+	if (auto* World = ActorInfo->OwnerActor.Get()->GetWorld();
+	    ensureMsgf(IsValid(World),
+	               TEXT("Expected ability activation in valid world")))
+		return World;
+	else
+		return nullptr;
+}
+
 namespace UE5Coro::Private
 {
 template<typename T>
 bool TAbilityPromise<T>::bCalledFromActivate = false;
-template struct UE5COROGAS_API TAbilityPromise<UUE5CoroAbilityTask>;
-template struct UE5COROGAS_API TAbilityPromise<UUE5CoroGameplayAbility>;
+template class UE5COROGAS_API TAbilityPromise<UUE5CoroAbilityTask>;
+template class UE5COROGAS_API TAbilityPromise<UUE5CoroGameplayAbility>;
 }

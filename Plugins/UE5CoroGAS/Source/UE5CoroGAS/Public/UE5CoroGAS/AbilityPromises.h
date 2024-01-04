@@ -70,7 +70,12 @@ class [[nodiscard]] UE5COROGAS_API FAbilityPromise
 	static FLatentActionInfo MakeLatentInfo(UObject&);
 
 protected:
-	explicit FAbilityPromise(UObject&);
+	UWorld* TryGetWorld() { return nullptr; }
+	UWorld* TryGetWorld(FGameplayAbilitySpecHandle Handle,
+	                    const FGameplayAbilityActorInfo* ActorInfo,
+	                    FGameplayAbilityActivationInfo ActivationInfo,
+	                    const FGameplayEventData* TriggerEventData);
+	explicit FAbilityPromise(UObject&, UWorld* = nullptr);
 
 public:
 	GAS::FAbilityCoroutine get_return_object() noexcept;
@@ -78,13 +83,18 @@ public:
 };
 
 template<typename T>
-struct [[nodiscard]] UE5COROGAS_API TAbilityPromise final : FAbilityPromise
+class [[nodiscard]] UE5COROGAS_API TAbilityPromise final : public FAbilityPromise
 {
+	void Init(T&);
+
+public:
 	static bool bCalledFromActivate;
-	explicit TAbilityPromise(T& Target);
 	template<typename U, typename... A>
-	explicit TAbilityPromise(U& Target, A&&...)
-		: TAbilityPromise(static_cast<T&>(Target)) { }
+	explicit TAbilityPromise(U& Target, A&... Args)
+		: FAbilityPromise(static_cast<T&>(Target), TryGetWorld(Args...))
+	{
+		Init(Target);
+	}
 };
 
 // C++17 SFINAE helpers
