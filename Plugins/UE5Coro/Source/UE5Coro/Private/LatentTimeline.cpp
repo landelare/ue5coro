@@ -40,7 +40,7 @@ namespace
 {
 // Force to latent, otherwise it would keep running even after the world is gone.
 template<auto GetTime>
-TCoroutine<> CommonTimeline(const UObject*, double From, double To,
+TCoroutine<> CommonTimeline(const UObject* WCO, double From, double To,
                             double Length, std::function<void(double)> Fn,
                             bool bRunWhenPaused, FForceLatentCoroutine = {})
 {
@@ -61,16 +61,17 @@ TCoroutine<> CommonTimeline(const UObject*, double From, double To,
 
 	checkf(IsInGameThread(),
 	       TEXT("Latent coroutines may only be started on the game thread"));
-	checkf(GWorld,
-	       TEXT("This function may only be used in the context of a world"));
+	checkf(IsValid(WCO) && IsValid(WCO->GetWorld()),
+	       TEXT("Latent timeline started without valid world"));
+	auto* World = WCO->GetWorld();
 
-	double Start = (GWorld->*GetTime)();
+	double Start = (World->*GetTime)();
 	for (;;)
 	{
 		// Make sure the last call is exactly at Length
-		double Time = FMath::Min((GWorld->*GetTime)() - Start, Length);
+		double Time = FMath::Min((World->*GetTime)() - Start, Length);
 		// If the world is paused, only evaluate the function if asked.
-		if (bRunWhenPaused || !GWorld->IsPaused())
+		if (bRunWhenPaused || !World->IsPaused())
 		{
 			double Value = FMath::Lerp(From, To, Time / Length);
 #if ENABLE_NAN_DIAGNOSTIC
@@ -85,6 +86,10 @@ TCoroutine<> CommonTimeline(const UObject*, double From, double To,
 				co_return;
 		}
 		co_await NextTick();
+
+		// How and why is the latent action manager still ticking this?
+		checkf(IsValid(World),
+		       TEXT("Internal error: timeline still running on invalid world"));
 	}
 }
 }
