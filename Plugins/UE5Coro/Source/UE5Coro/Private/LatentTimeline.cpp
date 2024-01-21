@@ -40,9 +40,9 @@ namespace
 {
 // Force to latent, otherwise it would keep running even after the world is gone.
 template<auto GetTime>
-TCoroutine<> CommonTimeline(double From, double To, double Length,
-                            std::function<void(double)> Fn, bool bRunWhenPaused,
-                            FForceLatentCoroutine = {})
+TCoroutine<> CommonTimeline(const UObject*, double From, double To,
+                            double Length, std::function<void(double)> Fn,
+                            bool bRunWhenPaused, FForceLatentCoroutine = {})
 {
 #if ENABLE_NAN_DIAGNOSTIC
 	if (FMath::IsNaN(From) || FMath::IsNaN(To) || FMath::IsNaN(Length))
@@ -89,34 +89,35 @@ TCoroutine<> CommonTimeline(double From, double To, double Length,
 }
 }
 
-TCoroutine<> Latent::Timeline(double From, double To, double Length,
-                              std::function<void(double)> Fn,
+TCoroutine<> Latent::Timeline(const UObject* WCO, double From, double To,
+                              double Length, std::function<void(double)> Fn,
                               bool bRunWhenPaused)
 {
 	return CommonTimeline<&UWorld::GetTimeSeconds>(
-		From, To, Length, std::move(Fn), bRunWhenPaused);
+		WCO, From, To, Length, std::move(Fn), bRunWhenPaused);
 }
 
-TCoroutine<> Latent::UnpausedTimeline(double From, double To, double Length,
+TCoroutine<> Latent::UnpausedTimeline(const UObject* WCO, double From,
+                                      double To, double Length,
                                       std::function<void(double)> Fn,
                                       bool bRunWhenPaused)
 {
 	return CommonTimeline<&UWorld::GetUnpausedTimeSeconds>(
-		From, To, Length, std::move(Fn), bRunWhenPaused);
+		WCO, From, To, Length, std::move(Fn), bRunWhenPaused);
 }
 
-TCoroutine<> Latent::RealTimeline(double From, double To, double Length,
-                                  std::function<void(double)> Fn,
+TCoroutine<> Latent::RealTimeline(const UObject* WCO, double From, double To,
+                                  double Length, std::function<void(double)> Fn,
                                   bool bRunWhenPaused)
 {
 	return CommonTimeline<&UWorld::GetRealTimeSeconds>(
-		From, To, Length, std::move(Fn), bRunWhenPaused);
+		WCO, From, To, Length, std::move(Fn), bRunWhenPaused);
 }
 
-TCoroutine<> Latent::AudioTimeline(double From, double To, double Length,
-                                   std::function<void(double)> Fn,
+TCoroutine<> Latent::AudioTimeline(const UObject* WCO, double From, double To,
+                                   double Length, std::function<void(double)> Fn,
                                    bool bRunWhenPaused)
 {
 	return CommonTimeline<&UWorld::GetAudioTimeSeconds>(
-		From, To, Length, std::move(Fn), bRunWhenPaused);
+		WCO, From, To, Length, std::move(Fn), bRunWhenPaused);
 }

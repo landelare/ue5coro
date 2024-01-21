@@ -39,25 +39,29 @@
 namespace UE5Coro::Latent
 {
 /** Repeatedly calls the provided function with linearly-interpolated values. */
-UE5CORO_API TCoroutine<> Timeline(double From, double To, double Length,
+UE5CORO_API TCoroutine<> Timeline(const UObject* WorldContextObject,
+                                  double From, double To, double Length,
                                   std::function<void(double)> Fn,
                                   bool bRunWhenPaused = false);
 
 /** Repeatedly calls the provided function with linearly-interpolated values.<br>
  *  This is affected by time dilation only, NOT pause. */
-UE5CORO_API TCoroutine<> UnpausedTimeline(double From, double To, double Length,
+UE5CORO_API TCoroutine<> UnpausedTimeline(const UObject* WorldContextObject,
+                                          double From, double To, double Length,
                                           std::function<void(double)> Fn,
                                           bool bRunWhenPaused = true);
 
 /** Repeatedly calls the provided function with linearly-interpolated values.<br>
  *  This is not affected by pause or time dilation. */
-UE5CORO_API TCoroutine<> RealTimeline(double From, double To, double Length,
+UE5CORO_API TCoroutine<> RealTimeline(const UObject* WorldContextObject,
+                                      double From, double To, double Length,
                                       std::function<void(double)> Fn,
                                       bool bRunWhenPaused = true);
 
 /** Repeatedly calls the provided function with linearly-interpolated values.<br>
  *  This is affected by pause only, NOT time dilation. */
-UE5CORO_API TCoroutine<> AudioTimeline(double From, double To, double Length,
+UE5CORO_API TCoroutine<> AudioTimeline(const UObject* WorldContextObject,
+                                       double From, double To, double Length,
                                        std::function<void(double)> Fn,
                                        bool bRunWhenPaused = false);
 }
