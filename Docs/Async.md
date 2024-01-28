@@ -94,11 +94,17 @@ If your function (probably a UFUNCTION in this case but this is **not** checked
 or required) takes `FLatentActionInfo` or `FForceLatentCoroutine`, the coroutine
 is running in "latent mode".
 The world will be fetched from the first UObject* parameter that returns a valid
-pointer from GetWorld() with GWorld used as a last resort fallback.
+pointer from GetWorld().
 If there's a FLatentActionInfo parameter, its callback target will be used with
 the highest priority.
 The latent info will be registered with that world's latent action manager,
 there's no need to call FLatentActionManager::AddNewAction().
+
+> [!IMPORTANT]
+> A future update will simplify this logic to make it more performant, reliable,
+> and match BP behavior even more closely.
+> To prepare, make sure your world context object is the first parameter (`this`
+> for nonstatic members).
 
 The detected world context (most often `this` for non-static member UFUNCTIONs)
 will act as the latent action's owner, and the coroutine will enjoy a measure of

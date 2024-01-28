@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "0.10",
+	"VersionName": "0.10.1",
 	"FriendlyName": "UE5Coro – AI",
 	"Description": "C++20 coroutines for AI",
 	"Category": "Programming",

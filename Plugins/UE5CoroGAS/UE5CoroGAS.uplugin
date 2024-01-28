@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "0.10",
+	"VersionName": "1.10.1",
 	"FriendlyName": "UE5Coro – Gameplay Ability System",
 	"Description": "C++17/20 coroutines for GAS",
 	"Category": "Programming",
@@ -14,7 +14,7 @@
 	"CanContainContent": false,
 	"CanContainVerse": false,
 	"IsBetaVersion": false,
-	"IsExperimentalVersion": true,
+	"IsExperimentalVersion": false,
 	"Installed": false,
 	"Modules": [
 		{

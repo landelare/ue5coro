@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "1.10",
+	"VersionName": "1.10.1",
 	"FriendlyName": "UE5Coro",
 	"Description": "C++17/20 coroutine implementation for Unreal Engine",
 	"Category": "Programming",
