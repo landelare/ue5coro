@@ -198,15 +198,19 @@ public:
 			checkf(!Future.IsValid(),
 			       TEXT("Internal error: future was not consumed"));
 
-			// TFuture<T&> will pass T* for Value, TFuture<void> an int
 			if constexpr (std::is_lvalue_reference_v<T>)
 			{
-				static_assert(std::is_pointer_v<decltype(InFuture.Get())>);
+				// The type of Get() is T* in 5.3 and T*& in 5.4
+				static_assert(std::is_pointer_v<
+				              std::remove_reference_t<decltype(InFuture.Get())>>);
 				Result = InFuture.Get();
 				Promise.Resume();
 			}
 			else
 			{
+				// If T is void, Get() returns an int (5.3) or int& (5.4), which
+				// is harmless to process; await_resume will ignore it.
+
 				// It's normally dangerous to expose a pointer to a local, but
 				auto Value = InFuture.Get(); // This will be alive while...
 				Result = &Value;
@@ -222,7 +226,6 @@ public:
 			// Result being nullptr indicates that await_ready returned true,
 			// Then has not and will not run, and Future is still valid
 			checkf(Future.IsValid(), TEXT("Internal error: future was consumed"));
-			static_assert(std::is_same_v<T, decltype(Future.Get())>);
 			Result = reinterpret_cast<decltype(Result)>(-1); // Mark as spent
 			return Future.Get();
 		}
