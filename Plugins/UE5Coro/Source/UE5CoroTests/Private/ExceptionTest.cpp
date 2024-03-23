@@ -69,16 +69,17 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 		auto Fn = []() -> TGenerator<int>
 		{
 			co_yield 1;
-			throw FTestException("test");
+			throw new FTestException("test");
 		};
 		auto Gen = Fn();
 		TestEqual(TEXT("Generator init value"), Gen.Current(), 1);
 		Gen.Resume();
 		TestTrue(TEXT("Generator unreachable code"), false);
 	}
-	catch (const FTestException& Ex)
+	catch (const FTestException* Ex)
 	{
-		TestEqual(TEXT("Generator exception"), Ex.what(), "test");
+		TestEqual(TEXT("Generator exception"), Ex->what(), "test");
+		delete Ex;
 	}
 	catch (...)
 	{
@@ -93,15 +94,16 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 			co_await stdcoro::suspend_never();
 			Coro = static_cast<TCoroutinePromise<void, FAsyncPromise>&>(
 				FPromise::Current()).get_return_object();
-			throw FTestException("async");
+			throw new FTestException("async");
 		};
 		Coro = std::nullopt;
 		Fn();
 		TestTrue(TEXT("Async unreachable code"), false);
 	}
-	catch (const FTestException& Ex)
+	catch (const FTestException* Ex)
 	{
-		TestEqual(TEXT("Async exception"), Ex.what(), "async");
+		TestEqual(TEXT("Async exception"), Ex->what(), "async");
+		delete Ex;
 	}
 	catch (...)
 	{
@@ -118,16 +120,17 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 			co_await stdcoro::suspend_never();
 			Coro = static_cast<TCoroutinePromise<void, FLatentPromise>&>(
 				FPromise::Current()).get_return_object();
-			throw FTestException("latent");
+			throw new FTestException("latent");
 		};
 		FLatentActionInfo Info(0, 0, nullptr, NewObject<UUE5CoroTestObject>());
 		Coro = std::nullopt;
 		Fn(Info);
 		TestTrue(TEXT("Latent unreachable code"), false);
 	}
-	catch (const FTestException& Ex)
+	catch (const FTestException* Ex)
 	{
-		TestEqual(TEXT("Latent exception"), Ex.what(), "latent");
+		TestEqual(TEXT("Latent exception"), Ex->what(), "latent");
+		delete Ex;
 	}
 	catch (...)
 	{
