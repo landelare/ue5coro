@@ -37,6 +37,7 @@
 #include <concepts>
 #endif
 #include <functional>
+#include "Engine/OverlapResult.h"
 #include "Engine/StreamableManager.h"
 #include "UE5Coro/AsyncCoroutine.h"
 #include "UE5Coro/Private.h"
