@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<!-- Promises. Looking at them works better from Resume() instead of __coro_frame_ptr. -->
+	<Type Name="UE5Coro::Private::FPromise">
+		<DisplayString>FPromise {*Extras._Ptr}</DisplayString>
+		<Expand>
+			<ExpandedItem>*Extras._Ptr</ExpandedItem>
+		</Expand>
+	</Type>
+	<Type Name="UE5Coro::Private::FPromiseExtras">
+		<DisplayString>{{{DebugPromiseType,sub}, ID={DebugID}, Name={DebugName,sub}}}</DisplayString>
+		<Expand>
+			<Item Name="[Promise type]" Optional="true">DebugPromiseType,sub</Item>
+			<Item Name="DebugID" Optional="true">DebugID</Item>
+			<Item Name="DebugName" Optional="true">DebugName,su</Item>
+			<Item Name="bWasSuccessful" Optional="true">bWasSuccessful</Item>
+			<Item Name="[Lock held]" Optional="true">Lock.bFlag</Item>
+			<Item Name="[Promise or retval]" Optional="true">Promise</Item>
+		</Expand>
+	</Type>
+</AutoVisualizer>
