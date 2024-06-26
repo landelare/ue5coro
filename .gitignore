@@ -1,0 +1,22 @@
+# Unreal
+
+Binaries
+Build
+DerivedDataCache
+Intermediate
+Saved
+*_BuiltData.uasset
+.vscode
+.vs
+*.VC.db
+*.opensdf
+*.opendb
+*.sdf
+*.sln
+*.suo
+*.xcodeproj
+*.xcworkspace
+
+# Tools
+bin
+obj
