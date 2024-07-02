@@ -81,6 +81,33 @@ co_await MoveToGameThread();
 UseValueOnGameThread(std::move(Value));
 ```
 
+### auto MoveToThreadPool(FQueuedThreadPool& ThreadPool = *GThreadPool, EQueuedWorkPriority Priority = EQueuedWorkPriority::Normal)
+
+The return value of this function lets coroutines move execution into the
+specified thread pool, with the specified priority.
+
+The return value is reusable, it remembers the originally-provided thread pool
+and priority, and awaiting it will keep queueing back on the same thread pool.
+
+Behavior is undefined if the thread pool is not valid at the time of the
+co_await.
+
+Example:
+```cpp
+using namespace UE5Coro::Async;
+
+TCoroutine<> ProcessOnThreadPool(AActress* Target, FQueuedThreadPool& ThreadPool,
+                                 FForceLatentCoroutine = {})
+{
+    if (!ensure(IsValid(Target)))
+        co_return;
+    co_await MoveToThreadPool(ThreadPool);
+    auto Value = SomeExpensiveFunction();
+    co_await MoveToGameThread();
+    Target->SetValue(std::move(Value));
+}
+```
+
 ### auto Yield() noexcept
 
 The return value of this function moves the coroutine back into the same kind
