@@ -214,6 +214,23 @@ UE5CORO_API auto AsyncLoadPackage(const FPackagePath& Path,
 	const FLinkerInstancingContext* InstancingContext = nullptr)
 	-> Private::FPackageLoadAwaiter;
 
+/** Asynchronously begins the bundle state change on the provided assets,
+ *  resumes once it's done.
+ *  For parameters, see UAssetManager::ChangeBundleStateForPrimaryAssets. */
+UE5CORO_API auto AsyncChangeBundleStateForPrimaryAssets(
+	const TArray<FPrimaryAssetId>& AssetsToChange,
+	const TArray<FName>& AddBundles, const TArray<FName>& RemoveBundles,
+	bool bRemoveAllBundles = false,
+	TAsyncLoadPriority Priority = FStreamableManager::DefaultAsyncLoadPriority)
+	-> Private::FLatentAwaiter;
+
+/** Asynchronously begins the bundle state change on every primary asset that
+ *  matches OldBundles, resumes once it's done. */
+UE5CORO_API auto AsyncChangeBundleStateForMatchingPrimaryAssets(
+	const TArray<FName>& NewBundles, const TArray<FName>& OldBundles,
+	TAsyncLoadPriority Priority = FStreamableManager::DefaultAsyncLoadPriority)
+	-> Private::FLatentAwaiter;
+
 #pragma endregion
 
 #pragma region Async collision queries

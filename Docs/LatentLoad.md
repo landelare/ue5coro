@@ -95,3 +95,23 @@ using namespace UE5Coro::Latent;
 
 UPackage* Package = co_await AsyncLoadPackage(Path);
 ```
+
+### auto AsyncChangeBundleStateForPrimaryAssets(const TArray<FPrimaryAssetId>& AssetsToChange, const TArray<FName>& AddBundles, const TArray<FName>& RemoveBundles, bool bRemoveAllBundles = false, TAsyncLoadPriority Priority = FStreamableManager::DefaultAsyncLoadPriority)
+### auto AsyncChangeBundleStateForMatchingPrimaryAssets(const TArray<FName>& NewBundles, const TArray<FName>& OldBundles, TAsyncLoadPriority Priority = FStreamableManager::DefaultAsyncLoadPriority)
+
+These functions begin the requested bundle state changes on the provided (first
+function) or all matching (second function) primary assets, and return an object
+that can be awaited to resume the calling coroutine when loading is complete or
+if it was canceled.
+
+If the asset manager determines there's nothing to do, the calling coroutine
+will continue immediately.
+
+For more details, see the corresponding functions on `UAssetManager`.
+
+Example:
+```cpp
+using namespace UE5Coro::Latent;
+
+co_await AsyncChangeBundleStateForMatchingPrimaryAssets({"LoadMe"}, {"RemoveMe"});
+```
