@@ -171,6 +171,19 @@ void DoTest(FAutomationTestBase& Test)
 		              FPlatformTime::Seconds() >= Start + 0.1);
 		Test.TestEqual("Final state", State, 2);
 	}
+
+	{
+		std::atomic<bool> bDone = false;
+		FEventRef CoroToTest;
+		World.Run(CORO
+		{
+			co_await MoveToThreadPool();
+			bDone = true;
+			CoroToTest->Trigger();
+		});
+		CoroToTest->Wait();
+		Test.TestTrue("Move successful", bDone);
+	}
 }
 }
 

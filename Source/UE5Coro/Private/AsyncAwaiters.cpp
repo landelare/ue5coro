@@ -97,6 +97,12 @@ FTaskAwaiter Async::MoveToTask(const TCHAR* DebugName)
 	return FTaskAwaiter(DebugName);
 }
 
+FThreadPoolAwaiter Async::MoveToThreadPool(FQueuedThreadPool& ThreadPool,
+                                           EQueuedWorkPriority Priority)
+{
+	return FThreadPoolAwaiter(ThreadPool, Priority);
+}
+
 FAsyncYieldAwaiter Async::Yield() noexcept
 {
 	return {};
@@ -127,6 +133,35 @@ FAsyncTimeAwaiter Async::UntilPlatformTime(double Time) noexcept
 FAsyncTimeAwaiter Async::UntilPlatformTimeAnyThread(double Time) noexcept
 {
 	return FAsyncTimeAwaiter(Time, true);
+}
+
+void FThreadPoolAwaiter::DoThreadedWork()
+{
+	checkf(Promise.load(), TEXT("Internal error: scheduled without a promise"));
+	bAbandoned = false;
+	Promise.exchange(nullptr)->Resume();
+}
+
+void FThreadPoolAwaiter::Abandon()
+{
+	checkf(Promise.load(), TEXT("Internal error: scheduled without a promise"));
+	bAbandoned = true;
+	Promise.exchange(nullptr)->Resume();
+}
+
+FThreadPoolAwaiter::FThreadPoolAwaiter(const FThreadPoolAwaiter& Other)
+	: Pool(Other.Pool), Priority(Other.Priority)
+{
+}
+
+void FThreadPoolAwaiter::Suspend(FPromise& InPromise)
+{
+	checkf(!Promise, TEXT("Internal error: recursive suspension"));
+	Promise = &InPromise;
+	// Since the coroutine is suspended (and detached, if latent), this awaiter
+	// will remain alive until Resume(). Pass ownership to the thread pool,
+	// DoThreadedWork/Abandon will take it back.
+	Pool.AddQueuedWork(this, Priority);
 }
 
 void FNewThreadAwaiter::Suspend(FPromise& Promise)

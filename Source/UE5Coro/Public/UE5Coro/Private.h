@@ -92,6 +92,7 @@ struct FPromiseExtras;
 class FRaceAwaiter;
 class FSemaphoreAwaiter;
 class FTaskAwaiter;
+class FThreadPoolAwaiter;
 class FTwoLives;
 namespace Test { class FTestHelper; }
 template<typename> struct TAnimAwaiter;

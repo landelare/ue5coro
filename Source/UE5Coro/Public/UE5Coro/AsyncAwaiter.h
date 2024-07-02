@@ -77,6 +77,21 @@ UE5CORO_API auto MoveToSimilarThread() -> Private::FAsyncAwaiter;
 UE5CORO_API auto MoveToTask(const TCHAR* DebugName = nullptr)
 	-> Private::FTaskAwaiter;
 
+/** Returns an object that, when co_awaited, unconditionally suspends the
+ *  calling coroutine, and queues it to resume on the provided thread pool with
+ *  the given priority.
+ *
+ *  The result of the await expression is true if the thread pool scheduled the
+ *  work normally, false if it was abandoned.
+ *
+ *  The return value of this function is reusable.
+ *  Repeated co_awaits will keep moving back to the same thread pool at the
+ *  originally-provided priority. */
+UE5CORO_API auto MoveToThreadPool(
+    FQueuedThreadPool& ThreadPool = *GThreadPool,
+    EQueuedWorkPriority Priority = EQueuedWorkPriority::Normal)
+	-> Private::FThreadPoolAwaiter;
+
 /** Returns an object that, when co_awaited, unconditionally suspends its caller
  *  and resumes it on the same kind of named thread that it's currently running
  *  on, or AnyThread if it's not running on a detectable named thread.
@@ -306,6 +321,26 @@ struct TAwaitTransform<P, T>
 
 	// The delegate needs to live longer than the awaiter. Use lvalues only.
 	FAwaiter operator()(T&& Delegate) = delete;
+};
+
+class [[nodiscard]] UE5CORO_API FThreadPoolAwaiter final
+	: public IQueuedWork, public TAwaiter<FThreadPoolAwaiter>
+{
+	std::atomic<FPromise*> Promise = nullptr;
+	FQueuedThreadPool& Pool;
+	EQueuedWorkPriority Priority;
+	bool bAbandoned = false;
+
+	virtual void DoThreadedWork() override;
+	virtual void Abandon() override;
+
+public:
+	explicit FThreadPoolAwaiter(FQueuedThreadPool& Pool,
+	                            EQueuedWorkPriority Priority)
+		: Pool(Pool), Priority(Priority) { }
+	FThreadPoolAwaiter(const FThreadPoolAwaiter&);
+	void Suspend(FPromise&);
+	bool await_resume() { return !bAbandoned; }
 };
 
 class [[nodiscard]] UE5CORO_API FNewThreadAwaiter
