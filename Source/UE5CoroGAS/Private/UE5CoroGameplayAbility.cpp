@@ -53,6 +53,30 @@ bool IsTemplate(UObject* Object)
 	// Outer is explicitly not checked, it might be destroyed already
 	return Object->HasAnyFlags(RF_ArchetypeObject | RF_ClassDefaultObject);
 }
+
+FMulticastDelegateProperty* FindDelegate(UClass* Class)
+{
+	// The class is already validated to have 1 property if there is a cache hit
+	static TMap<TWeakObjectPtr<UClass>, FMulticastDelegateProperty*> Cache;
+	if (auto* Property = Cache.FindRef(Class))
+		return Property;
+
+	// Find BlueprintAssignable properties
+	FProperty* Property = nullptr;
+	for (auto* i = Class->PropertyLink; i; i = i->NextRef)
+		if (i->HasAnyPropertyFlags(CPF_BlueprintAssignable))
+		{
+			checkf(!Property,
+			       TEXT("Only one BlueprintAssignable UPROPERTY is supported"));
+			Property = i;
+			if constexpr (!UE5CORO_DEBUG) // Keep looking for others in debug
+				break;
+		}
+	checkf(Property, TEXT("A BlueprintAssignable UPROPERTY is required"));
+	auto* DelegateProp = CastFieldChecked<FMulticastDelegateProperty>(Property);
+	Cache.Add(Class, DelegateProp);
+	return DelegateProp;
+}
 }
 
 UUE5CoroGameplayAbility::UUE5CoroGameplayAbility()
@@ -84,25 +108,10 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object, bool bAutoActivate
 	       TEXT("This method is only available on the game thread"));
 	checkf(IsValid(Object), TEXT("Attempting to await invalid object"));
 
-	// Find BlueprintAssignable properties
-	auto* Class = Object->GetClass();
-	FProperty* Property = nullptr;
-	for (auto* i = Class->PropertyLink; i; i = i->NextRef)
-		if (i->HasAnyPropertyFlags(CPF_BlueprintAssignable))
-		{
-			checkf(!Property,
-			       TEXT("Only one BlueprintAssignable UPROPERTY is supported"));
-			Property = i;
-			if constexpr (!UE5CORO_DEBUG) // Keep looking for others in debug
-				break;
-		}
-	checkf(Property, TEXT("A BlueprintAssignable UPROPERTY is required"));
-	auto* DelegateProp = CastFieldChecked<FMulticastDelegateProperty>(Property);
-
 	auto* Target = NewObject<UUE5CoroTaskCallbackTarget>(this);
 	FScriptDelegate Delegate;
 	Delegate.BindUFunction(Target, NAME_Core);
-	DelegateProp->AddDelegate(std::move(Delegate), Object);
+	FindDelegate(Object->GetClass())->AddDelegate(std::move(Delegate), Object);
 
 	// Activate some well-known base classes (IsValid was checked above)
 	if (bAutoActivate)
