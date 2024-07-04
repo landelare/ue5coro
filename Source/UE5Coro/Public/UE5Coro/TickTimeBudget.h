@@ -31,26 +31,32 @@
 
 #pragma once
 
-#ifndef UE5CORO_PRIVATE_ALLOW_DIRECT_INCLUDE
-#define UE5CORO_PRIVATE_ALLOW_DIRECT_INCLUDE
-#endif
-
+#include "CoreMinimal.h"
 #include "UE5Coro/Definition.h"
-#include "UE5Coro/AggregateAwaiter.h"
-#include "UE5Coro/AnimationAwaiter.h"
-#include "UE5Coro/AsyncAwaiter.h"
-#include "UE5Coro/Cancellation.h"
-#include "UE5Coro/Coroutine.h"
-#include "UE5Coro/CoroutineAwaiter.h"
-#include "UE5Coro/Generator.h"
-#include "UE5Coro/HttpAwaiter.h"
 #include "UE5Coro/LatentAwaiter.h"
-#include "UE5Coro/LatentCallback.h"
-#include "UE5Coro/LatentTimeline.h"
-#include "UE5Coro/Private.h"
-#include "UE5Coro/TaskAwaiter.h"
-#include "UE5Coro/TickTimeBudget.h"
-#include "UE5Coro/Threading.h"
-#include "UE5Coro/UnrealTypes.h"
 
-#undef UE5CORO_PRIVATE_ALLOW_DIRECT_INCLUDE
+namespace UE5Coro::Latent
+{
+/** This class keeps track of the time elapsed during a tick, and co_awaiting it
+ *  will delay the coroutine's execution to the next tick if the budget has been
+ *  exhausted, otherwise it will keep running.
+ *  Make sure to keep this outside the loop that uses it! */
+class [[nodiscard]] UE5CORO_API FTickTimeBudget : Private::FLatentAwaiter
+{
+	explicit FTickTimeBudget(double);
+	// These fields will be object sliced for await_suspend
+	int CyclesPerTick;
+	int Start;
+
+public:
+	static FTickTimeBudget Seconds(double SecondsPerTick);
+	static FTickTimeBudget Milliseconds(double MillisecondsPerTick);
+	static FTickTimeBudget Microseconds(double MicrosecondsPerTick);
+	UE_NONCOPYABLE(FTickTimeBudget);
+
+	bool await_ready();
+	void await_suspend(auto Handle) { FLatentAwaiter::await_suspend(Handle); }
+	void await_resume();
+};
+static_assert(!TLatentAwaiter<FTickTimeBudget>);
+}

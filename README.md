@@ -51,6 +51,10 @@ and other handlers.
   benefits (and your FPS).
 * What about spreading a heavy computation across multiple ticks?<br>
   Add a `co_await NextTick();` inside a loop, and you're already done.
+  There's a time budget class that lets you specify the desired processing time
+  directly, and let the coroutine dynamically schedule itself.
+* Speaking of dynamic scheduling, throttling can be as simple as this:<br>
+  `co_await Ticks(bCloseToCamera ? 1 : 2);`
 * Why time slice on the game thread when you have multiple CPU cores eager to
   work?<br>
   Add `co_await MoveToTask();` to your function, and everything after that line
@@ -124,6 +128,7 @@ coroutines.
   * [Asset loading](Docs/LatentLoad.md) (async loading soft pointers, bundles...)
   * [Async collision queries](Docs/LatentCollision.md) (line traces, overlap checks...)
   * [Latent chain](Docs/LatentChain.md) (universal latent action wrapper)
+  * [Tick time budget](Docs/LatentTickTimeBudget.md) (run for x ms per frame)
 * [Latent callbacks](Docs/LatentCallback.md) (interaction with the latent
   action manager)
 
