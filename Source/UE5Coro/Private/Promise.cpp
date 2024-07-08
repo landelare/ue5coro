@@ -168,7 +168,11 @@ void FPromise::AddContinuation(std::function<void(void*)> Fn)
 void FPromise::unhandled_exception()
 {
 #if PLATFORM_EXCEPTIONS_DISABLED
-	check(!"Exceptions are not supported");
+	// Hitting this can be a result of the coroutine itself invoking undefined
+	// behavior, e.g., by using a bad pointer.
+	// On Windows, SEH exceptions can end up here if C++ exceptions are disabled.
+	// If this hinders debugging, feel free to remove it!
+	checkSlow(!"Unhandled exception from coroutine!");
 #else
 	bUnhandledException = true;
 	throw;
