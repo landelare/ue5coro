@@ -1,0 +1,36 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.10.2-ue4",
+	"FriendlyName": "UE5Coro – AI (UE4 edition)",
+	"Description": "C++20 coroutines for AI",
+	"Category": "Programming",
+	"CreatedBy": "Laura Andelare",
+	"CreatedByURL": "https://github.com/landelare/ue5coro",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"EnabledByDefault": false,
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "UE5CoroAI",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		},
+		{
+			"Name": "UE5CoroAITests",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PreDefault"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "UE5Coro",
+			"Enabled": true
+		}
+	]
+}
