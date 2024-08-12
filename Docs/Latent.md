@@ -84,6 +84,43 @@ FVoidCoroutine Example(FLatentActionInfo LatentInfo)
 }
 ```
 
+### auto UntilCoroutine(TCoroutine<> Coroutine)
+
+This wrapper forces awaits of TCoroutines to be performed in latent mode,
+even if the caller coroutine is async.
+Normally, the implementation is chosen based on the _awaiting_ coroutine's
+execution mode, with async coroutines using a callback-based approach that is
+optimized for no CPU overhead until the awaited coroutine completes.
+The _awaited_ coroutine's execution mode doesn't matter.
+
+Forcing latent mode can improve responsiveness to cancellations of the awaiting
+coroutine, at the price of the added runtime overhead of creating and ticking a
+backing latent action for the await.
+It also requires the await to happen on the game thread.
+
+Using this wrapper has no effect in a latent coroutine.
+It already has a latent action, which gets reused.
+
+Example:
+```cpp
+using namespace UE5Coro;
+using namespace UE5Coro::Latent;
+
+TCoroutine<> Example();
+
+TCoroutine<> Async()
+{
+    co_await UntilCoroutine(Example()); // The await is latent
+    co_await Example(); // The await is async
+}
+
+TCoroutine<> Latent(UWorld*, FLatentActionInfo)
+{
+    co_await UntilCoroutine(Example()); // Pointless force to latent
+    co_await Example(); // The await is naturally latent already
+}
+```
+
 ### auto UntilDelegate(T& Delegate)
 
 This function provides a safer alternative to
