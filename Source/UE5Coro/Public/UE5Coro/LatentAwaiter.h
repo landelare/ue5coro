@@ -56,6 +56,19 @@ UE5CORO_API auto Ticks(int64 Ticks) -> Private::FLatentAwaiter;
 UE5CORO_API auto Until(std::function<bool()> Function)
 	-> Private::FLatentAwaiter;
 
+#pragma endregion
+
+/** Resumes the coroutine after the provided other coroutine completes, but the
+ *  wait itself is forced to latent mode regardless of the awaiting coroutine's
+ *  execution mode. For advanced usage.
+ *  TCoroutines are directly co_awaitable without using this wrapper.
+ *
+ *  Forcing latent mode can improve responsiveness to cancellations in async
+ *  coroutines.
+ *  Using this wrapper is pointless if the awaiting coroutine is latent. */
+UE5CORO_API auto UntilCoroutine(TCoroutine<> Coroutine)
+	-> Private::TLatentCoroutineAwaiter<void, false>;
+
 /** Resumes the coroutine after the delegate executes.
  *  Delegate parameters are ignored, a return value is not provided.
  *
@@ -63,8 +76,6 @@ UE5CORO_API auto Until(std::function<bool()> Function)
  *  See the documentation for details on the differences in behavior. */
 auto UntilDelegate(Private::TIsDelegate auto& Delegate)
 	-> Private::FLatentAwaiter;
-
-#pragma endregion
 
 #pragma region Time
 

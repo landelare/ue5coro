@@ -31,6 +31,7 @@
 
 #include "UE5Coro/LatentAwaiter.h"
 #include "Engine/World.h"
+#include "UE5Coro/CoroutineAwaiter.h"
 #include "UE5CoroDelegateCallbackTarget.h"
 
 using namespace UE5Coro;
@@ -145,6 +146,12 @@ FLatentAwaiter Latent::Until(std::function<bool()> Function)
 	checkf(Function, TEXT("Provided function is empty"));
 	return FLatentAwaiter(new std::function(std::move(Function)),
 	                      &WaitUntilPredicate);
+}
+
+auto Latent::UntilCoroutine(TCoroutine<> Coroutine)
+	-> TLatentCoroutineAwaiter<void, false>
+{
+	return TLatentCoroutineAwaiter<void, false>(std::move(Coroutine));
 }
 
 std::tuple<FLatentAwaiter, UObject*> Private::UntilDelegateCore()
