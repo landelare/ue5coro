@@ -36,7 +36,11 @@ using namespace UE5Coro::Private;
 void FGeneratorPromise::unhandled_exception()
 {
 #if PLATFORM_EXCEPTIONS_DISABLED
-	check(!"Exceptions are not supported");
+	// Hitting this can be a result of the generator itself invoking undefined
+	// behavior, e.g., by using a bad pointer.
+	// On Windows, SEH exceptions can end up here if C++ exceptions are disabled.
+	// If this hinders debugging, feel free to remove it!
+	checkSlow(!"Unhandled exception from generator!");
 #else
 	throw;
 #endif

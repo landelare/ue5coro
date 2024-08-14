@@ -37,6 +37,7 @@
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
+using namespace UE5CoroGAS::Private;
 
 namespace
 {
@@ -53,10 +54,30 @@ bool IsTemplate(UObject* Object)
 }
 }
 
+namespace UE5CoroGAS::Private
+{
+struct FStrictPredictionKey : FPredictionKey
+{
+	FStrictPredictionKey(const FPredictionKey& Key) noexcept
+		: FPredictionKey(Key) { }
+
+	bool operator==(const FStrictPredictionKey& Other) const noexcept
+	{
+		return FPredictionKey::operator==(Other) && Base == Other.Base;
+	}
+};
+
+int32 GetTypeHash(const FStrictPredictionKey& Key) noexcept // ADL
+{
+	return GetTypeHash(static_cast<const FPredictionKey&>(Key)) ^
+	       Key.Base << 16;
+}
+}
+
 UUE5CoroGameplayAbility::UUE5CoroGameplayAbility()
 {
 	if (::IsTemplate(this))
-		Activations = new TMap<FPredictionKey, TAbilityPromise<ThisClass>*>;
+		Activations = new TMap<FStrictPredictionKey, TAbilityPromise<ThisClass>*>;
 	else
 		Activations = GetDefault<ThisClass>(GetClass())->Activations;
 	checkf(Activations, TEXT("Internal error: non-template object before CDO"));
