@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "1.10.2-ue4",
+	"VersionName": "1.10.3-ue4",
 	"FriendlyName": "UE5Coro – Gameplay Ability System (UE4 edition)",
 	"Description": "C++20 coroutines for GAS",
 	"Category": "Programming",
