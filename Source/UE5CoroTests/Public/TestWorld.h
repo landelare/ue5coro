@@ -33,6 +33,12 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro.h"
+#include "Misc/EngineVersionComparison.h"
+
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+constexpr EAutomationTestFlags::Type EAutomationTestFlags_ApplicationContextMask =
+	EAutomationTestFlags::ApplicationContextMask;
+#endif
 
 #define CORO [&](T...) -> FVoidCoroutine
 #define CORO_R(Type) [&](T...) -> TCoroutine<Type>

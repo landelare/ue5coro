@@ -31,25 +31,28 @@
 
 #include "GASTestWorld.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/EngineVersionComparison.h"
 #include "UE5CoroGASTestGameplayAbility.h"
 
 using namespace UE5Coro::Private::Test;
 
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGameplayAbilityTestNonInstanced,
                                  "UE5Coro.GAS.GameplayAbility.NonInstanced",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
+#endif
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGameplayAbilityTestPerActor,
                                  "UE5Coro.GAS.GameplayAbility.PerActor",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGameplayAbilityTestPerExecution,
                                  "UE5Coro.GAS.GameplayAbility.PerExecution",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
@@ -58,7 +61,11 @@ namespace
 void DoTest(FAutomationTestBase& Test,
             EGameplayAbilityInstancingPolicy::Type Policy)
 {
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 	bool bInstanced = Policy != EGameplayAbilityInstancingPolicy::NonInstanced;
+#else
+	constexpr bool bInstanced = true;
+#endif
 	auto* CDO = GetMutableDefault<UUE5CoroGASTestGameplayAbility>();
 	UUE5CoroGASTestGameplayAbility::SetInstancingPolicy(Policy);
 	int& State = UUE5CoroGASTestGameplayAbility::State;
@@ -118,11 +125,13 @@ void DoTest(FAutomationTestBase& Test,
 }
 }
 
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 bool FGameplayAbilityTestNonInstanced::RunTest(const FString& Parameters)
 {
 	DoTest(*this, EGameplayAbilityInstancingPolicy::NonInstanced);
 	return true;
 }
+#endif
 
 bool FGameplayAbilityTestPerActor::RunTest(const FString& Parameters)
 {

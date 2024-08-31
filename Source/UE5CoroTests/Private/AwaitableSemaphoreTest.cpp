@@ -37,12 +37,12 @@ using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSemaAsyncTest, "UE5Coro.Threading.Semaphore.Async",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::CriticalPriority |
                                  EAutomationTestFlags::ProductFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSemaLatentTest, "UE5Coro.Threading.Semaphore.Latent",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::CriticalPriority |
                                  EAutomationTestFlags::ProductFilter)
 

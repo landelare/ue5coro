@@ -43,7 +43,7 @@ using namespace UE5Coro::Private::Test;
 #if !PLATFORM_EXCEPTIONS_DISABLED
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExceptionTest, "UE5Coro.Exceptions",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
