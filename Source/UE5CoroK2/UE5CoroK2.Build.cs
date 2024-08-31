@@ -40,6 +40,7 @@ public class UE5CoroK2 : UE5CoroModuleRules
 		{
 			"BlueprintGraph",
 			"UE5Coro",
+			"UnrealEd",
 		});
 	}
 }
