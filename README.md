@@ -194,7 +194,7 @@ file... don't :)
 ## Usage
 
 Reference the `"UE5Coro"` module from your Build.cs as you would any other
-C++ module, and use `#include "UE5Coro.h"`.
+C++ module, and use `#include "UE5Coro.h"` with `using namespace UE5Coro`.
 The plugin itself does not need to be enabled.
 
 Some functionality is in optional modules that need to be referenced separately.
