@@ -39,6 +39,7 @@
 #include <type_traits>
 #include <utility>
 #include "Delegates/DelegateBase.h"
+#include "Misc/EngineVersionComparison.h"
 #include "UObject/GarbageCollection.h"
 #include "UObject/GCObjectScopeGuard.h"
 #include "UObject/SparseDelegate.h"
@@ -152,14 +153,22 @@ struct TWeak : std::false_type { };
 template<TIsUObjectPtr T>
 struct TWeak<T> : std::true_type
 {
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 	using strong = TGCObjectScopeGuard<std::remove_pointer_t<T>>;
+#else
+	using strong = TStrongObjectPtr<std::remove_pointer_t<T>>;
+#endif
 	using weak = TWeakObjectPtr<std::remove_pointer_t<T>>;
 	using ptr = T;
 	static strong Strengthen(const weak& Weak)
 	{
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 		FGCScopeGuard _;
 		// There's no API to convert a weak ptr to a strong one...
-		return strong(Weak.Get()); // relying on C++17 mandatory RVO
+		return strong(Weak.Get());
+#else
+		return Weak.Pin();
+#endif
 	}
 	static ptr Get(const strong& Strong) { return Strong.Get(); }
 };
