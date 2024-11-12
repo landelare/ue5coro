@@ -52,7 +52,8 @@ bool WaitUntilTime(void* State, bool bCleanup)
 		return false;
 
 	auto& TargetTime = reinterpret_cast<double&>(State);
-	checkf(GWorld, TEXT("Internal error: latent poll outside of a world"));
+	checkf(IsValid(GWorld),
+	       TEXT("Internal error: latent poll outside of a valid world"));
 	return (GWorld->*GetTime)() >= TargetTime;
 }
 
@@ -79,8 +80,8 @@ FLatentAwaiter GenericUntil(double Time)
 #endif
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	checkf(GWorld,
-	       TEXT("This function may only be used in the context of a world"));
+	checkf(IsValid(GWorld),
+	       TEXT("This function may only be used in the context of a valid world"));
 
 	if constexpr (bTimeIsOffset)
 		Time += (GWorld->*GetTime)();

@@ -37,7 +37,7 @@ using namespace UE5Coro::Private;
 
 std::tuple<FLatentActionInfo, FTwoLives*> Private::MakeLatentInfo()
 {
-	checkf(GWorld, TEXT("Internal error: unguarded world access"));
+	checkf(IsValid(GWorld), TEXT("Internal error: unguarded world access"));
 	auto* Sys = GWorld->GetSubsystem<UUE5CoroSubsystem>();
 	// Will be Released by the FLatentAwaiter from the caller
 	// and UUE5CoroSubsystem on the latent action's completion.

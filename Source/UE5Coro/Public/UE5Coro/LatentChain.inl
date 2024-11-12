@@ -87,7 +87,8 @@ struct FLatentChain<true, bInfo, Type, Types...>
 {
 	static void Call(auto&& Fn, FLatentActionInfo LatentInfo, auto&&... Args)
 	{
-		checkf(GWorld, TEXT("Could not chain latent action: no world found"));
+		checkf(IsValid(GWorld),
+		       TEXT("Could not chain latent action: no valid world found"));
 		FLatentChain<false, bInfo, Types...>::Call(
 			std::bind_front(std::forward<decltype(Fn)>(Fn), &*GWorld),
 			std::move(LatentInfo),
@@ -165,8 +166,8 @@ Private::FLatentChainAwaiter ChainEx(auto&& Function, auto&&... Args)
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
 	if constexpr ((... || (std::is_placeholder_v<std::decay_t<decltype(Args)>> == 1)))
-		checkf(GWorld,
-		       TEXT("Could not chain latent action: no world found for _1"));
+		checkf(IsValid(GWorld),
+		       TEXT("Could not chain latent action: no valid world found for _1"));
 	static_assert((... || (std::is_placeholder_v<std::decay_t<decltype(Args)>> == 2)),
 	              "The _2 parameter for LatentInfo is mandatory");
 

@@ -119,8 +119,8 @@ void FLatentAwaiter::Suspend(FAsyncPromise& Promise)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	checkf(GWorld,
-	       TEXT("Awaiting this can only be done in the context of a world"));
+	checkf(::IsValid(GWorld),
+	       TEXT("Awaiting this can only be done in the context of a valid world"));
 
 	// Prepare a latent action on the subsystem and transfer ownership to that
 	auto* Sys = GWorld->GetSubsystem<UUE5CoroSubsystem>();
