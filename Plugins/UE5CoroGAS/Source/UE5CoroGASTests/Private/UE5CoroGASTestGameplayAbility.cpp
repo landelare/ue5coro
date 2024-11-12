@@ -30,6 +30,7 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5CoroGASTestGameplayAbility.h"
+#include "Misc/EngineVersionComparison.h"
 #include "Tasks/GameplayTask_WaitDelay.h"
 #include "UE5Coro/AsyncAwaiters.h"
 #include "UE5Coro/Cancellation.h"
@@ -80,7 +81,11 @@ FAbilityCoroutine UUE5CoroGASTestGameplayAbility::ExecuteAbility(
 	State = 4;
 
 	// UGameplayTask_WaitDelay only works on instanced abilities
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 	if (GetInstancingPolicy() != EGameplayAbilityInstancingPolicy::NonInstanced)
+#else
+	if constexpr (true)
+#endif
 	{
 		// UGameplayTask_WaitDelay is MinimalAPI
 		auto* Class = UGameplayTask_WaitDelay::StaticClass();

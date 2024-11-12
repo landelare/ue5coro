@@ -41,17 +41,17 @@ using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FDelegateTestCore, "UE5Coro.Delegate.Core",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::CriticalPriority |
                                  EAutomationTestFlags::SmokeFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FDelegateTestAsync, "UE5Coro.Delegate.Async",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FDelegateTestLatent, "UE5Coro.Delegate.Latent",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 

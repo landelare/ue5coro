@@ -40,12 +40,12 @@ using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAggregateAsyncTest, "UE5Coro.Aggregate.Async",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAggregateLatentTest, "UE5Coro.Aggregate.Latent",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 

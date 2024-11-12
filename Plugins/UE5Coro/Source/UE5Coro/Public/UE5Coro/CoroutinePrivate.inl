@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "Misc/EngineVersionComparison.h"
 #include "UObject/GCObjectScopeGuard.h"
 
 namespace UE5Coro::Private
@@ -45,14 +46,22 @@ struct TWeak : std::false_type { };
 template<typename T>
 struct TWeak<T*> : std::bool_constant<std::is_convertible_v<T*, const UObject*>>
 {
-	using strong = TGCObjectScopeGuard<T>;
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+	using strong = TGCObjectScopeGuard<std::remove_pointer_t<T>>;
+#else
+	using strong = TStrongObjectPtr<std::remove_pointer_t<T>>;
+#endif
 	using weak = TWeakObjectPtr<T>;
 	using ptr = std::enable_if_t<TWeak::value, T*>;
 	static strong Strengthen(const weak& Weak)
 	{
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 		FGCScopeGuard _;
 		// There's no API to convert a weak ptr to a strong one...
-		return strong(Weak.Get()); // relying on C++17 mandatory RVO
+		return strong(Weak.Get());
+#else
+		return Weak.Pin();
+#endif
 	}
 	static ptr Get(const strong& Strong) { return Strong.Get(); }
 };

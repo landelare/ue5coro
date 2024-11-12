@@ -41,12 +41,12 @@ using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHttpAsyncTest, "UE5Coro.Http.Async",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHttpLatentTest, "UE5Coro.Http.Latent",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 

@@ -40,7 +40,7 @@ using namespace UE5Coro;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentCallbackTest, "UE5Coro.Latent.Callbacks",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 

@@ -38,12 +38,12 @@ using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncQueryTestAsync, "UE5Coro.AsyncQuery.Async",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncQueryTestLatent, "UE5Coro.AsyncQuery.Latent",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 

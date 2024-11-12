@@ -20,8 +20,12 @@ abilities using a C++ coroutine.
 Instead of overriding ActivateAbility, override the new ExecuteAbility instead.
 **Overriding ExecuteAbility with a subroutine is undefined behavior.**
 
-Every instancing policy is supported, including it dynamically changing at
-runtime.
+Every instancing policy is supported on Unreal Engine 5.3 and 5.4, including it
+dynamically changing at runtime.
+
+Starting with 5.5, NonInstanced is not supported.
+Using the `AbilitySystem.Fix.AllowNonInstancedAbilities` CVar to get it back is
+possible, but not recommended due to engine issues.
 
 The following events are turned into interactions with the ExecuteAbility
 coroutine:

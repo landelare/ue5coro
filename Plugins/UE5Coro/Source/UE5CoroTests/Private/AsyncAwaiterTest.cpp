@@ -39,17 +39,17 @@ using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncAwaiterTest, "UE5Coro.Async.TrueAsync",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncInLatentTest, "UE5Coro.Async.Latent",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncStressTest, "UE5Coro.Async.Stress",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::MediumPriority |
                                  EAutomationTestFlags::ProductFilter)
 

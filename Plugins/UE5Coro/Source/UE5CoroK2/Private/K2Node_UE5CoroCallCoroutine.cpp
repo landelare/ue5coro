@@ -33,6 +33,7 @@
 #include "BlueprintActionDatabaseRegistrar.h"
 #include "BlueprintNodeSpawner.h"
 #include "EdGraphSchema_K2.h"
+#include "Misc/EngineVersionComparison.h"
 #include "UE5Coro/AsyncCoroutine.h"
 #include "UObject/Class.h"
 #include "UObject/Field.h"
@@ -40,6 +41,12 @@
 #include "UObject/UObjectIterator.h"
 
 #define LOCTEXT_NAMESPACE "UE5Coro"
+
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+using ObjectTools = UK2Node_CallFunction;
+#else
+#include "ObjectTools.h"
+#endif
 
 void UK2Node_UE5CoroCallCoroutine::CustomizeNode(UEdGraphNode* NewNode, bool,
                                                  UFunction* Function)
@@ -74,7 +81,8 @@ void UK2Node_UE5CoroCallCoroutine::GetMenuActions(
 			Menu.Category = GetDefaultCategoryForFunction(Fn, FText::GetEmpty());
 			if (Menu.Category.IsEmpty())
 				Menu.Category = LOCTEXT("CallCoroutine", "Call Coroutine");
-			Menu.Tooltip = FText::FromString(GetDefaultTooltipForFunction(Fn));
+			Menu.Tooltip = FText::FromString(
+				ObjectTools::GetDefaultTooltipForFunction(Fn));
 			Menu.Keywords = GetKeywordsForFunction(Fn);
 			Menu.Icon = GetIconAndTint(Menu.IconTint);
 			Menu.DocLink = GetDocumentationLink();

@@ -32,10 +32,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Misc/EngineVersionComparison.h"
 #include "UE5Coro/Definitions.h"
 #include <functional>
 #include "UE5Coro/AsyncCoroutine.h"
 #include "UE5Coro/UE5CoroSubsystem.h"
+
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+constexpr EAutomationTestFlags::Type EAutomationTestFlags_ApplicationContextMask =
+	EAutomationTestFlags::ApplicationContextMask;
+#endif
 
 #define CORO [&](T...) -> FAsyncCoroutine
 #define CORO_R(Type) [&](T...) -> TCoroutine<Type>

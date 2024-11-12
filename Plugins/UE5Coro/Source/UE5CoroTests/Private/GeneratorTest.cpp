@@ -29,13 +29,14 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "TestWorld.h"
 #include "Misc/AutomationTest.h"
 #include "UE5Coro/Generator.h"
 
 using namespace UE5Coro;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGeneratorTest, "UE5Coro.Generator",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::CriticalPriority |
                                  EAutomationTestFlags::ProductFilter)
 
