@@ -223,13 +223,44 @@ Latent coroutines' lifetimes being controlled by the latent action manager is
 highly beneficial, as it provides a measure of protection against running on an
 invalid object, which could then lead to data corruption and/or crashes.
 
-This is perhaps best illustrated with a direct line-by-line comparison, showing
+This is perhaps best illustrated with direct line-by-line comparisons, showing
 the code that does _not_ need to be written for a latent coroutine:
 
 <table><tr><td>
 
 ```cpp
-TCoroutine<> Async(AActress* Target)
+TCoroutine<> AActress::MemberAsync()
+{
+    check(IsInGameThread());
+    TWeakObjectPtr WeakThis = this;
+    co_await MoveToTask();
+    auto Value = HeavyProcessing();
+    co_await MoveToGameThread();
+    if (!WeakThis.IsValid())
+        co_return;
+    /*this->*/SetValue(std::move(Value));
+}
+```
+</td><td>
+
+```cpp
+TCoroutine<> AActress::MemberLatent(FForceLatentCoroutine = {})
+{
+
+
+    co_await MoveToTask();
+    auto Value = HeavyProcessing();
+    co_await MoveToGameThread();
+
+
+    /*this->*/SetValue(std::move(Value));
+}
+```
+</td></tr><tr></tr><tr><td> <!-- Extra row to work around the default CSS -->
+
+```cpp
+static TCoroutine<> Async(AActress* Target)
+
 {
     check(IsInGameThread());
     TWeakObjectPtr WeakTarget = Target;
@@ -244,7 +275,8 @@ TCoroutine<> Async(AActress* Target)
 </td><td>
 
 ```cpp
-TCoroutine<> Latent(AActress* Target, FForceLatentCoroutine = {})
+static TCoroutine<> Latent(AActress* Target,
+                           FForceLatentCoroutine = {})
 {
 
 
@@ -258,11 +290,10 @@ TCoroutine<> Latent(AActress* Target, FForceLatentCoroutine = {})
 ```
 </td></tr></table>
 
-If Target is destroyed before the coroutine moves back to the game thread, a
-latent coroutine would have its latent action destroyed, which in turn cancels
-the coroutine execution, making sure that SetValue does not run.
-
-Non-static member UFUNCTIONs enjoy this lifetime tracking on their `this`.
+If a UObject `this` or Target is destroyed before the coroutine moves back to
+the game thread, a latent coroutine would have its latent action destroyed,
+which in turn cancels the coroutine execution, making sure that SetValue does
+not run.
 
 Since UObject lifetimes and latent actions are both strongly tied to the game
 thread, accessing the coroutine's target UObject is only safe to do on the game
