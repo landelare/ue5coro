@@ -16,9 +16,16 @@ await, before the coroutine would normally resume.
 When such a type is awaited from an async coroutine, a latent action is created
 and registered behind the scenes to handle the awaiter, which incurs additional
 overhead.
-When this happens, the GWorld global variable is read, and it must be valid at
-the time of the co_await (which is usually the case on the game thread).
-Latent coroutines do not have this limitation and do not access GWorld.
+When this happens, the GWorld global variable is read, and it must be valid
+throughout the co_await (which is usually the case on the game thread).
+
+Some latent awaiters are world sensitive.
+These have an additional requirement that the world must remain the same from
+calling their functions to the end of the co_await, instead of just being valid.
+This is guarded by an ensure() on Tick.
+
+Latent coroutines (as opposed to latent awaiters) do not have this limitation,
+and they do not access GWorld.
 The functions from this namespace may still do.
 
 ### auto NextTick()
@@ -71,6 +78,9 @@ each tick, and resumes the coroutine when it first returns true.
 It's roughly equivalent to `while (!Function()) co_await NextTick();`, but the
 provided function is internally called on a fast path, without repeatedly
 resuming and suspending the coroutine.
+
+This function assumes that `Function` is not world-sensitive.
+If it uses GWorld, make sure it can handle it changing, or prevent world changes.
 
 Example:
 ```cpp
@@ -176,6 +186,7 @@ FVoidCoroutine CountDown(int Value, FLatentActionInfo LatentInfo)
 
 Waiting for a negative amount of time will `ensure` and finish immediately.
 
+These functions return world-sensitive awaiters.
 See UE5Coro::Async::PlatformSeconds for a thread-safe alternative to RealSeconds
 that does not require a world.
 
@@ -194,4 +205,5 @@ For example, `UntilTime(GWorld->GetTimeSeconds() + 10)` is equivalent to
 
 For more details, see the Seconds family of functions right above this section.
 
+These functions return world-sensitive awaiters.
 The async counterpart of UntilRealTime is UE5Coro::Async::UntilPlatformTime.

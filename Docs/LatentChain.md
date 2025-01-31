@@ -15,6 +15,9 @@ supported.
 See [delegate support](Implicit.md#delegates) for awaiting the delegates of
 these.
 
+The returned awaiter assumes that the chained latent action is world sensitive,
+see [this page](Latent.md) for details.
+
 ### auto Chain(? (*Function)(?...), T&&... Args)
 ### auto Chain(U* Object, ? (U::*Function)(?...), T&&... Args)
 

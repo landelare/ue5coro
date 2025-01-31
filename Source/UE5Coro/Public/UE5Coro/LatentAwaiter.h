@@ -335,9 +335,13 @@ class [[nodiscard]] UE5CORO_API FLatentAwaiter // not TAwaiter
 protected:
 	void* State;
 	bool (*Resume)(void* State, bool bCleanup);
+#if UE5CORO_DEBUG
+	UWorld* OriginalWorld;
+#endif
 
 public:
-	explicit FLatentAwaiter(void* State, bool (*Resume)(void*, bool)) noexcept;
+	explicit FLatentAwaiter(void* State, bool (*Resume)(void*, bool),
+	                        auto WorldSensitive) noexcept(!UE5CORO_DEBUG);
 	FLatentAwaiter(FLatentAwaiter&&) noexcept;
 	~FLatentAwaiter();
 
@@ -351,6 +355,8 @@ public:
 
 	void await_resume() noexcept { }
 };
+
+static_assert(std::is_standard_layout_v<FLatentAwaiter>);
 
 namespace AsyncLoad
 {

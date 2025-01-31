@@ -46,7 +46,8 @@ std::tuple<FLatentActionInfo, FTwoLives*> Private::MakeLatentInfo()
 }
 
 FLatentChainAwaiter::FLatentChainAwaiter(FTwoLives* Done) noexcept
-	: FLatentAwaiter(Done, &FTwoLives::ShouldResume)
+	// The chained latent action can be anything, assume it's world sensitive
+	: FLatentAwaiter(Done, &FTwoLives::ShouldResume, std::true_type())
 {
 }
 

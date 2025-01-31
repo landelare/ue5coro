@@ -167,7 +167,7 @@ FLatentAwaiter Latent::AsyncLoadObjects(TArray<FSoftObjectPath> Paths,
                                         TAsyncLoadPriority Priority)
 {
 	return FLatentAwaiter(new FLatentLoader(std::move(Paths), Priority),
-	                      &FLatentLoader::ShouldResume);
+	                      &FLatentLoader::ShouldResume, std::false_type());
 }
 
 FLatentAwaiter Latent::AsyncLoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad,
@@ -183,7 +183,7 @@ FLatentAwaiter Latent::AsyncLoadPrimaryAssets(TArray<FPrimaryAssetId> AssetsToLo
 {
 	return FLatentAwaiter(
 		new FPrimaryLoader(std::move(AssetsToLoad), LoadBundles, Priority),
-		&FPrimaryLoader::ShouldResume);
+		&FPrimaryLoader::ShouldResume, std::false_type());
 }
 
 auto Latent::AsyncLoadClass(TSoftClassPtr<> Ptr, TAsyncLoadPriority Priority)
@@ -226,7 +226,7 @@ FPackageLoadAwaiter::FPackageLoadAwaiter(
 	TAsyncLoadPriority PackagePriority,
 	const FLinkerInstancingContext* InstancingContext)
 	: FLatentAwaiter(new FPackageLoadState::FPtr(new FPackageLoadState),
-	                 &FPackageLoadState::ShouldResume)
+	                 &FPackageLoadState::ShouldResume, std::false_type())
 {
 	auto& Ptr = *static_cast<FPackageLoadState::FPtr*>(State);
 	auto Delegate = FLoadPackageAsyncDelegate::CreateSP(

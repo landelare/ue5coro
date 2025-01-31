@@ -43,7 +43,7 @@ bool WaitForNextFrame(void* State, bool)
 }
 
 FTickTimeBudget::FTickTimeBudget(double SecondsPerTick)
-	: FLatentAwaiter(nullptr, &WaitForNextFrame)
+	: FLatentAwaiter(nullptr, &WaitForNextFrame, std::false_type())
 {
 	// Check undefined conversion behavior before it occurs
 	checkf(SecondsPerTick / FPlatformTime::GetSecondsPerCycle() <
