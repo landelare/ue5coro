@@ -29,6 +29,8 @@ The result of awaiting this function's returned object is a
 `TTuple<ENavigationQueryResult::Type, FNavPathSharedPtr>` containing the
 pathfinding operation's results.
 
+The returned awaiter is world sensitive, see [this page](Latent.md) for details.
+
 Example:
 ```cpp
 using namespace UE5Coro::AI;
@@ -47,6 +49,8 @@ It invokes `UAITask_MoveTo::AIMoveTo` with the provided parameters.
 Awaiting the return value will resume the coroutine when the move finishes for
 any reason, including failure.
 The await expression will provide the EPathFollowingResult.
+
+The returned awaiter is world sensitive, see [this page](Latent.md) for details.
 
 Example:
 ```cpp
@@ -72,6 +76,8 @@ This function does not require the controller to be an AI controller.
 Awaiting the return value will resume the coroutine when the move finishes for
 any reason, including failure.
 The await expression will result in the operation's FPathFollowingResult.
+
+The returned awaiter is world sensitive, see [this page](Latent.md) for details.
 
 Example:
 ```cpp

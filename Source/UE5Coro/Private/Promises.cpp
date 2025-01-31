@@ -53,7 +53,7 @@ public:
 	explicit FPendingLatentCoroutine(std::shared_ptr<FPromiseExtras> Extras,
 	                                 FLatentActionInfo LatentInfo)
 		: Extras(std::move(Extras)), LatentInfo(std::move(LatentInfo))
-		, CurrentAwaiter(nullptr, nullptr) { }
+		, CurrentAwaiter(nullptr, nullptr, std::false_type()) { }
 
 	UE_NONCOPYABLE(FPendingLatentCoroutine);
 

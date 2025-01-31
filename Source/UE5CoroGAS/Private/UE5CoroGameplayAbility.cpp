@@ -148,7 +148,7 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object, bool bAutoActivate
 	static_assert(sizeof(FCallbackTargetPtr) <= sizeof(void*));
 	void* Data;
 	new (&Data) FCallbackTargetPtr(Target);
-	return FLatentAwaiter(Data, &ShouldResumeTask);
+	return FLatentAwaiter(Data, &ShouldResumeTask, std::true_type());
 }
 
 void UUE5CoroGameplayAbility::ActivateAbility(

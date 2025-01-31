@@ -89,7 +89,7 @@ TAsyncQueryAwaiter<T>::TAsyncQueryAwaiter(UWorld* World,
                                           FTraceHandle (UWorld::*Fn)(P...),
                                           auto&&... Params)
 	: FLatentAwaiter(new typename TQueryResult<T>::FPtr(new TQueryResult<T>),
-	                 &TQueryResult<T>::ShouldResume)
+	                 &TQueryResult<T>::ShouldResume, std::false_type())
 {
 	checkf(IsInGameThread(),
 	       TEXT("Async queries may only be started from the game thread"));

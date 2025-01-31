@@ -88,7 +88,7 @@ struct TLatentCoroutineAwaiter final : FLatentAwaiter
 {
 	explicit TLatentCoroutineAwaiter(TCoroutine<T> Antecedent)
 		: FLatentAwaiter(new TCoroutine<T>(std::move(Antecedent)),
-		                 &ShouldResumeLatentCoroutine<T>) { }
+		                 &ShouldResumeLatentCoroutine<T>, std::false_type()) { }
 
 	T await_resume()
 	{

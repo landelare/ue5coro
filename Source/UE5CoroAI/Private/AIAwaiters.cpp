@@ -216,7 +216,7 @@ FSimpleMoveToAwaiter SimpleMoveToCore(AController* Controller, TGoal auto Target
 }
 
 FPathFindingAwaiter::FPathFindingAwaiter(void* InState)
-	: FLatentAwaiter(InState, &ShouldResumeFindPath)
+	: FLatentAwaiter(InState, &ShouldResumeFindPath, std::true_type())
 {
 }
 
@@ -231,7 +231,7 @@ auto FPathFindingAwaiter::await_resume()
 
 
 FMoveToAwaiter::FMoveToAwaiter(UAITask_MoveTo* Task)
-	: FLatentAwaiter(nullptr, &ShouldResumeMoveTo)
+	: FLatentAwaiter(nullptr, &ShouldResumeMoveTo, std::true_type())
 {
 	static_assert(sizeof(FAICallbackTargetPtr) <= sizeof(State));
 	new (&State) FAICallbackTargetPtr(
@@ -267,14 +267,15 @@ bool FSimpleMoveToAwaiter::ShouldResume(void* InState, bool bCleanup)
 }
 
 FSimpleMoveToAwaiter::FSimpleMoveToAwaiter(EPathFollowingResult::Type Result)
-	: FLatentAwaiter(new FComplexData{.Result = {Result}}, &ShouldResume)
+	: FLatentAwaiter(new FComplexData{.Result = {Result}}, &ShouldResume,
+	                 std::true_type())
 {
 }
 
 FSimpleMoveToAwaiter::FSimpleMoveToAwaiter(UPathFollowingComponent* PFC,
                                            FAIRequestID ID)
 	: FLatentAwaiter(new FComplexData{.RequestID = ID, .PathFollow = PFC},
-	                 &ShouldResume)
+	                 &ShouldResume, std::true_type())
 {
 	auto* Data = static_cast<FComplexData*>(State);
 	Data->Handle = PFC->OnRequestFinished.AddRaw(Data,

@@ -92,7 +92,7 @@ FLatentAwaiter GenericUntil(double Time)
 	// Definition.h validates that a double fits into a void*
 	void* State = nullptr;
 	reinterpret_cast<double&>(State) = Time;
-	return FLatentAwaiter(State, &WaitUntilTime<GetTime>);
+	return FLatentAwaiter(State, &WaitUntilTime<GetTime>, std::true_type());
 }
 
 class [[nodiscard]] FUntilDelegateState final
@@ -139,14 +139,15 @@ FLatentAwaiter Latent::Ticks(int64 Ticks)
 {
 	ensureMsgf(Ticks >= 0, TEXT("Invalid number of ticks %lld"), Ticks);
 	uint64 Target = GFrameCounter + Ticks;
-	return FLatentAwaiter(reinterpret_cast<void*>(Target), &WaitUntilFrame);
+	return FLatentAwaiter(reinterpret_cast<void*>(Target), &WaitUntilFrame,
+	                      std::false_type());
 }
 
 FLatentAwaiter Latent::Until(std::function<bool()> Function)
 {
 	checkf(Function, TEXT("Provided function is empty"));
 	return FLatentAwaiter(new std::function(std::move(Function)),
-	                      &WaitUntilPredicate);
+	                      &WaitUntilPredicate, std::false_type());
 }
 
 auto Latent::UntilCoroutine(TCoroutine<> Coroutine)
@@ -163,7 +164,8 @@ std::tuple<FLatentAwaiter, UObject*> Private::UntilDelegateCore()
 	auto* Target = NewObject<UUE5CoroDelegateCallbackTarget>();
 	auto* State = new auto(std::make_shared<FUntilDelegateState>(Target));
 	(*State)->Init();
-	return {FLatentAwaiter(State, &FUntilDelegateState::ShouldResume), Target};
+	return {FLatentAwaiter(State, &FUntilDelegateState::ShouldResume,
+	                       std::false_type()), Target};
 }
 
 FLatentAwaiter Latent::Seconds(double Seconds)

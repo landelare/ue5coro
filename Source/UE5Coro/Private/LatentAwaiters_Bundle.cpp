@@ -87,7 +87,7 @@ FLatentAwaiter Latent::AsyncChangeBundleStateForPrimaryAssets(
 	return FLatentAwaiter(new FBundleChangeState(AssetsToChange, AddBundles,
 	                                             RemoveBundles,
 	                                             bRemoveAllBundles, Priority),
-	                      &FBundleChangeState::ShouldResume);
+	                      &FBundleChangeState::ShouldResume, std::false_type());
 }
 
 FLatentAwaiter Latent::AsyncChangeBundleStateForMatchingPrimaryAssets(
@@ -96,5 +96,5 @@ FLatentAwaiter Latent::AsyncChangeBundleStateForMatchingPrimaryAssets(
 {
 	return FLatentAwaiter(new FBundleChangeState(NewBundles, OldBundles,
 	                                             Priority),
-	                      &FBundleChangeState::ShouldResume);
+	                      &FBundleChangeState::ShouldResume, std::false_type());
 }

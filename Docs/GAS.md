@@ -95,6 +95,7 @@ This wrapper is locked to the game thread, responds to cancellations
 immediately, but it also discards delegate parameters.
 It is the preferred way to await single-delegate tasks from a gameplay ability
 coroutine.
+It is also world sensitive, see [this page](Latent.md) for details.
 
 Consider using something like `Latent::UntilDelegate` instead of awaiting the
 delegate directly if you need to deal with multiple UPROPERTYs.

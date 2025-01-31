@@ -355,6 +355,10 @@ single-entry vtable would need one extra indirection.
 If no return value is needed, it's fairly simple to define new latent awaiters:
 return FLatentAwaiter itself initialized with an arbitrary state and a suitable
 function pointer that will be called once on co_await and then once per tick.
+The third constructor argument should be std::true_type() if the function is
+sensitive to world changes, or std::false_type() otherwise.
+This only affects an ensure() in debug.
+
 Return true if the coroutine should be resumed, and clean up the state if the
 bool parameter was true.
 Refer to the many existing examples in the plugin code.
