@@ -75,12 +75,12 @@ FPromise::~FPromise()
 	GDestroyedEarly = false;
 
 	// The coroutine is considered completed NOW
+	auto* ReturnValuePtr = std::exchange(Extras->ReturnValuePtr, nullptr);
 	Extras->Completed->Trigger();
 	Extras->Lock.unlock();
 
 	for (auto& Fn : OnCompleted)
-		Fn(Extras->ReturnValuePtr);
-	Extras->ReturnValuePtr = nullptr;
+		Fn(ReturnValuePtr);
 }
 
 void FPromise::ResumeInternal(bool bBypassCancellationHolds)
