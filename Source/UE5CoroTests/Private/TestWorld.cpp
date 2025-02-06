@@ -98,3 +98,15 @@ void FTestHelper::CheckWorld(FAutomationTestBase& Test, UWorld* World)
 	// Now that it's known to be latent, check the world
 	Test.TestEqual("World check", Promise.World.Get(), World);
 }
+
+bool FTestHelper::ReadEvent(FAwaitableEvent& Event)
+{
+	UE::TUniqueLock Lock(Event.Lock);
+	return Event.bActive;
+}
+
+int FTestHelper::ReadSemaphore(FAwaitableSemaphore& Semaphore)
+{
+	UE::TUniqueLock Lock(Semaphore.Lock);
+	return Semaphore.Count;
+}

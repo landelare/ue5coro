@@ -44,6 +44,7 @@ namespace UE5Coro
 class UE5CORO_API FAwaitableEvent final
 {
 	friend Private::FEventAwaiter;
+	friend Private::Test::FTestHelper;
 
 	UE::FMutex Lock;
 	bool bActive;
@@ -79,6 +80,7 @@ private:
 class UE5CORO_API FAwaitableSemaphore final
 {
 	friend Private::FSemaphoreAwaiter;
+	friend Private::Test::FTestHelper;
 
 	UE::FMutex Lock;
 	const int Capacity;
