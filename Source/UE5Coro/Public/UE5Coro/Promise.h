@@ -159,7 +159,7 @@ struct [[nodiscard]] TPromiseExtras final : FPromiseExtras
 		: FPromiseExtras(InPromise) { }
 };
 
-class [[nodiscard]] UE5CORO_API FCancellationTracker
+class [[nodiscard]] FCancellationTracker
 {
 	std::atomic<bool> bCanceled = false;
 	std::atomic<int> CancellationHolds = 0;
@@ -168,7 +168,10 @@ public:
 	void Cancel() { bCanceled = true; }
 	void Hold() { verify(++CancellationHolds >= 0); }
 	void Release() { verify(--CancellationHolds >= 0); }
-	bool ShouldCancel(bool bBypassHolds) const;
+	bool ShouldCancel(bool bBypassHolds) const
+	{
+		return bCanceled && (bBypassHolds || CancellationHolds == 0);
+	}
 };
 
 #if UE5CORO_DEBUG

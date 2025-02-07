@@ -46,11 +46,6 @@ bool FPromiseExtras::IsComplete() const
 	return Completed->Wait(0, true);
 }
 
-bool FCancellationTracker::ShouldCancel(bool bBypassHolds) const
-{
-	return bCanceled && (bBypassHolds || CancellationHolds == 0);
-}
-
 FPromise::FPromise(std::shared_ptr<FPromiseExtras> InExtras,
                    const TCHAR* PromiseType)
 	: Extras(std::move(InExtras))
