@@ -252,7 +252,7 @@ void FLatentPromise::Resume()
 
 void FLatentPromise::LatentActionDestroyed()
 {
-	std::scoped_lock _(Extras->Lock);
+	UE::TUniqueLock Lock(Extras->Lock);
 	LatentAction = nullptr;
 	Cancel();
 	checkf(ShouldCancel(true),
@@ -314,7 +314,7 @@ void FLatentPromise::SetCurrentAwaiter(const FLatentAwaiter& Awaiter)
 	checkf(LatentFlags == 0,
 	       TEXT("Internal error: unexpected state in latent coroutine"));
 	checkCode(
-		std::scoped_lock _(Extras->Lock);
+		UE::TUniqueLock Lock(Extras->Lock);
 		checkf(LatentAction,
 		       TEXT("Internal error: unexpected awaiter without latent action"));
 	);
@@ -361,7 +361,7 @@ FInitialSuspend FLatentPromise::initial_suspend()
 
 FLatentFinalSuspend FLatentPromise::final_suspend() noexcept
 {
-	std::scoped_lock _(Extras->Lock); // Block incoming destruction requests
+	UE::TUniqueLock Lock(Extras->Lock); // Block incoming destruction requests
 	bool bDestroy;
 
 	// It is possible that the latent action was deleted somewhere between

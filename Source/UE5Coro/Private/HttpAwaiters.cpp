@@ -59,13 +59,16 @@ FHttpAwaiter::FHttpAwaiter(FHttpRequestRef&& Request)
 
 bool FHttpAwaiter::await_ready()
 {
-	std::unique_lock _(State->Lock);
+	State->Lock.Lock();
 
 	// Skip suspension if the request finished first
 	if (State->Result.has_value())
+	{
+		State->Lock.Unlock();
 		return true;
+	}
 
-	_.release(); // Carry the lock into Suspend()
+	// Carry the lock into Suspend()
 	checkf(!State->bSuspended, TEXT("Attempted second concurrent co_await"));
 	State->bSuspended = true;
 	return false;
@@ -74,9 +77,9 @@ bool FHttpAwaiter::await_ready()
 void FHttpAwaiter::Suspend(FPromise& Promise)
 {
 	// This should be locked from await_ready
-	checkf(!State->Lock.try_lock(), TEXT("Internal error: lock wasn't taken"));
+	checkf(State->Lock.IsLocked(), TEXT("Internal error: lock wasn't taken"));
 	State->Promise = &Promise;
-	State->Lock.unlock();
+	State->Lock.Unlock();
 }
 
 void FHttpAwaiter::FState::Resume()
@@ -99,11 +102,11 @@ void FHttpAwaiter::FState::RequestComplete(FHttpRequestPtr,
                                            FHttpResponsePtr Response,
                                            bool bConnectedSuccessfully)
 {
-	std::unique_lock _(Lock);
+	UE::TDynamicUniqueLock L(Lock);
 	Result = {std::move(Response), bConnectedSuccessfully};
 	if (bSuspended)
 	{
-		_.unlock();
+		L.Unlock();
 		Resume();
 	}
 }

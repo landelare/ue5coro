@@ -64,7 +64,7 @@ FPromise::FPromise(std::shared_ptr<FPromiseExtras> InExtras,
 FPromise::~FPromise()
 {
 	// Expecting the lock to be taken by a derived destructor
-	checkf(!Extras->Lock.try_lock(), TEXT("Internal error: lock not held"));
+	checkf(Extras->Lock.IsLocked(), TEXT("Internal error: lock not held"));
 	checkf(!Extras->IsComplete(),
 	       TEXT("Internal error: unexpected late/double coroutine destruction"));
 #if PLATFORM_EXCEPTIONS_DISABLED
@@ -77,7 +77,7 @@ FPromise::~FPromise()
 	// The coroutine is considered completed NOW
 	auto* ReturnValuePtr = std::exchange(Extras->ReturnValuePtr, nullptr);
 	Extras->Completed->Trigger();
-	Extras->Lock.unlock();
+	Extras->Lock.Unlock();
 
 	for (auto& Fn : OnCompleted)
 		Fn(ReturnValuePtr);
@@ -159,7 +159,7 @@ void FPromise::ResumeFast()
 void FPromise::AddContinuation(std::function<void(void*)> Fn)
 {
 	// Expecting a non-empty function and the lock to be held by the caller
-	checkf(!Extras->Lock.try_lock(), TEXT("Internal error: lock not held"));
+	checkf(Extras->Lock.IsLocked(), TEXT("Internal error: lock not held"));
 	checkf(Fn, TEXT("Internal error: adding empty function as continuation"));
 
 	OnCompleted.Add(std::move(Fn));

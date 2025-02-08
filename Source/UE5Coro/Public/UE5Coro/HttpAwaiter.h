@@ -53,9 +53,9 @@ class [[nodiscard]] UE5CORO_API FHttpAwaiter : public TAwaiter<FHttpAwaiter>
 {
 	struct [[nodiscard]] UE5CORO_API FState
 	{
-		FMutex Lock;
-		const ENamedThreads::Type Thread;
+		UE::FMutex Lock;
 		bool bSuspended = false; // Lock
+		const ENamedThreads::Type Thread;
 		const FHttpRequestRef Request;
 		FPromise* Promise = nullptr; // Lock
 		std::optional<TTuple<FHttpResponsePtr, bool>> Result;

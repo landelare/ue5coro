@@ -132,7 +132,7 @@ struct [[nodiscard]] UE5CORO_API FPromiseExtras
 	// This could be read from another thread
 	std::atomic<bool> bWasSuccessful = false;
 
-	FMutex Lock; // Used for the union below and by FLatentPromise
+	UE::FMutex Lock; // Used for the union below and by FLatentPromise
 	union
 	{
 		FPromise* Promise; // nullptr once destroyed
@@ -299,7 +299,7 @@ public:
 	~TCoroutinePromise()
 	{
 		auto* ExtrasT = static_cast<TPromiseExtras<T>*>(this->Extras.get());
-		ExtrasT->Lock.lock(); // This will be held until the end of ~FPromise
+		ExtrasT->Lock.Lock(); // This will be held until the end of ~FPromise
 		checkf(ExtrasT->Promise, TEXT("Unexpected double promise destruction"));
 		ExtrasT->ReturnValuePtr = &ExtrasT->ReturnValue;
 	}
@@ -307,7 +307,7 @@ public:
 	void return_value(T Value)
 	{
 		auto* ExtrasT = static_cast<TPromiseExtras<T>*>(this->Extras.get());
-		std::scoped_lock _(ExtrasT->Lock);
+		UE::TUniqueLock Lock(ExtrasT->Lock);
 		check(!ExtrasT->IsComplete()); // Completion is after a value is returned
 		ExtrasT->ReturnValue = std::move(Value);
 	}
@@ -329,7 +329,7 @@ public:
 	~TCoroutinePromise()
 	{
 		// This will be held until the end of ~FPromise
-		this->Extras->Lock.lock();
+		this->Extras->Lock.Lock();
 		checkf(this->Extras->Promise,
 		       TEXT("Unexpected double promise destruction"));
 		this->Extras->ReturnValuePtr = nullptr;
@@ -346,10 +346,10 @@ public:
 template<typename T>
 void FPromiseExtras::ContinueWith(auto Fn)
 {
-	std::unique_lock _(Lock);
+	UE::TDynamicUniqueLock L(Lock);
 	if (IsComplete()) // Already completed?
 	{
-		_.unlock();
+		L.Unlock();
 		if constexpr (std::is_void_v<T>)
 			Fn();
 		else // T is controlled by TCoroutine<T>, safe to cast

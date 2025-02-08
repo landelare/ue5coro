@@ -43,7 +43,7 @@ class UE5CORO_API FTimerThread final
 	static FTimerThread* Instance;
 
 	FEvent* Event;
-	FMutex Lock;
+	UE::FMutex Lock;
 	TArray<FAsyncTimeAwaiter*> Queue;
 	FThread Thread; // This one must come last
 

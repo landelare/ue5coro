@@ -44,7 +44,7 @@ struct FAwaitingPromise
 }
 
 FAwaitableEvent::FAwaitableEvent(EEventMode Mode, bool bInitialState)
-	: Mode(Mode), bActive(bInitialState)
+	: bActive(bInitialState), Mode(Mode)
 {
 	checkf(Mode == EEventMode::AutoReset || Mode == EEventMode::ManualReset,
 	       TEXT("Invalid event mode"));
@@ -60,7 +60,7 @@ FAwaitableEvent::~FAwaitableEvent()
 
 void FAwaitableEvent::Trigger()
 {
-	Lock.lock();
+	Lock.Lock();
 	if (Mode == EEventMode::ManualReset)
 	{
 		bActive = true;
@@ -71,13 +71,13 @@ void FAwaitableEvent::Trigger()
 	else
 	{
 		bActive = true;
-		Lock.unlock();
+		Lock.Unlock();
 	}
 }
 
 void FAwaitableEvent::Reset()
 {
-	std::scoped_lock _(Lock);
+	UE::TUniqueLock L(Lock);
 	bActive = false;
 }
 
@@ -93,11 +93,11 @@ FEventAwaiter FAwaitableEvent::operator co_await()
 
 void FAwaitableEvent::ResumeOne()
 {
-	checkf(!Lock.try_lock(), TEXT("Internal error: resuming without lock"));
+	checkf(Lock.IsLocked(), TEXT("Internal error: resuming without lock"));
 	checkf(Awaiters, TEXT("Internal error: attempting to resume nothing"));
 	auto* Node = static_cast<FAwaitingPromise*>(std::exchange(Awaiters,
 		static_cast<FAwaitingPromise*>(Awaiters)->Next));
-	Lock.unlock(); // The coroutine might want the lock
+	Lock.Unlock(); // The coroutine might want the lock
 
 	auto* Promise = Node->Promise;
 	delete Node; // Do this first to help tail calls
@@ -106,12 +106,12 @@ void FAwaitableEvent::ResumeOne()
 
 void FAwaitableEvent::TryResumeAll()
 {
-	checkf(!Lock.try_lock(), TEXT("Internal error: resuming without lock"));
+	checkf(Lock.IsLocked(), TEXT("Internal error: resuming without lock"));
 
 	// Start a new awaiter list to make sure everything active at this point
 	// gets resumed eventually, even if the event is reset
 	auto* Node = static_cast<FAwaitingPromise*>(std::exchange(Awaiters, nullptr));
-	Lock.unlock();
+	Lock.Unlock();
 
 	while (Node)
 	{
@@ -122,13 +122,13 @@ void FAwaitableEvent::TryResumeAll()
 
 bool FEventAwaiter::await_ready() noexcept
 {
-	Event.Lock.lock();
+	Event.Lock.Lock();
 	bool bValue = Event.bActive;
 	if (Event.Mode == EEventMode::AutoReset)
 		Event.bActive = false;
 	if (bValue)
 	{
-		Event.Lock.unlock();
+		Event.Lock.Unlock();
 		return true;
 	}
 	else // Leave it locked
@@ -137,10 +137,10 @@ bool FEventAwaiter::await_ready() noexcept
 
 void FEventAwaiter::Suspend(FPromise& Promise)
 {
-	checkf(!Event.Lock.try_lock(),
+	checkf(Event.Lock.IsLocked(),
 	       TEXT("Internal error: suspension without lock"));
 	checkf(!Event.bActive, TEXT("Internal error: suspending with active event"));
 	Event.Awaiters = new FAwaitingPromise(
 		&Promise, static_cast<FAwaitingPromise*>(Event.Awaiters));
-	Event.Lock.unlock();
+	Event.Lock.Unlock();
 }

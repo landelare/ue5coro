@@ -45,9 +45,9 @@ class UE5CORO_API FAwaitableEvent final
 {
 	friend Private::FEventAwaiter;
 
-	Private::FMutex Lock;
-	const EEventMode Mode;
+	UE::FMutex Lock;
 	bool bActive;
+	const EEventMode Mode;
 	void* Awaiters = nullptr; // FAwaitingPromise*
 
 public:
@@ -80,7 +80,7 @@ class UE5CORO_API FAwaitableSemaphore final
 {
 	friend Private::FSemaphoreAwaiter;
 
-	Private::FMutex Lock;
+	UE::FMutex Lock;
 	const int Capacity;
 	int Count;
 	void* Awaiters = nullptr; // FAwaitingPromise*

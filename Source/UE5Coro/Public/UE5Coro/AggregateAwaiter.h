@@ -87,7 +87,7 @@ class [[nodiscard]] UE5CORO_API FAggregateAwaiter
 {
 	struct FData
 	{
-		FMutex Lock;
+		UE::FMutex Lock;
 		int Count;
 		int Index = -1;
 		FPromise* Promise = nullptr;
@@ -136,9 +136,9 @@ class [[nodiscard]] UE5CORO_API FRaceAwaiter : public TAwaiter<FRaceAwaiter>
 {
 	struct FData
 	{
-		FMutex Lock;
-		TArray<TCoroutine<>> Handles;
+		UE::FMutex Lock;
 		int Index = -1;
+		TArray<TCoroutine<>> Handles;
 		FPromise* Promise = nullptr;
 
 		explicit FData(TArray<TCoroutine<>>&& Array)
@@ -178,12 +178,12 @@ UE5Coro::TCoroutine<> UE5Coro::Private::FAggregateAwaiter::Consume(
 {
 	ON_SCOPE_EXIT // Handle both success and cancellation
 	{
-		std::unique_lock _(Data->Lock);
+		UE::TDynamicUniqueLock Lock(Data->Lock);
 		if (--Data->Count != 0)
 			return;
 		Data->Index = Index; // Mark that this index was the one reaching 0
 		auto* Promise = Data->Promise;
-		_.unlock();
+		Lock.Unlock();
 
 		// Not co_awaited yet if this is nullptr, await_ready deals with this
 		if (Promise != nullptr)

@@ -61,7 +61,7 @@ FAwaitableSemaphore::~FAwaitableSemaphore()
 void FAwaitableSemaphore::Unlock(int InCount)
 {
 	checkf(InCount > 0, TEXT("Invalid count"));
-	Lock.lock();
+	Lock.Lock();
 	verifyf((Count += InCount) <= Capacity,
 	        TEXT("Semaphore unlocked above maximum"));
 	TryResumeAll();
@@ -74,28 +74,28 @@ FSemaphoreAwaiter FAwaitableSemaphore::operator co_await()
 
 void FAwaitableSemaphore::TryResumeAll()
 {
-	checkf(!Lock.try_lock(), TEXT("Internal error: resuming without lock held"));
+	checkf(Lock.IsLocked(), TEXT("Internal error: resuming without lock held"));
 	while (Awaiters && Count > 0)
 	{
 		auto* Node = static_cast<FAwaitingPromise*>(std::exchange(
 			Awaiters, static_cast<FAwaitingPromise*>(Awaiters)->Next));
 		verifyf(--Count >= 0, TEXT("Internal error: semaphore went negative"));
-		Lock.unlock();
+		Lock.Unlock();
 		Node->Promise->Resume();
 		delete Node;
-		Lock.lock();
+		Lock.Lock();
 	}
-	Lock.unlock();
+	Lock.Unlock();
 }
 
 bool FSemaphoreAwaiter::await_ready()
 {
-	Semaphore.Lock.lock();
+	Semaphore.Lock.Lock();
 	if (Semaphore.Count > 0)
 	{
 		verifyf(--Semaphore.Count >= 0,
 		        TEXT("Internal error: semaphore went negative"));
-		Semaphore.Lock.unlock();
+		Semaphore.Lock.Unlock();
 		return true;
 	}
 	else // Leave it locked
@@ -104,9 +104,9 @@ bool FSemaphoreAwaiter::await_ready()
 
 void FSemaphoreAwaiter::Suspend(FPromise& Promise)
 {
-	checkf(!Semaphore.Lock.try_lock(),
+	checkf(Semaphore.Lock.IsLocked(),
 	       TEXT("Internal error: suspension without lock"));
 	Semaphore.Awaiters = new FAwaitingPromise(
 		&Promise, static_cast<FAwaitingPromise*>(Semaphore.Awaiters));
-	Semaphore.Lock.unlock();
+	Semaphore.Lock.Unlock();
 }
