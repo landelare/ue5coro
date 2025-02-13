@@ -34,13 +34,101 @@
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
 
-namespace
+FAwaitableEvent::FAwaitableEvent(EEventMode Mode, bool bInitialState)
+	: bActive(bInitialState), Mode(Mode)
 {
-struct FAwaitingPromise
+	checkf(Mode == EEventMode::AutoReset || Mode == EEventMode::ManualReset,
+	       TEXT("Invalid event mode"));
+}
+
+#if UE5CORO_DEBUG
+FAwaitableEvent::~FAwaitableEvent()
 {
-	FPromise* Promise;
-	FAwaitingPromise* Next;
-};
+	ensureMsgf(AwaitingPromises.empty(),
+	           TEXT("Destroyed early, remaining awaiters will never resume!"));
+}
+#endif
+
+void FAwaitableEvent::Trigger()
+{
+	Lock.Lock();
+	if (Mode == EEventMode::ManualReset)
+	{
+		bActive = true;
+		TryResumeAll();
+	}
+	else if (!AwaitingPromises.empty())
+		ResumeOne(); // AutoReset: don't set bActive
+	else
+	{
+		bActive = true;
+		Lock.Unlock();
+	}
+}
+
+void FAwaitableEvent::Reset()
+{
+	UE::TUniqueLock L(Lock);
+	bActive = false;
+}
+
+bool FAwaitableEvent::IsManualReset() const noexcept
+{
+	return Mode == EEventMode::ManualReset;
+}
+
+FEventAwaiter FAwaitableEvent::operator co_await()
+{
+	return FEventAwaiter(*this);
+}
+
+void FAwaitableEvent::ResumeOne()
+{
+	checkf(Lock.IsLocked(), TEXT("Internal error: resuming without lock"));
+	checkf(!AwaitingPromises.empty(),
+	       TEXT("Internal error: attempting to resume nothing"));
+	auto* Promise = AwaitingPromises.front();
+	AwaitingPromises.pop_front();
+	Lock.Unlock(); // The coroutine might want the lock
+
+	Promise->Resume();
+}
+
+void FAwaitableEvent::TryResumeAll()
+{
+	checkf(Lock.IsLocked(), TEXT("Internal error: resuming without lock"));
+
+	// Start a new list to make sure every current awaiter gets resumed,
+	// even if the event is reset during one of the Resume() calls
+	auto List = std::exchange(AwaitingPromises, {});
+	Lock.Unlock();
+
+	for (auto* Promise : List)
+		Promise->Resume();
+}
+
+bool FEventAwaiter::await_ready() noexcept
+{
+	Event.Lock.Lock();
+	bool bValue = Event.bActive;
+	if (Event.Mode == EEventMode::AutoReset)
+		Event.bActive = false;
+	if (bValue)
+	{
+		Event.Lock.Unlock();
+		return true;
+	}
+	else // Leave it locked
+		return false;
+}
+
+void FEventAwaiter::Suspend(FPromise& Promise)
+{
+	checkf(Event.Lock.IsLocked(),
+	       TEXT("Internal error: suspension without lock"));
+	checkf(!Event.bActive, TEXT("Internal error: suspending with active event"));
+	Event.AwaitingPromises.push_front(&Promise);
+	Event.Lock.Unlock();
 }
 
 FAwaitableSemaphore::FAwaitableSemaphore(int Capacity, int InitialCount)
@@ -53,7 +141,7 @@ FAwaitableSemaphore::FAwaitableSemaphore(int Capacity, int InitialCount)
 #if UE5CORO_DEBUG
 FAwaitableSemaphore::~FAwaitableSemaphore()
 {
-	ensureMsgf(!Awaiters,
+	ensureMsgf(AwaitingPromises.empty(),
 	           TEXT("Destroyed early, remaining awaiters will never resume!"));
 }
 #endif
@@ -75,14 +163,13 @@ FSemaphoreAwaiter FAwaitableSemaphore::operator co_await()
 void FAwaitableSemaphore::TryResumeAll()
 {
 	checkf(Lock.IsLocked(), TEXT("Internal error: resuming without lock held"));
-	while (Awaiters && Count > 0)
+	while (!AwaitingPromises.empty() && Count > 0)
 	{
-		auto* Node = static_cast<FAwaitingPromise*>(std::exchange(
-			Awaiters, static_cast<FAwaitingPromise*>(Awaiters)->Next));
+		auto* Promise = AwaitingPromises.front();
+		AwaitingPromises.pop_front();
 		verifyf(--Count >= 0, TEXT("Internal error: semaphore went negative"));
 		Lock.Unlock();
-		Node->Promise->Resume();
-		delete Node;
+		Promise->Resume(); // The coroutine might want the lock
 		Lock.Lock();
 	}
 	Lock.Unlock();
@@ -106,7 +193,6 @@ void FSemaphoreAwaiter::Suspend(FPromise& Promise)
 {
 	checkf(Semaphore.Lock.IsLocked(),
 	       TEXT("Internal error: suspension without lock"));
-	Semaphore.Awaiters = new FAwaitingPromise(
-		&Promise, static_cast<FAwaitingPromise*>(Semaphore.Awaiters));
+	Semaphore.AwaitingPromises.push_front(&Promise);
 	Semaphore.Lock.Unlock();
 }

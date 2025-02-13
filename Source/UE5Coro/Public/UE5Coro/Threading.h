@@ -33,6 +33,7 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definition.h"
+#include <forward_list>
 #include "UE5Coro/Private.h"
 #include "UE5Coro/Promise.h"
 
@@ -49,7 +50,7 @@ class UE5CORO_API FAwaitableEvent final
 	UE::FMutex Lock;
 	bool bActive;
 	const EEventMode Mode;
-	void* Awaiters = nullptr; // FAwaitingPromise*
+	std::forward_list<Private::FPromise*> AwaitingPromises;
 
 public:
 	/** Initializes this event to be in the given mode and state. */
@@ -85,7 +86,7 @@ class UE5CORO_API FAwaitableSemaphore final
 	UE::FMutex Lock;
 	const int Capacity;
 	int Count;
-	void* Awaiters = nullptr; // FAwaitingPromise*
+	std::forward_list<Private::FPromise*> AwaitingPromises;
 
 public:
 	/** Initializes the semaphore to the given capacity and initial count.
