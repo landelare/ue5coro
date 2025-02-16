@@ -71,7 +71,7 @@ public:
 	auto operator co_await() -> Private::FEventAwaiter;
 
 private:
-	void ResumeOne();
+	[[nodiscard]] bool TryResumeOne();
 	void TryResumeAll();
 };
 
@@ -111,30 +111,37 @@ private:
 namespace UE5Coro::Private
 {
 class [[nodiscard]] UE5CORO_API FEventAwaiter final
-	: public TAwaiter<FEventAwaiter>
+	: public TCancelableAwaiter<FEventAwaiter>
 {
 	FAwaitableEvent& Event;
 
 public:
-	explicit FEventAwaiter(FAwaitableEvent& Event) : Event(Event) { }
+	explicit FEventAwaiter(FAwaitableEvent& Event)
+		: TCancelableAwaiter(&Cancel), Event(Event) { }
 
 	[[nodiscard]] bool await_ready() noexcept;
 	void Suspend(FPromise&);
 	void await_resume() noexcept { }
+
+private:
+	static void Cancel(void*, FPromise&);
 };
 
 class [[nodiscard]] UE5CORO_API FSemaphoreAwaiter final
-	: public TAwaiter<FSemaphoreAwaiter>
+	: public TCancelableAwaiter<FSemaphoreAwaiter>
 {
 	FAwaitableSemaphore& Semaphore;
 
 public:
 	explicit FSemaphoreAwaiter(FAwaitableSemaphore& Semaphore)
-		: Semaphore(Semaphore) { }
+		: TCancelableAwaiter(&Cancel), Semaphore(Semaphore) { }
 
 	[[nodiscard]] bool await_ready();
 	void Suspend(FPromise&);
 	void await_resume() noexcept { }
+
+private:
+	static void Cancel(void*, FPromise&);
 };
 }
 #pragma endregion

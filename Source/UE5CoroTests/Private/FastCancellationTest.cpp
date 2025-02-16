@@ -1,0 +1,170 @@
+// Copyright © Laura Andelare
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted (subject to the limitations in the disclaimer
+// below) provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+//
+// NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
+// THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+// CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
+// NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#include "TestWorld.h"
+#include "Misc/AutomationTest.h"
+#include "UE5Coro.h"
+
+using namespace UE5Coro;
+using namespace UE5Coro::Private::Test;
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFastCancelTestAsyncST,
+                                 "UE5Coro.Cancel.Fast.Async.ST",
+                                 EAutomationTestFlags_ApplicationContextMask |
+                                 EAutomationTestFlags::HighPriority |
+                                 EAutomationTestFlags::ProductFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFastCancelTestAsyncMT,
+                                 "UE5Coro.Cancel.Fast.Async.MT",
+                                 EAutomationTestFlags_ApplicationContextMask |
+                                 EAutomationTestFlags::HighPriority |
+                                 EAutomationTestFlags::ProductFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFastCancelTestLatentST,
+                                 "UE5Coro.Cancel.Fast.Latent.ST",
+                                 EAutomationTestFlags_ApplicationContextMask |
+                                 EAutomationTestFlags::HighPriority |
+                                 EAutomationTestFlags::ProductFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFastCancelTestLatentMT,
+                                 "UE5Coro.Cancel.Fast.Latent.MT",
+                                 EAutomationTestFlags_ApplicationContextMask |
+                                 EAutomationTestFlags::HighPriority |
+                                 EAutomationTestFlags::ProductFilter)
+
+namespace
+{
+template<bool bMultithreaded, typename... T>
+void DoTest(FAutomationTestBase& Test)
+{
+	FTestWorld World;
+
+	auto EventTest = [&](EEventMode Mode)
+	{
+		FAwaitableEvent Event(Mode);
+		FEventRef CoroToTest;
+		std::atomic<int> State = 0;
+		auto Coro = World.Run(CORO
+		{
+			ON_SCOPE_EXIT { State = 99; };
+			if constexpr (bMultithreaded)
+				co_await Async::MoveToTask();
+			for (int i = 1; i < 10; ++i)
+			{
+				State = i;
+				CoroToTest->Trigger();
+				co_await Event;
+				if (Mode == EEventMode::ManualReset)
+					Event.Reset();
+			}
+		});
+		World.EndTick();
+		CoroToTest->Wait();
+		Test.TestEqual("Start", State, 1);
+		CoroToTest->Reset();
+		Event.Trigger();
+		CoroToTest->Wait();
+		Test.TestEqual("Coroutine resumes immediately", State, 2);
+		Test.TestFalse("Event is reset", FTestHelper::ReadEvent(Event));
+		CoroToTest->Reset();
+		Coro.Cancel();
+		FTestHelper::PumpGameThread(World, [&] { return State == 99; });
+		Test.TestTrue("Coroutine done", Coro.IsDone());
+		Event.Trigger();
+		Test.TestEqual("State no longer changes", State, 99);
+		Test.TestTrue("Event is still triggered",
+		              FTestHelper::ReadEvent(Event));
+	};
+	EventTest(EEventMode::AutoReset);
+	EventTest(EEventMode::ManualReset);
+
+	for (int i = 1; i <= 2; ++i)
+	{
+		FAwaitableSemaphore Semaphore(i, 0);
+		FEventRef CoroToTest;
+		std::atomic<int> State = 0;
+		auto Coro = World.Run(CORO
+		{
+			ON_SCOPE_EXIT { State = 99; };
+			if constexpr (bMultithreaded)
+				co_await Async::MoveToTask();
+			for (int j = 1; j < 10; ++j)
+			{
+				State = j;
+				CoroToTest->Trigger();
+				co_await Semaphore;
+			}
+		});
+		World.EndTick();
+		CoroToTest->Wait();
+		Test.TestEqual("Start", State, 1);
+		CoroToTest->Reset();
+		Semaphore.Unlock();
+		CoroToTest->Wait();
+		Test.TestEqual("Coroutine resumes immediately", State, 2);
+		Test.TestEqual("Semaphore is used",
+		               FTestHelper::ReadSemaphore(Semaphore), 0);
+		CoroToTest->Reset();
+		Coro.Cancel();
+		FTestHelper::PumpGameThread(World, [&] { return State == 99; });
+		Test.TestTrue("Coroutine done", Coro.IsDone());
+		Test.TestEqual("Immediate cancellation", State, 99);
+		Semaphore.Unlock();
+		Test.TestEqual("State no longer changes", State, 99);
+		Test.TestEqual("Semaphore is still available",
+		               FTestHelper::ReadSemaphore(Semaphore), 1);
+	}
+}
+}
+
+bool FFastCancelTestAsyncST::RunTest(const FString& Parameters)
+{
+	DoTest<false>(*this);
+	return true;
+}
+
+bool FFastCancelTestAsyncMT::RunTest(const FString& Parameters)
+{
+	DoTest<true>(*this);
+	return true;
+}
+
+bool FFastCancelTestLatentST::RunTest(const FString& Parameters)
+{
+	DoTest<false, FLatentActionInfo>(*this);
+	return true;
+}
+
+bool FFastCancelTestLatentMT::RunTest(const FString& Parameters)
+{
+	DoTest<true, FLatentActionInfo>(*this);
+	return true;
+}

@@ -12,6 +12,10 @@ Every operation is thread safe.
 FAwaitableEvent objects are immovable.
 Use smart pointers if moves/copies are required.
 
+FAwaitableEvent supports expedited cancellation.
+Cancellations are processed on the same kind of named thread as the one that
+called Cancel().
+
 ### FAwaitableEvent::FAwaitableEvent(EEventMode Mode = EEventMode::AutoReset, bool bInitialState = false)
 
 Initializes a new event in the specified mode and initial state.
@@ -52,6 +56,10 @@ Interprocess usage is not supported.
 
 FAwaitableSemaphore objects are immovable.
 Use smart pointers if moves/copies are required.
+
+FAwaitableSemaphore supports expedited cancellation.
+Cancellations are processed on the same kind of named thread as the one that
+called Cancel().
 
 ### FAwaitableSemaphore::FAwaitableSemaphore(int Capacity = 1, int InitialCount = 1)
 

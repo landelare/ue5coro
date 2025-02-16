@@ -201,7 +201,7 @@ class [[nodiscard]] UE5CORO_API FAsyncYieldAwaiter
 	: public TAwaiter<FAsyncYieldAwaiter>
 {
 public:
-	void Suspend(FPromise&);
+	static void Suspend(FPromise&);
 };
 
 template<typename T>
