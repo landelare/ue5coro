@@ -112,6 +112,28 @@ Of course, this means that now, with `FPromiseExtras` being present, the
 additional overhead from more shared pointer usage would be proportionally lower
 than it was back then.
 
+## Debug tools
+
+Debug.h contains a few unused debug utilities that might be useful.
+
+Defining `UE5CORO_PRIVATE_USE_DEBUG_ALLOCATOR` to 1 applies a lighter version of
+stompmalloc to just coroutine states (Windows only).
+It deliberately leaks address space (memory is decommitted, but not released) to
+force new promises to be allocated at different addresses.
+
+ClearEvents/GEventLog can be used as a low-overhead event logger to debug
+multithreading issues.
+Use ClearEvents() before the problem section, and
+`UE5CORO_PRIVATE_DEBUG_EVENT(Pretty much anything)` to trace execution.
+`bLogThread` can be set to true to capture the source thread of each message,
+but this has higher overhead.
+
+`GLastDebugID` and `GActiveCoroutines` can help to track down coroutine leaks.
+`FPromiseExtras::DebugID` uses the same counter.
+
+`Use()` is useful on some compilers to extend the lifetimes of certain primitive
+local variables that are optimized out even in debug builds.
+
 ## Style
 
 Although UE5Coro aims to provide a native, Unreal-looking public API, its

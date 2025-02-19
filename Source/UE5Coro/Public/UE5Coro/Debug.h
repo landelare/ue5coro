@@ -31,18 +31,46 @@
 
 #pragma once
 
-#ifndef UE5CORO_DEBUG
-#define UE5CORO_DEBUG (UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT)
+#include "CoreMinimal.h"
+#include "UE5Coro/Definition.h"
+
+#define UE5CORO_PRIVATE_USE_DEBUG_ALLOCATOR 0
+
+#if UE5CORO_DEBUG
+/** The utilities in this namespace are sometimes used to debug UE5Coro itself. */
+namespace UE5Coro::Private::Debug
+{
+constexpr int GMaxEvents = 100;
+constexpr bool bLogThread = false;
+
+struct FThreadedEventLogEntry
+{
+	const char* Message;
+	uint32 Thread;
+	FThreadedEventLogEntry(const char* Message = nullptr)
+		: Message(Message), Thread(FPlatformTLS::GetCurrentThreadId()) { }
+};
+using FEventLogEntry = std::conditional_t<bLogThread,
+                                          FThreadedEventLogEntry, const char*>;
+extern UE5CORO_API FEventLogEntry GEventLog[GMaxEvents];
+extern UE5CORO_API std::atomic<int> GNextEvent;
+
+extern UE5CORO_API std::atomic<int> GLastDebugID;
+extern UE5CORO_API std::atomic<int> GActiveCoroutines;
+
+inline void ClearEvents()
+{
+	std::ranges::fill(GEventLog, FEventLogEntry());
+	GNextEvent = 0;
+}
+
+void Use(auto&&)
+{
+}
+
+#define UE5CORO_PRIVATE_DEBUG_EVENT(...) do { \
+	namespace D = ::UE5Coro::Private::Debug; \
+	D::GEventLog[D::GNextEvent++] = #__VA_ARGS__; \
+	FPlatformMisc::MemoryBarrier(); } while (false)
+}
 #endif
-
-#ifndef UE5CORO_PRIVATE_ALLOW_DIRECT_INCLUDE
-#error Do not #include individual headers directly. Use "UE5Coro.h"
-#endif
-
-static_assert(sizeof(void*) == 8, "UE5Coro only supports 64-bit platforms");
-
-#if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1941
-#error UE5Coro requires MSVC v14.41 or newer
-#endif
-
-#include "UE5Coro/Debug.h"

@@ -174,10 +174,6 @@ public:
 	}
 };
 
-#if UE5CORO_DEBUG
-extern std::atomic<int> GLastDebugID;
-#endif
-
 extern thread_local FPromise* GCurrentPromise;
 
 class [[nodiscard]] UE5CORO_API FPromise
@@ -215,6 +211,11 @@ public:
 
 	// co_yield is not allowed in these types of coroutines
 	std::suspend_never yield_value(auto&&) = delete;
+
+#if UE5CORO_PRIVATE_USE_DEBUG_ALLOCATOR
+	void* operator new(size_t);
+	void operator delete(void*);
+#endif
 };
 
 class [[nodiscard]] UE5CORO_API FAsyncPromise : public FPromise

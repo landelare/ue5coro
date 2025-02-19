@@ -29,20 +29,15 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#ifndef UE5CORO_DEBUG
-#define UE5CORO_DEBUG (UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT)
-#endif
-
-#ifndef UE5CORO_PRIVATE_ALLOW_DIRECT_INCLUDE
-#error Do not #include individual headers directly. Use "UE5Coro.h"
-#endif
-
-static_assert(sizeof(void*) == 8, "UE5Coro only supports 64-bit platforms");
-
-#if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1941
-#error UE5Coro requires MSVC v14.41 or newer
-#endif
-
 #include "UE5Coro/Debug.h"
+
+using namespace UE5Coro::Private;
+using namespace UE5Coro::Private::Debug;
+
+#if UE5CORO_DEBUG
+FEventLogEntry Debug::GEventLog[GMaxEvents];
+std::atomic<int> Debug::GNextEvent = 0;
+
+std::atomic<int> Debug::GLastDebugID = -1; // -1 = no coroutines yet
+std::atomic<int> Debug::GActiveCoroutines = 0;
+#endif

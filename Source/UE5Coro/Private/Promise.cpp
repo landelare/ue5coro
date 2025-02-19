@@ -34,10 +34,6 @@
 
 using namespace UE5Coro::Private;
 
-#if UE5CORO_DEBUG
-std::atomic<int> UE5Coro::Private::GLastDebugID = -1; // -1 = no coroutines yet
-#endif
-
 thread_local FPromise* UE5Coro::Private::GCurrentPromise = nullptr;
 thread_local bool UE5Coro::Private::GDestroyedEarly = false;
 
@@ -51,13 +47,19 @@ FPromise::FPromise(std::shared_ptr<FPromiseExtras> InExtras,
 	: Extras(std::move(InExtras))
 {
 #if UE5CORO_DEBUG
-	Extras->DebugID = ++GLastDebugID;
+	verifyf(++Debug::GActiveCoroutines > 0,
+	        TEXT("Internal error: promise tracking derailed"));
+	Extras->DebugID = ++Debug::GLastDebugID;
 	Extras->DebugPromiseType = PromiseType;
 #endif
 }
 
 FPromise::~FPromise()
 {
+#if UE5CORO_DEBUG
+	verifyf(--Debug::GActiveCoroutines >= 0,
+	        TEXT("Internal error: promise tracking derailed"));
+#endif
 	// Expecting the lock to be taken by a derived destructor
 	checkf(Extras->Lock.IsLocked(), TEXT("Internal error: lock not held"));
 	checkf(!Extras->IsComplete(),
@@ -173,3 +175,22 @@ void FPromise::unhandled_exception()
 	throw;
 #endif
 }
+
+#if UE5CORO_PRIVATE_USE_DEBUG_ALLOCATOR
+#include "Windows/WindowsHWrapper.h"
+
+void* FPromise::operator new(size_t Size)
+{
+	auto* Memory = VirtualAlloc(nullptr, Size, MEM_COMMIT | MEM_RESERVE,
+	                            PAGE_READWRITE);
+	checkf(Memory, TEXT("VirtualAlloc failed"));
+	memset(Memory, 0xAA, Size);
+	return Memory;
+}
+
+void FPromise::operator delete(void* Memory)
+{
+	// Keep the memory reserved, so that future promises don't recycle addresses
+	verifyf(VirtualFree(Memory, 0, MEM_DECOMMIT), TEXT("VirtualFree failed"));
+}
+#endif

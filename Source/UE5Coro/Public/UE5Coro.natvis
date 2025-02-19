@@ -18,4 +18,7 @@
 			<Item Name="[Promise or retval]" Optional="true">Promise</Item>
 		</Expand>
 	</Type>
+	<Type Name="UE5Coro::Private::Debug::FThreadedEventLogEntry">
+		<DisplayString>{{{Thread}, {Message,sb}}}</DisplayString>
+	</Type>
 </AutoVisualizer>
