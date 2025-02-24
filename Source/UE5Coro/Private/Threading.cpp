@@ -85,8 +85,9 @@ FAwaitableEvent::FAwaitableEvent(EEventMode Mode, bool bInitialState)
 #if UE5CORO_DEBUG
 FAwaitableEvent::~FAwaitableEvent()
 {
-	ensureMsgf(AwaitingPromises.empty(),
-	           TEXT("Destroyed early, remaining awaiters will never resume!"));
+	UE::TUniqueLock L(Lock);
+	checkf(AwaitingPromises.empty(),
+	       TEXT("Event destroyed with active awaiters"));
 }
 #endif
 
@@ -201,8 +202,9 @@ FAwaitableSemaphore::FAwaitableSemaphore(int Capacity, int InitialCount)
 #if UE5CORO_DEBUG
 FAwaitableSemaphore::~FAwaitableSemaphore()
 {
-	ensureMsgf(AwaitingPromises.empty(),
-	           TEXT("Destroyed early, remaining awaiters will never resume!"));
+	UE::TUniqueLock L(Lock);
+	checkf(AwaitingPromises.empty(),
+	       TEXT("Semaphore destroyed with active awaiters"));
 }
 #endif
 
