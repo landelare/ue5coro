@@ -50,7 +50,7 @@ class UE5CORO_API FTimerThread final
 public:
 	static FTimerThread& Get();
 	void Register(FAsyncTimeAwaiter*);
-	void TryUnregister(FAsyncTimeAwaiter*);
+	bool TryUnregister(FAsyncTimeAwaiter*);
 
 private:
 	explicit FTimerThread();

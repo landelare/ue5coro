@@ -183,6 +183,8 @@ The source of time is the `FPlatformTime::Seconds()` engine function.
 * UntilPlatformTime(AnyThread) will suspend until FPlatformTime::Seconds()
   reaches the specified point in time.
 
+The awaiter returned by these functions supports expedited cancellation.
+
 The AnyThread functions will resume the coroutine on a background thread, the
 shorter-named ones will try and resume on the original named thread (game thread
 to game thread, render thread to render thread, etc.).<br>

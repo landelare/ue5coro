@@ -76,8 +76,12 @@ void FAsyncAwaiter::Suspend(FPromise& Promise)
 }
 
 FAsyncTimeAwaiter::FAsyncTimeAwaiter(const FAsyncTimeAwaiter& Other)
-	: TargetTime(Other.TargetTime), Thread(Other.Thread) // bAnyThread included
+	: TCancelableAwaiter(&Cancel), TargetTime(Other.TargetTime),
+	  Thread(Other.Thread) // bAnyThread included
 {
+	// Such a copy would need to happen after the coroutine was canceled
+	ensureMsgf(TargetTime != std::numeric_limits<double>::lowest(),
+	           TEXT("Copying a canceled awaiter copies the cancellation, too"));
 }
 
 FAsyncTimeAwaiter::~FAsyncTimeAwaiter()
@@ -93,19 +97,44 @@ bool FAsyncTimeAwaiter::await_ready() noexcept
 
 void FAsyncTimeAwaiter::Suspend(FPromise& InPromise)
 {
-	checkf(!Promise, TEXT("Internal error: double resume"));
+	checkf(!Promise, TEXT("Internal error: double suspend after await_ready"));
 	if (bAnyThread)
 		Thread = ENamedThreads::AnyThread;
 	else
 		Thread = FTaskGraphInterface::Get().GetCurrentThreadIfKnown();
+	UE::TUniqueLock Lock(InPromise.GetLock());
 	Promise = &InPromise;
+	if (!InPromise.RegisterCancelableAwaiter(this))
+		TargetTime = std::numeric_limits<double>::lowest(); // Expire ASAP
 	FTimerThread::Get().Register(this);
+}
+
+void FAsyncTimeAwaiter::Cancel(void* This, FPromise& Promise)
+{
+	// Synchronize with the timer thread first, promise second
+	if (auto* Awaiter = static_cast<FAsyncTimeAwaiter*>(This);
+	    FTimerThread::Get().TryUnregister(Awaiter))
+	{
+		if (Promise.UnregisterCancelableAwaiter<false>())
+		{
+			verifyf(Awaiter->Promise.exchange(nullptr) == &Promise,
+			        TEXT("Internal error: mismatched promise at cancellation"));
+			AsyncTask(Awaiter->Thread, [&Promise] { Promise.Resume(); });
+		}
+		else
+			check(!"Internal error: unexpected race condition");
+	}
 }
 
 void FAsyncTimeAwaiter::Resume()
 {
+	// This is called from the timer thread, coroutine resumption must be async
 	checkf(Promise, TEXT("Internal error: spurious resume without suspension"));
-	AsyncTask(Thread, [this] { Promise.exchange(nullptr)->Resume(); });
+	if (auto* P = Promise.exchange(nullptr);
+	    P->UnregisterCancelableAwaiter<true>())
+		AsyncTask(Thread, [P] { P->Resume(); });
+	else
+		check(!"Internal error: unexpected race condition");
 }
 
 void FAsyncYieldAwaiter::Suspend(FPromise& Promise)

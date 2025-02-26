@@ -50,14 +50,15 @@ void FTimerThread::Register(FAsyncTimeAwaiter* Awaiter)
 	Event->Trigger();
 }
 
-void FTimerThread::TryUnregister(FAsyncTimeAwaiter* Awaiter)
+bool FTimerThread::TryUnregister(FAsyncTimeAwaiter* Awaiter)
 {
 	UE::TUniqueLock L(Lock);
-	// Slow, but this function is called extremely rarely
+	// Slow, but this function is called relatively rarely
 	auto Idx = Queue.Find(Awaiter);
 	if (Idx == INDEX_NONE)
-		return;
+		return false;
 	Queue.HeapRemoveAt(Idx, &Less);
+	return true;
 }
 
 FTimerThread::FTimerThread()

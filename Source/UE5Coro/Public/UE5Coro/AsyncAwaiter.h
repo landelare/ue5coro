@@ -167,11 +167,11 @@ public:
 };
 
 class [[nodiscard]] UE5CORO_API FAsyncTimeAwaiter
-	: public TAwaiter<FAsyncTimeAwaiter>
+	: public TCancelableAwaiter<FAsyncTimeAwaiter>
 {
 	friend class FTimerThread;
 
-	const double TargetTime;
+	double TargetTime;
 	union
 	{
 		bool bAnyThread; // Before suspension
@@ -181,7 +181,8 @@ class [[nodiscard]] UE5CORO_API FAsyncTimeAwaiter
 
 public:
 	explicit FAsyncTimeAwaiter(double TargetTime, bool bAnyThread) noexcept
-		: TargetTime(TargetTime), bAnyThread(bAnyThread) { }
+		: TCancelableAwaiter(&Cancel), TargetTime(TargetTime),
+		  bAnyThread(bAnyThread) { }
 	FAsyncTimeAwaiter(const FAsyncTimeAwaiter&);
 	~FAsyncTimeAwaiter();
 
@@ -189,6 +190,7 @@ public:
 	void Suspend(FPromise&);
 
 private:
+	static void Cancel(void*, FPromise&);
 	void Resume();
 
 	[[nodiscard]] auto operator<=>(const FAsyncTimeAwaiter& Other) const noexcept
