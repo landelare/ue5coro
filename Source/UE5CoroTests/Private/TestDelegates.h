@@ -53,3 +53,58 @@ DECLARE_DYNAMIC_DELEGATE_RetVal_TwoParams(FUE5CoroTestConstructionChecker,
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUE5CoroTestDynamicMulticastVoidDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FUE5CoroTestDynamicMulticastParamsDelegate, int, A, int&, B);
+
+template<bool bDynamic, bool bMulticast>
+struct TDelegateForTest;
+
+template<>
+struct TDelegateForTest<false, false>
+{
+	using FVoid = TDelegate<void()>;
+	using FParams = TDelegate<void(int, int&)>;
+	using FRetVal = TDelegate<FUE5CoroTestConstructionChecker()>;
+	using FAll = TDelegate<FUE5CoroTestConstructionChecker(int, int&)>;
+};
+
+template<>
+struct TDelegateForTest<false, true>
+{
+	using FVoid = TMulticastDelegate<void()>;
+	using FParams = TMulticastDelegate<void(int, int&)>;
+	using FRetVal = void;
+	using FAll = void;
+};
+
+template<>
+struct TDelegateForTest<true, false>
+{
+	using FVoid = FUE5CoroTestDynamicVoidDelegate;
+	using FParams = FUE5CoroTestDynamicParamsDelegate;
+	using FRetVal = FUE5CoroTestDynamicRetvalDelegate;
+	using FAll = FUE5CoroTestDynamicAllDelegate;
+};
+
+template<>
+struct TDelegateForTest<true, true>
+{
+	using FVoid = FUE5CoroTestDynamicMulticastVoidDelegate;
+	using FParams = FUE5CoroTestDynamicMulticastParamsDelegate;
+	using FRetVal = void;
+	using FAll = void;
+};
+
+template<int N>
+struct TDelegateSelector
+{
+	static constexpr bool bDynamic = (N & 1) != 0;
+	static constexpr bool bMulticast = (N & 2) != 0;
+	static constexpr bool bParams = (N & 4) != 0;
+	static constexpr bool bRetval = (N & 8) != 0;
+
+	using FSelector = TDelegateForTest<bDynamic, bMulticast>;
+	using type = std::conditional_t<bParams,
+		std::conditional_t<bRetval, typename FSelector::FAll,
+		                            typename FSelector::FParams>,
+		std::conditional_t<bRetval, typename FSelector::FRetVal,
+		                            typename FSelector::FVoid>>;
+};
