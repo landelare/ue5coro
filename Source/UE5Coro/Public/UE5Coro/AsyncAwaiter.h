@@ -378,16 +378,23 @@ public:
 };
 
 class [[nodiscard]] UE5CORO_API FDelegateAwaiter
-	: public TAwaiter<FDelegateAwaiter>
+	: public TCancelableAwaiter<FDelegateAwaiter>
 {
+	static void Cancel(void*, FPromise&);
+
 protected:
-	FPromise* Promise = nullptr;
+	std::atomic<FPromise*> Promise = nullptr;
 	std::function<void()> Cleanup;
-	void TryResumeOnce();
+
+	FDelegateAwaiter();
+	void Resume();
 	UObject* SetupCallbackTarget(std::function<void(void*)>);
 
 public:
+	UE_NONCOPYABLE(FDelegateAwaiter);
+#if UE5CORO_DEBUG
 	~FDelegateAwaiter();
+#endif
 	void Suspend(FPromise& InPromise);
 };
 
@@ -422,7 +429,7 @@ public:
 	{
 		TTuple<T...> Values(std::forward<T>(Args)...);
 		Result = &Values; // This exposes a pointer to a local, but...
-		TryResumeOnce(); // ...it's only read by await_resume, right here
+		Resume(); // ...it's only read by await_resume, right here
 		// The coroutine might have completed, destroying this object
 		return R();
 	}
@@ -454,7 +461,7 @@ public:
 		{
 			// This matches the hack in TBaseUFunctionDelegateInstance::Execute
 			Result = static_cast<TDecayedPayload<A...>*>(Params);
-			TryResumeOnce();
+			Resume();
 			// The coroutine might have completed, deleting the awaiter
 			if constexpr (!std::is_void_v<R>)
 				static_cast<FPayload*>(Params)->template get<sizeof...(A)>() = R();

@@ -120,13 +120,23 @@ Return types must be _DefaultConstructible_ or void.
 More than nine parameters are supported, and interacting with DYNAMIC delegates
 this way does not require a UFUNCTION or even a UCLASS at all.
 
-Thread safety and synchronization is the coroutine's responsibility: there are
-no checks or other measures taken against data races when the await expression
-starts (Bind/Add) or finishes (Unbind/Remove).
+> [!CAUTION]
+> Thread safety and synchronization is your responsibility: there are no checks
+> or other measures taken against data races when the await expression starts
+> (Bind/Add) or finishes (Unbind/Remove).
+>
+> Similarly, coroutine cancellation itself is thread safe, but most Unreal
+> delegates are not.
+> A coroutine awaiting a delegate will unbind on the thread that triggered the
+> delegate, or the thread that cancels the coroutine, whichever occurs first.
 
 The delegate will directly and synchronously call into the coroutine.
 If the delegate is destroyed or isn't ever invoked, the coroutine will not be
 resumed, which could result in a memory leak.
+A delegate getting destroyed while it's being awaited is undefined behavior.
+
+Awaiting delegates supports expedited cancellation.
+Canceling the TCoroutine will prevent the memory leak.
 
 To explicitly handle delegates that might not ever be invoked, there are safer,
 more limited wrappers available, such as UE5Coro::Latent::UntilDelegate, or
