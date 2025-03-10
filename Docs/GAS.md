@@ -97,10 +97,11 @@ It is the preferred way to await single-delegate tasks from a gameplay ability
 coroutine.
 It is also world sensitive, see [this page](Latent.md) for details.
 
-Consider using something like `Latent::UntilDelegate` instead of awaiting the
-delegate directly if you need to deal with multiple UPROPERTYs.
-Awaiting the delegate directly is fully supported, but it might result in
-cancellations not being processed if the delegate is never triggered.
+In cases where this is not suitable, activate the task manually, and
+[co_await its delegate(s)](Implicit.md#delegates) directly.
+This method supports delegate return values, but it will not track worlds.
+You'll need to ensure that the coroutine is canceled or otherwise resumed if the
+task gets destroyed before it's complete.
 
 ## UUE5CoroAbilityTask
 

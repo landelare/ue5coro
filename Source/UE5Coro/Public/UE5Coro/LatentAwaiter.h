@@ -70,10 +70,8 @@ UE5CORO_API auto UntilCoroutine(TCoroutine<> Coroutine)
 	-> Private::TLatentCoroutineAwaiter<void, false>;
 
 /** Resumes the coroutine after the delegate executes.
- *  Delegate parameters are ignored, a return value is not provided.
- *
- *  Delegates are also co_awaitable without this wrapper.
- *  See the documentation for details on the differences in behavior. */
+ *  Delegate parameters are ignored, a return value is not provided. */
+[[deprecated("This wrapper is no longer needed.")]]
 auto UntilDelegate(Private::TIsDelegate auto& Delegate)
 	-> Private::FLatentAwaiter;
 

@@ -55,6 +55,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FDelegateTestLatent, "UE5Coro.Delegate.Latent",
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
+// For testing UntilDelegate
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning (disable:4996)
+#endif
+
 namespace
 {
 struct alignas(4096) FHighlyAlignedByte

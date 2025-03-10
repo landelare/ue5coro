@@ -133,22 +133,8 @@ TCoroutine<> Latent(UWorld*, FLatentActionInfo)
 
 ### auto UntilDelegate(T& Delegate)
 
-This function provides a safer alternative to
-[awaiting a delegate directly](Implicit.md#delegates).
-It is recommended to be used from latent coroutines if the delegate might not
-get invoked.
-Cancellation is handled promptly, however, parameters are not provided to the
-coroutine.
-The delegate itself may still have parameters and/or a return value (which will
-be default constructed).
-
-Example:
-```cpp
-using namespace UE5Coro::Latent;
-
-// Instead of co_await ExampleDelegate;
-co_await UntilDelegate(ExampleDelegate);
-```
+This function is obsolete.
+[Await the delegate directly](Implicit.md#delegates) instead.
 
 ### auto Seconds(double Seconds)
 ### auto UnpausedSeconds(double Seconds)

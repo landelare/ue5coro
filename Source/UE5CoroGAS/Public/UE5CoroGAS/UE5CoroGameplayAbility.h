@@ -78,8 +78,8 @@ protected:
 		PURE_VIRTUAL(UUE5CoroGameplayAbility::ExecuteAbility, co_return;);
 
 	/** Given a UObject* with a single BlueprintAssignable UPROPERTY,
-	 *  the return value of this function lets you co_await that delegate safely,
-	 *  handling cancellations even if its delegate never Broadcasts.
+	 *  awaiting the return value of this function will resume the coroutine
+	 *  when that delegate is Broadcast().
 	 *  If the parameter is a UGameplayTask or UBlueprintAsyncActionBase, it
 	 *  will be activated before returning by default. */
 	auto Task(UObject*, bool bAutoActivate = true)

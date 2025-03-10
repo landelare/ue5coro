@@ -138,13 +138,6 @@ A delegate getting destroyed while it's being awaited is undefined behavior.
 Awaiting delegates supports expedited cancellation.
 Canceling the TCoroutine will prevent the memory leak.
 
-To explicitly handle delegates that might not ever be invoked, there are safer,
-more limited wrappers available, such as UE5Coro::Latent::UntilDelegate, or
-UUE5CoroGameplayAbility::Task.
-UE5Coro::FAwaitableEvent can also be used to manually resume coroutines from a
-delegate handler as well as at the time of the delegate's destruction, to make
-sure that the coroutine can finish.
-
 The await expression results in an unspecified type that may be used with
 structured bindings to optionally receive the delegate's parameters.
 Reference parameters are passed through as references, and may be written to.
