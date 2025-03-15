@@ -37,6 +37,18 @@ using namespace UE5Coro::Private;
 thread_local FPromise* UE5Coro::Private::GCurrentPromise = nullptr;
 thread_local bool UE5Coro::Private::GDestroyedEarly = false;
 
+FCoroutineScope::FCoroutineScope(FPromise* Promise)
+	: Promise(Promise),
+	  PreviousPromise(std::exchange(GCurrentPromise, Promise))
+{
+}
+
+FCoroutineScope::~FCoroutineScope()
+{
+	verifyf(std::exchange(GCurrentPromise, PreviousPromise) == Promise,
+	        TEXT("Internal error: coroutine tracking derailed"));
+}
+
 bool FPromiseExtras::IsComplete() const
 {
 	return Completed->Wait(0, true);
@@ -85,27 +97,25 @@ void FPromise::ResumeInternal(bool bBypassCancellationHolds)
 	checkf(this, TEXT("Corruption")); // UB, but still useful on some compilers
 	checkf(!Extras->IsComplete(),
 	       TEXT("Attempting to resume completed coroutine"));
-	auto* CallerPromise = std::exchange(GCurrentPromise, this);
-	ON_SCOPE_EXIT
-	{
-		// Coroutine resumption might result in `this` having been freed already
-		checkf(GCurrentPromise == this,
-		       TEXT("Internal error: coroutine resume tracking derailed"));
-		GCurrentPromise = CallerPromise;
-	};
 
 	// Self-destruct instead of resuming if a cancellation was received
 	if (ShouldCancel(bBypassCancellationHolds)) [[unlikely]]
 		ThreadSafeDestroy();
 	else
+	{
+		FCoroutineScope Scope(this);
 		std::coroutine_handle<FPromise>::from_promise(*this).resume();
+	}
 }
 
 void FPromise::ThreadSafeDestroy()
 {
 	auto Handle = std::coroutine_handle<FPromise>::from_promise(*this);
 	GDestroyedEarly = IsEarlyDestroy();
-	Handle.destroy(); // counts as delete this;
+	{
+		FCoroutineScope Scope(this);
+		Handle.destroy(); // counts as delete this;
+	}
 	checkf(!GDestroyedEarly,
 	       TEXT("Internal error: early destroy flag not reset"));
 }
@@ -147,9 +157,9 @@ void FPromise::ResumeFast()
 	checkf(!Extras->IsComplete() && !ShouldCancel(true),
 	       TEXT("Internal error: fast resume preconditions not met"));
 	// If this is a FLatentPromise, !LF_Detached is also assumed
-	auto* CallerPromise = GCurrentPromise;
-	GCurrentPromise = this;
-	ON_SCOPE_EXIT { GCurrentPromise = CallerPromise; };
+
+	checkf(GCurrentPromise == this,
+	       TEXT("Internal error: expected to run inside a coroutine scope"));
 	std::coroutine_handle<FPromise>::from_promise(*this).resume();
 }
 

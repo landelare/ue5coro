@@ -79,6 +79,15 @@ struct [[nodiscard]] TAwaiter
 	void await_resume() noexcept { }
 };
 
+struct UE5CORO_API FCoroutineScope final
+{
+	FPromise* Promise;
+	FPromise* PreviousPromise;
+
+	explicit FCoroutineScope(FPromise*);
+	~FCoroutineScope();
+};
+
 struct FInitialSuspend final
 {
 	enum EAction
@@ -92,6 +101,7 @@ struct FInitialSuspend final
 	template<std::derived_from<FPromise> P>
 	void await_suspend(std::coroutine_handle<P> Handle)
 	{
+		FCoroutineScope Scope(&Handle.promise());
 		switch (Action)
 		{
 			case Resume: Handle.promise().ResumeFast(); break;
