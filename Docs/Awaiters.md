@@ -184,6 +184,9 @@ co_await Async::Yield();
 
 ### TFuture
 
+> [!WARNING]
+> TFuture's API is unstable in the engine itself; it is not recommended for use.
+
 TFuture\<T\> is directly co_awaitable.
 The co_await expression returns the result of the future and consumes the
 TFuture object similarly to its Then and Next members.

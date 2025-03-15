@@ -160,19 +160,19 @@ template<typename T> class TAsyncCoroutineAwaiter;
 template<typename T> class TLatentCoroutineAwaiter;
 
 template<typename T>
-struct Private::TAwaitTransform<FAsyncPromise, TCoroutine<T>>
+struct TAwaitTransform<FAsyncPromise, TCoroutine<T>>
 {
 	TAsyncCoroutineAwaiter<T> operator()(TCoroutine<T>);
 };
 
 template<typename T>
-struct Private::TAwaitTransform<FLatentPromise, TCoroutine<T>>
+struct TAwaitTransform<FLatentPromise, TCoroutine<T>>
 {
 	TLatentCoroutineAwaiter<T> operator()(TCoroutine<T>);
 };
 
 template<typename P>
-struct Private::TAwaitTransform<P, FAsyncCoroutine>
+struct TAwaitTransform<P, FAsyncCoroutine>
 {
 	auto operator()(FAsyncCoroutine Coro)
 	{

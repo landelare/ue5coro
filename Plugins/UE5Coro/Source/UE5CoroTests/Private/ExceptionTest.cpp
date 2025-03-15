@@ -78,7 +78,7 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 	}
 	catch (const FTestException* Ex)
 	{
-		TestEqual(TEXT("Generator exception"), Ex->what(), "test");
+		TestEqual(TEXT("Generator exception"), std::strcmp(Ex->what(), "test"), 0);
 		delete Ex;
 	}
 	catch (...)
@@ -102,7 +102,7 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 	}
 	catch (const FTestException* Ex)
 	{
-		TestEqual(TEXT("Async exception"), Ex->what(), "async");
+		TestEqual(TEXT("Async exception"), std::strcmp(Ex->what(), "async"), 0);
 		delete Ex;
 	}
 	catch (...)
@@ -129,7 +129,7 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 	}
 	catch (const FTestException* Ex)
 	{
-		TestEqual(TEXT("Latent exception"), Ex->what(), "latent");
+		TestEqual(TEXT("Latent exception"), std::strcmp(Ex->what(), "latent"), 0);
 		delete Ex;
 	}
 	catch (...)
