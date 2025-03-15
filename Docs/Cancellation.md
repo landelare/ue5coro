@@ -17,7 +17,8 @@ true, and TCoroutine::WasSuccessful() will return false.
 TCoroutine\<T\>'s result will be set to a default-constructed T() (if T≠`void`).
 
 Cancellation is thread safe.
-Async coroutines clean up on the thread that would've resumed them next.
+Async coroutines clean up either on the thread that canceled them or the one on
+which they would've continued running.
 Latent coroutines always clean up on the game thread **when canceled**.
 
 > [!NOTE]
@@ -44,10 +45,18 @@ In case of a latent coroutine awaiting something satisfying the TLatentAwaiter
 concept, cancellations are processed within one tick regardless of the awaiter's
 completion.
 
+Awaiters satisfying the TCancelableAwaiter concept will similarly process
+incoming cancellations quickly (not measured in ticks), even if they would
+otherwise never resume the coroutine.
+
 ## Coroutine initiated
 
 `co_await UE5Coro::FSelfCancellation()` will self-cancel and proceed to cleanup
 instead of resuming the coroutine.
+
+> [!CAUTION]
+> A coroutine canceling itself during its cleanup (e.g., in ON_SCOPE_EXIT) will
+> deadlock.
 
 ### Async coroutines
 
@@ -77,6 +86,10 @@ suspended) or next (if it isn't) co_await, as explained in the first section.
 Canceling a coroutine that has already completed or about to complete is safe to
 do, thread safe, and has no effect.
 Multiple cancellations have the same effect as one.
+
+> [!CAUTION]
+> A coroutine canceling itself during its cleanup (e.g., in ON_SCOPE_EXIT) will
+> deadlock.
 
 There is no functionality to withdraw a cancellation.
 

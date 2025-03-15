@@ -60,7 +60,10 @@ public:
 			return;
 		// This class doesn't own the coroutine (its Latent counterpart does),
 		// no need for special forced cancellation to propagate destruction
-		Promise->Cancel();
+		{
+			UE::TUniqueLock Lock(Promise->GetLock());
+			Promise->Cancel(false);
+		}
 		Promise->Resume(); // The latent action ended, which is a kind of result
 	}
 

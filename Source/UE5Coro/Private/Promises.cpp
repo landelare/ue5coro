@@ -65,8 +65,20 @@ public:
 			[[likely]]
 		{
 			LatentPromise->LatentActionDestroyed();
-			// Process the resulting forced cancellation right away,
-			// there might be no further resumption
+			// This call force-canceled the promise, and unregistered the
+			// pending latent action from it.
+
+			// If the promise was detached from the game thread, calling
+			// Resume() will reattach it, and calling Resume() again will handle
+			// cleanup. One call is this one, the other comes from the awaiter,
+			// either the current one, or the next one if the coroutine is
+			// running. There is always a next one, due to final_suspend.
+			// The order doesn't matter.
+
+			// If the promise was not detached, it must be awaiting a
+			// FLatentAwaiter, otherwise it would be blocking this destructor.
+			// The pending latent action will no longer tick the awaiter, so
+			// Resume() must be called now to clean up.
 			LatentPromise->Resume();
 		}
 		// CurrentAwaiter is a non-owning copy, disarm its destructor
@@ -253,8 +265,9 @@ void FLatentPromise::Resume()
 void FLatentPromise::LatentActionDestroyed()
 {
 	UE::TUniqueLock Lock(Extras->Lock);
-	LatentAction = nullptr;
-	Cancel();
+	verifyf(std::exchange(LatentAction, nullptr),
+	        TEXT("Internal error: double latent action destruction"));
+	Cancel(true);
 	checkf(ShouldCancel(true),
 	       TEXT("Internal error: forced cancellation not received"));
 }
@@ -264,11 +277,13 @@ void FLatentPromise::CancelFromWithin()
 	// Force move the coroutine back to the game thread
 	AttachToGameThread(true);
 
-	Cancel();
-
-	checkf(ShouldCancel(false),
-	       TEXT("Coroutines may only be canceled from within if no "
-	            "FCancellationGuards are active"));
+	{
+		UE::TUniqueLock Lock(Extras->Lock);
+		Cancel(false);
+		checkf(ShouldCancel(false),
+		       TEXT("Coroutines may only be canceled from within if no "
+		            "FCancellationGuards are active"));
+	}
 
 	// If the self-cancellation arrived on the game thread, don't wait for the
 	// next FPendingLatentCoroutine tick to start cleaning up
@@ -280,17 +295,27 @@ void FLatentPromise::AttachToGameThread(bool bFromAnyThread)
 {
 	checkf(bFromAnyThread || IsInGameThread(),
 	       TEXT("Internal error: expected to be on the game thread"));
+	checkf([this]
+	{
+		UE::TUniqueLock Lock(Extras->Lock);
+		return !CancelableAwaiter;
+	}(), TEXT("Internal error: cannot reattach with a registered awaiter"));
+
 	LatentFlags &= ~LF_Detached;
 }
 
+/** Calling this method "pins" the promise and coroutine state, deferring any
+ *  destruction requests from the latent action manager.
+ *  This is useful for threading or callback-based awaiters to ensure that
+ *  there will be a valid promise and coroutine state to return to.
+ *  FLatentAwaiters use a dedicated code path and do not call this, as they
+ *  support destruction on game thread Tick while being co_awaited. */
 void FLatentPromise::DetachFromGameThread()
 {
-	// Calling this method "pins" the promise and coroutine state, deferring any
-	// destruction requests from the latent action manager.
-	// This is useful for threading or callback-based awaiters to ensure that
-	// there will be a valid promise and coroutine state to return to.
-	// FLatentAwaiters use a dedicated code path and do not call this, as they
-	// support destruction while being co_awaited.
+	// Multiple detachments in a row are OK, but the first one must be on the GT
+	checkf(LatentFlags & LF_Detached || IsInGameThread(),
+	       TEXT("Internal error: expected first detachment on the GT"));
+
 	LatentFlags |= LF_Detached;
 }
 

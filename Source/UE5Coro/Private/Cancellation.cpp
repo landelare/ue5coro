@@ -47,11 +47,14 @@ void CleanupIfCanceled(std::function<void()>& Fn)
 
 void FSelfCancellation::Cancel(FAsyncPromise& Promise)
 {
-	Promise.Cancel();
-	checkf(Promise.ShouldCancel(false),
-	       TEXT("Coroutines may only be canceled from within if no "
-	            "FCancellationGuards are active"));
-	Promise.Resume();
+	{
+		UE::TUniqueLock Lock(Promise.GetLock());
+		Promise.Cancel(false);
+		checkf(Promise.ShouldCancel(false),
+		       TEXT("Coroutines may only be canceled from within if no "
+		            "FCancellationGuards are active"));
+	}
+	Promise.Resume(); // Counts as delete this
 }
 
 void FSelfCancellation::Cancel(FLatentPromise& Promise)

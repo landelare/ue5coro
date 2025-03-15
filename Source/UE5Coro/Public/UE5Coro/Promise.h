@@ -58,6 +58,15 @@ concept TAwaitable = requires
  *  internal, but important implementation detail on the public API. */
 template<typename T>
 concept TLatentAwaiter = std::derived_from<T, Private::FLatentAwaiter>;
+
+/** Types that are not TLatentAwaiters, but support expedited cancellation.
+ *  This concept is mainly provided for documentation purposes. */
+template<typename T>
+concept TCancelableAwaiter =
+	std::derived_from<T, Private::TCancelableAwaiter<T>> ||
+	requires(T t) { { t.operator co_await() } -> std::derived_from<
+		Private::TCancelableAwaiter<decltype(t.operator co_await())>>; };
+	// TAwaitTransform is not handled by this concept
 }
 
 #pragma region Private
@@ -77,6 +86,24 @@ struct [[nodiscard]] TAwaiter
 	}
 
 	void await_resume() noexcept { }
+};
+
+template<typename T>
+class [[nodiscard]] TCancelableAwaiter : public TAwaiter<T>
+{
+	void (*fn_)(void*, FPromise&);
+
+protected:
+	explicit TCancelableAwaiter(void (*Cancel)(void*, FPromise&))
+		: fn_(Cancel) { }
+
+public:
+	template<std::derived_from<FPromise> P>
+	void await_suspend(std::coroutine_handle<P> Handle)
+	{
+		static_assert(STRUCT_OFFSET(T, fn_) == 0, "Unexpected object layout");
+		TAwaiter<T>::await_suspend(Handle);
+	}
 };
 
 struct UE5CORO_API FCoroutineScope final
@@ -193,6 +220,8 @@ class [[nodiscard]] UE5CORO_API FPromise
 	FCancellationTracker CancellationTracker;
 
 protected:
+	void* CancelableAwaiter = nullptr;
+
 	std::shared_ptr<FPromiseExtras> Extras;
 	TArray<std::function<void(void*)>> OnCompleted;
 #if !PLATFORM_EXCEPTIONS_DISABLED
@@ -208,8 +237,11 @@ protected:
 
 public:
 	static FPromise& Current();
+	UE::FMutex& GetLock();
 
-	void Cancel();
+	[[nodiscard]] bool RegisterCancelableAwaiter(void*);
+	template<bool bLock> [[nodiscard]] bool UnregisterCancelableAwaiter();
+	void Cancel(bool bBypassCancellationHolds);
 	bool ShouldCancel(bool bBypassCancellationHolds) const;
 	void HoldCancellation();
 	void ReleaseCancellation();
@@ -276,7 +308,7 @@ protected:
 	explicit FLatentPromise(std::shared_ptr<FPromiseExtras>, const auto&...);
 	virtual ~FLatentPromise() override;
 	virtual bool IsEarlyDestroy() const override;
-	virtual void ThreadSafeDestroy() override;
+	virtual void ThreadSafeDestroy() final override;
 
 public:
 	virtual void Resume() override;

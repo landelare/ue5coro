@@ -44,7 +44,7 @@ void TCoroutine<>::Cancel()
 	UE::TUniqueLock Lock(Extras->Lock);
 	// Holding the lock guarantees that Promise is active in the union
 	if (Extras->Promise)
-		Extras->Promise->Cancel();
+		Extras->Promise->Cancel(false);
 }
 
 bool TCoroutine<>::Wait(uint32 WaitTimeMilliseconds,

@@ -215,9 +215,10 @@ void UUE5CoroGameplayAbility::EndAbility(
 	// Cancel the coroutine. Depending on instancing policy, there will be a
 	// second, forced cancellation coming when the latent action manager
 	// processes the action's removal.
+	UE::TUniqueLock Lock(Promise->GetLock());
 	checkf(!Promise->get_return_object().IsDone(),
 	       TEXT("Internal error: unexpected coroutine state"));
-	Promise->Cancel();
+	Promise->Cancel(false);
 }
 
 void UUE5CoroGameplayAbility::CoroutineStarting(TAbilityPromise<ThisClass>* Promise)

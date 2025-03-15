@@ -97,6 +97,11 @@ void FPromise::ResumeInternal(bool bBypassCancellationHolds)
 	checkf(this, TEXT("Corruption")); // UB, but still useful on some compilers
 	checkf(!Extras->IsComplete(),
 	       TEXT("Attempting to resume completed coroutine"));
+	checkCode(
+		UE::TUniqueLock Lock(Extras->Lock);
+		checkf(!CancelableAwaiter,
+		       TEXT("Internal error: resumed with a registered awaiter"));
+	);
 
 	// Self-destruct instead of resuming if a cancellation was received
 	if (ShouldCancel(bBypassCancellationHolds)) [[unlikely]]
@@ -127,9 +132,52 @@ FPromise& FPromise::Current()
 	return *GCurrentPromise;
 }
 
-void FPromise::Cancel()
+UE::FMutex& FPromise::GetLock()
 {
+	return Extras->Lock;
+}
+
+bool FPromise::RegisterCancelableAwaiter(void* Awaiter)
+{
+	checkf(Extras->Lock.IsLocked(),
+	       TEXT("Internal error: unguarded awaiter registration"));
+	checkf(!CancelableAwaiter,
+	       TEXT("Internal error: overlapping awaiter registration"));
+	if (ShouldCancel(false))
+		return false;
+	else
+	{
+		CancelableAwaiter = Awaiter;
+		return true;
+	}
+}
+
+template<bool bLock>
+bool FPromise::UnregisterCancelableAwaiter()
+{
+	if constexpr (bLock)
+	{
+		UE::TUniqueLock Lock(Extras->Lock);
+		return std::exchange(CancelableAwaiter, nullptr) != nullptr;
+	}
+	else
+	{
+		checkf(Extras->Lock.IsLocked(),
+		       TEXT("Internal error: unguarded awaiter registration"));
+		return std::exchange(CancelableAwaiter, nullptr) != nullptr;
+	}
+}
+template UE5CORO_API bool FPromise::UnregisterCancelableAwaiter<false>();
+template UE5CORO_API bool FPromise::UnregisterCancelableAwaiter<true>();
+
+void FPromise::Cancel(bool bBypassCancellationHolds)
+{
+	checkf(Extras->Lock.IsLocked(),
+	       TEXT("Internal error: unguarded cancellation"));
 	CancellationTracker.Cancel();
+	if (CancelableAwaiter && ShouldCancel(bBypassCancellationHolds))
+		(**static_cast<void (**)(void*, FPromise&)>(CancelableAwaiter))(
+			CancelableAwaiter, *this);
 }
 
 bool FPromise::ShouldCancel(bool bBypassCancellationHolds) const
@@ -154,7 +202,8 @@ void FPromise::Resume()
 
 void FPromise::ResumeFast()
 {
-	checkf(!Extras->IsComplete() && !ShouldCancel(true),
+	checkf(!Extras->IsComplete() && !Extras->Lock.IsLocked() &&
+	       !CancelableAwaiter && !ShouldCancel(true),
 	       TEXT("Internal error: fast resume preconditions not met"));
 	// If this is a FLatentPromise, !LF_Detached is also assumed
 

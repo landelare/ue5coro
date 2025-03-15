@@ -193,6 +193,9 @@ situations where exactly two things are sharing data: the awaiter, and whatever
 engine function was wrapped.
 It is only a pointer large, which already includes 32 spare bits for custom data.
 
+Awaiters that can handle expedited cancellation can declare support by calling
+FPromise::RegisterCancelableAwaiter.
+
 ## Promises
 
 The built-in specializations of std::coroutine_traits inspect the arguments,
@@ -287,10 +290,11 @@ This lets promises handle cancellation, and game thread ownership in the case of
 FLatentPromise.
 
 Most awaiters in this plugin inherit from one of two base types: FLatentAwaiter
-for game thread polls, and TAwaiter for everything else that needs to detach a
-FLatentPromise.
-These are designed to use no `virtual`s, although FLatentAwaiter has a regular
-function pointer in it (which is one fewer indirection than a vtable).
+for game thread polls, and TAwaiter/TCancelableAwaiter for everything else that
+needs to detach a FLatentPromise.
+These are designed to use no `virtual`s, although FLatentAwaiter and
+TCancelableAwaiter have a regular function pointer in them (which is one fewer
+indirection than a vtable).
 
 Using these lets you define your own awaiter types and have them work similarly
 to the built-in ones, instead of relying on the generic awaiters on the public
@@ -307,7 +311,13 @@ await_resume (void no-op).
 It uses CRTP and static dispatch, to make sure as much code is eligible for
 inlining as possible.
 Awaiters may implement either `Suspend(FPromise&)`, or
-`Suspend(FAsyncPromise&)`+`Suspend(FLatentPromise&)`, which will cover every TCoroutinePromise type.
+`Suspend(FAsyncPromise&)`+`Suspend(FLatentPromise&)`, which will cover every
+TCoroutinePromise type.
+Be very careful with further levels of inheritance.
+It's usually done to provide a better implementation of await_resume for static
+dispatch.
+You might want to consider another level of CRTP for other scenarios, so that T
+is set to the most derived subclass.
 
 Numerous awaiters assume that await_suspend will be called right after
 await_ready returns false, and leave locks locked for additional safety and
@@ -315,6 +325,50 @@ performance, instead of having a const await_ready and locking again in
 await_suspend, then rechecking.
 
 Some of these could be made const, but some await_readys are truly mutating.
+
+### TCancelableAwaiter
+
+This TAwaiter subclass is for awaiters that support direct, expedited
+cancellation.
+This involves handling a complicated multithreading scenario, involving up to
+three threads concurrently racing (a latent coroutine detached from the game
+thread gets destroyed on the game thread, resumed on thread A, and canceled on
+thread B).
+
+Do not shadow `fn_` in derived types.
+It is named unusually to make this less likely to happen.
+
+#### How to author a TCancelableAwaiter
+
+In Suspend():
+* Lock the promise.
+* Call `Promise.RegisterCancelableAwaiter(this)`.
+* If it returns true, Cancel() might be called at any time, including right now,
+  but it will block until the promise is unlocked.
+* If it returns false, clean up if needed, and unconditionally `Resume()` the
+  coroutine **asynchronously**.
+* Only resume a promise that returns true from UnregisterCancelableAwaiter().
+  Normal resumptions are allowed to be synchronous.
+
+In `fn_` (Cancel()):
+* You already hold Extras->Lock, which blocks a potential ~FPromise(), and
+  UnregisterCancelableAwaiter\<true\>().
+* Call `Promise.UnregisterCancelableAwaiter<false>()`.
+  Do nothing if it returns false.
+  Something else received true, and it has arranged to resume the coroutine.
+* If it returns true, clean up if needed, and `Resume()` the coroutine
+  **asynchronously**.
+
+Awaiters must guarantee thread-safety between cancellations and Suspend/Resume,
+and that they resume the coroutine exactly once.
+
+Usually, this is the natural outcome of UnregisterCancelableAwaiter() returning
+false for every call but the first, but it might require additional
+synchronization.
+Destroying the coroutine will destroy the awaiter object, if it was a local
+variable or temporary.
+Resuming a canceled coroutine might result in its (and the awaiter's)
+destruction before Resume() returns.
 
 ### FLatentAwaiter
 
@@ -341,9 +395,8 @@ world in order to tick the awaiter.
 Unlike latent coroutines, async coroutines create one latent action for each
 individual co_await.
 
-This lets async coroutines enjoy some of the benefits of quicker cancellations,
-but it also means the latent action manager gets temporary ownership of a
-coroutine that normally owns and manages itself.
+This means the latent action manager gets temporary ownership of a coroutine
+that normally owns and manages itself.
 
 The latent action getting `delete`d is translated to a regular cancellation.
 Since async coroutines own themselves, this cancellation is not forced.

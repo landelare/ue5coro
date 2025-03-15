@@ -76,7 +76,10 @@ void UUE5CoroAbilityTask::OnDestroy(bool bInOwnerFinished)
 	// A forced cancellation would be more appropriate because this is a
 	// destruction, but the coroutine might be running (and NOT suspended!)
 	if (Promise)
-		Promise->Cancel();
+	{
+		UE::TUniqueLock Lock(Promise->GetLock());
+		Promise->Cancel(false);
+	}
 
 	Super::OnDestroy(bInOwnerFinished);
 	checkf(!IsValid(this), TEXT("Internal error: expected MarkAsGarbage()"));
