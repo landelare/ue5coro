@@ -41,54 +41,50 @@
 #pragma region Private
 namespace UE5Coro::Private
 {
-template<typename T, bool bMove>
-class TAsyncCoroutineAwaiter final
-	: public TAwaiter<TAsyncCoroutineAwaiter<T, bMove>>
+class UE5CORO_API FAsyncCoroutineAwaiter
+	: public TAwaiter<FAsyncCoroutineAwaiter>
 {
-	TCoroutine<T> Antecedent;
+protected:
+	TCoroutine<> Antecedent;
+	explicit FAsyncCoroutineAwaiter(TCoroutine<>&& Antecedent);
 
 public:
+	[[nodiscard]] bool await_ready();
+	void Suspend(FPromise& Promise);
+};
+
+class UE5CORO_API FLatentCoroutineAwaiter : public FLatentAwaiter
+{
+protected:
+	explicit FLatentCoroutineAwaiter(TCoroutine<>&& Antecedent);
+};
+
+template<typename T, bool bMove>
+struct TAsyncCoroutineAwaiter final : FAsyncCoroutineAwaiter
+{
 	explicit TAsyncCoroutineAwaiter(TCoroutine<T> Antecedent)
-		: Antecedent(std::move(Antecedent)) { }
-
-	[[nodiscard]] bool await_ready() { return Antecedent.IsDone(); }
-
-	void Suspend(FPromise& Promise)
-	{
-		Antecedent.ContinueWith([&Promise] { Promise.Resume(); });
-	}
+		: FAsyncCoroutineAwaiter(std::move(Antecedent)) { }
 
 	T await_resume()
 	{
 		checkf(Antecedent.IsDone(), TEXT("Internal error: resuming too early"));
+		auto& AntecedentT = static_cast<TCoroutine<T>&>(Antecedent);
+
 		if constexpr (!std::is_void_v<T>)
 		{
 			if constexpr (bMove) // This cannot be a ternary due to RVO rules
-				return Antecedent.MoveResult();
+				return AntecedentT.MoveResult();
 			else
-				return Antecedent.GetResult();
+				return AntecedentT.GetResult();
 		}
 	}
 };
 
-template<typename T>
-bool ShouldResumeLatentCoroutine(void* State, bool bCleanup)
-{
-	auto* This = static_cast<TCoroutine<T>*>(State);
-	if (bCleanup) [[unlikely]]
-	{
-		delete This;
-		return false;
-	}
-	return This->IsDone();
-}
-
 template<typename T, bool bMove>
-struct TLatentCoroutineAwaiter final : FLatentAwaiter
+struct TLatentCoroutineAwaiter final : FLatentCoroutineAwaiter
 {
 	explicit TLatentCoroutineAwaiter(TCoroutine<T> Antecedent)
-		: FLatentAwaiter(new TCoroutine<T>(std::move(Antecedent)),
-		                 &ShouldResumeLatentCoroutine<T>, std::false_type()) { }
+		: FLatentCoroutineAwaiter(std::move(Antecedent)) { }
 
 	T await_resume()
 	{
@@ -103,6 +99,9 @@ struct TLatentCoroutineAwaiter final : FLatentAwaiter
 		}
 	}
 };
+
+static_assert(sizeof(TLatentCoroutineAwaiter<FTransform, false>) ==
+              sizeof(FLatentAwaiter));
 
 template<typename T>
 auto TAwaitTransform<FAsyncPromise, TCoroutine<T>>::operator()(

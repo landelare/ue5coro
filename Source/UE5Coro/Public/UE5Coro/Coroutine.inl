@@ -140,10 +140,10 @@ void TCoroutine<T>::ContinueWithWeak(
 }
 
 // Declare these here, so that co_awaiting TCoroutines always picks them up.
-// They're implemented in another header.
+// They're implemented elsewhere.
 namespace UE5Coro::Private
 {
-template<typename, bool> class TAsyncCoroutineAwaiter;
+template<typename, bool> struct TAsyncCoroutineAwaiter;
 template<typename, bool> struct TLatentCoroutineAwaiter;
 
 template<typename T>
