@@ -167,6 +167,39 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestTrue("Coroutine done", Coro.IsDone());
 		Test.TestFalse("Coroutine was canceled", bWrong);
 	}
+
+	IF_CORO_ASYNC_OR(!bMultithreaded) // Latent + bMultithreaded is invalid
+	{
+		FAwaitableEvent Coro1Event;
+		auto Coro1 = World.Run(CORO
+		{
+			co_await Coro1Event;
+		});
+		FEventRef CoroToTest;
+		std::atomic<bool> bDone = false, bWrong = false;
+		auto Coro2 = World.Run(CORO
+		{
+			ON_SCOPE_EXIT { bDone = true; };
+			if constexpr (bMultithreaded)
+				co_await Async::MoveToTask();
+			CoroToTest->Trigger();
+			co_await Coro1; // This is a different awaiter in async and latent
+			bWrong = true;
+		});
+		World.EndTick();
+		CoroToTest->Wait();
+		for (int i = 0; i < 10; ++i)
+		{
+			Test.TestFalse("Still active", bDone);
+			World.Tick();
+		}
+		Coro2.Cancel();
+		FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
+		Test.TestTrue("Coroutine done", Coro2.IsDone());
+		Coro1Event.Trigger();
+		Test.TestTrue("Coro1 done", Coro1.IsDone());
+		Test.TestFalse("Coroutine was canceled", bWrong);
+	}
 }
 }
 

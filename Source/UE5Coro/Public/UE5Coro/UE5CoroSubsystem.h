@@ -78,9 +78,9 @@ class [[nodiscard]] UE5CORO_API FTwoLives
 public:
 	int UserData = 0;
 
-	bool Release(); // Dangerous! Only call externally exactly once!
+	bool Release(); // Dangerous! Must be called exactly twice!
 
-	// Generic implementation for FLatentAwaiter
+	// Generic implementation for FLatentAwaiter, calls Release on bCleanup
 	static bool ShouldResume(void* State, bool bCleanup);
 };
 }

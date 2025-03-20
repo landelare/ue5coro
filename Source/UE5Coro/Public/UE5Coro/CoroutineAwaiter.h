@@ -42,8 +42,10 @@
 namespace UE5Coro::Private
 {
 class UE5CORO_API FAsyncCoroutineAwaiter
-	: public TAwaiter<FAsyncCoroutineAwaiter>
+	: public TCancelableAwaiter<FAsyncCoroutineAwaiter>
 {
+	FTwoLives* State = nullptr;
+
 protected:
 	TCoroutine<> Antecedent;
 	explicit FAsyncCoroutineAwaiter(TCoroutine<>&& Antecedent);
@@ -51,6 +53,9 @@ protected:
 public:
 	[[nodiscard]] bool await_ready();
 	void Suspend(FPromise& Promise);
+
+private:
+	static void Cancel(void*, FPromise&);
 };
 
 class UE5CORO_API FLatentCoroutineAwaiter : public FLatentAwaiter

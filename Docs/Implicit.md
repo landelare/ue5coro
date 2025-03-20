@@ -15,8 +15,7 @@ Awaiting one from an async or latent coroutine results in different behavior:
 
 * Async coroutines will immediately resume when the coroutine completes, on the
   same thread that it completed on.
-* Latent coroutines can only await other coroutines on the game thread, but they
-  will react to cancellations within one tick, as usual.
+* Latent coroutines can only await other coroutines on the game thread.
 
 In either case, awaiting a coroutine that has already completed is instant, and
 synchronously continues on the caller thread.

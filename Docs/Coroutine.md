@@ -190,8 +190,7 @@ There is a fast path for awaiters that match the UE5Coro::TLatentAwaiter
 concept that avoids creating a latent action for each awaiter (unlike the
 built-in latent BP nodes, which usually create a new one for each call).
 TLatentAwaiters will also react within one tick to
-[cancellations](Cancellation.md), instead of some time later before the
-coroutine would resume.
+[cancellations](Cancellation.md), instead of a variable amount of time later.
 
 Awaiting anything else puts the coroutine into a special mode, where its
 lifetime is temporarily extended beyond its backing latent action's.

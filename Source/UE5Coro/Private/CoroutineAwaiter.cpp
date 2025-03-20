@@ -49,7 +49,7 @@ bool ShouldResumeLatentCoroutine(void* State, bool bCleanup)
 }
 
 FAsyncCoroutineAwaiter::FAsyncCoroutineAwaiter(TCoroutine<>&& Antecedent)
-	: Antecedent(std::move(Antecedent))
+	: TCancelableAwaiter(&Cancel), Antecedent(std::move(Antecedent))
 {
 }
 
@@ -60,7 +60,35 @@ bool FAsyncCoroutineAwaiter::await_ready()
 
 void FAsyncCoroutineAwaiter::Suspend(FPromise& Promise)
 {
-	Antecedent.ContinueWith([&Promise] { Promise.Resume(); });
+	checkf(!State, TEXT("Internal error: unexpected awaiter reuse"));
+	UE::TUniqueLock L(Promise.GetLock());
+	if (Promise.RegisterCancelableAwaiter(this))
+	{
+		State = new FTwoLives; // This must be created while the lock is held
+		Antecedent.ContinueWith([&Promise, State = State]
+		{
+			// Call Release() first, it might indicate that the promise is gone.
+			// If cancellation arrives right after Release() returns, it will
+			// win UnregisterCancelableAwaiter(), and call the second Release().
+			if (State->Release() && Promise.UnregisterCancelableAwaiter<true>())
+			{
+				State->Release();
+				Promise.Resume();
+			}
+		});
+	}
+	else
+		FAsyncYieldAwaiter::Suspend(Promise);
+}
+
+void FAsyncCoroutineAwaiter::Cancel(void* This, FPromise& Promise)
+{
+	if (Promise.UnregisterCancelableAwaiter<false>())
+	{
+		auto* Awaiter = static_cast<FAsyncCoroutineAwaiter*>(This);
+		Awaiter->State->Release(); // Disarm the continuation
+		FAsyncYieldAwaiter::Suspend(Promise);
+	}
 }
 
 FLatentCoroutineAwaiter::FLatentCoroutineAwaiter(TCoroutine<>&& Antecedent)

@@ -84,19 +84,11 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		World.EndTick();
 		Coro.Cancel();
+		// Expedited async cancellation will behave identically to latent
+		// cancellation, because it happens asynchronously on the game thread
 		Test.TestFalse("Not done yet", Coro.IsDone());
 		World.Tick();
-		IF_CORO_LATENT
-			Test.TestTrue("Done", Coro.IsDone());
-		else
-		{
-			for (int i = 0; i < 4; ++i)
-			{
-				Test.TestFalse("Not done yet", Coro.IsDone());
-				World.Tick();
-			}
-			Test.TestTrue("Done", Coro.IsDone()); // Wait5 needs to complete
-		}
+		Test.TestTrue("Done", Coro.IsDone());
 	}
 
 	{

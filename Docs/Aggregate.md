@@ -56,7 +56,7 @@ will cancel all the others.
 Completion includes **un**successful completions.
 
 Parameters may only be TCoroutines, not anything awaitable, since awaiters are
-not cancelable.
+not directly cancelable.
 Both overloads behave identically .
 
 If zero coroutines are racing, Race immediately succeeds and a negative value is
