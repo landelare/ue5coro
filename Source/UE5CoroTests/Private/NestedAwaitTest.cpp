@@ -48,6 +48,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentAwaitTest, "UE5Coro.Handle.Await.Latent"
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
+// For testing UntilCoroutine
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(disable:4996)
+#endif
+
 namespace
 {
 TCoroutine<> Wait5(TLatentContext<> Context)

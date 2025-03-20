@@ -60,12 +60,8 @@ UE5CORO_API auto Until(std::function<bool()> Function)
 
 /** Resumes the coroutine after the provided other coroutine completes, but the
  *  wait itself is forced to latent mode regardless of the awaiting coroutine's
- *  execution mode. For advanced usage.
- *  TCoroutines are directly co_awaitable without using this wrapper.
- *
- *  Forcing latent mode can improve responsiveness to cancellations in async
- *  coroutines.
- *  Using this wrapper is pointless if the awaiting coroutine is latent. */
+ *  execution mode. */
+[[deprecated("This wrapper is no longer needed.")]]
 UE5CORO_API auto UntilCoroutine(TCoroutine<> Coroutine)
 	-> Private::TLatentCoroutineAwaiter<void, false>;
 
