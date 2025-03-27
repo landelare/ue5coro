@@ -326,6 +326,10 @@ class [[nodiscard]] UE5CORO_API FLatentAwaiter // not TAwaiter
 	[[nodiscard]] bool IsValid() const noexcept { return Resume != nullptr; }
 	[[nodiscard]] bool ShouldResume();
 
+	// Copying is for internal use only
+	FLatentAwaiter(const FLatentAwaiter&) = default;
+	FLatentAwaiter& operator=(const FLatentAwaiter&) = default;
+
 protected:
 	void* State;
 	bool (*Resume)(void* State, bool bCleanup);

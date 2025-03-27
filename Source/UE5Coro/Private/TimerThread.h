@@ -33,6 +33,7 @@
 
 #include "CoreMinimal.h"
 #include "UE5Coro/Definition.h"
+#include <mutex>
 #include "UE5Coro/Private.h"
 
 namespace UE5Coro::Private
