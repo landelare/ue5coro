@@ -46,9 +46,8 @@ class [[nodiscard]] FPendingAsyncCoroutine final : public FPendingLatentAction
 public:
 	FPendingAsyncCoroutine(FAsyncPromise& Promise,
 	                       const FLatentAwaiter& InAwaiter)
-		: Promise(&Promise), Awaiter(nullptr, nullptr, std::false_type())
+		: Promise(&Promise), Awaiter(InAwaiter)
 	{
-		std::memcpy(&Awaiter, &InAwaiter, sizeof(FLatentAwaiter));
 	}
 
 	UE_NONCOPYABLE(FPendingAsyncCoroutine);

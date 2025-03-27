@@ -162,8 +162,7 @@ public:
 		       TEXT("Latent awaiters may only be used on the game thread"));
 		ensureMsgf(!CurrentAwaiter.IsValid(), TEXT("Unexpected double await"));
 
-		// FLatentAwaiter is deliberately not copy assignable
-		std::memcpy(&CurrentAwaiter, &Awaiter, sizeof(FLatentAwaiter));
+		CurrentAwaiter = Awaiter;
 	}
 };
 }
