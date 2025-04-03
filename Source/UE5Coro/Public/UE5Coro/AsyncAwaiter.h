@@ -237,21 +237,27 @@ public:
 
 			if constexpr (std::is_lvalue_reference_v<T>)
 			{
-				// The type of Get() is T* in 5.3 and T*& in 5.4
-				static_assert(std::is_pointer_v<
-				              std::remove_reference_t<decltype(InFuture.Get())>>);
-				Result = InFuture.Get();
+				// The return type of TFuture<T&>::Get() is T*, T*&, or T&,
+				// depending on the version of Unreal...
+				if constexpr (std::is_pointer_v<
+				              std::remove_reference_t<decltype(InFuture.Get())>>)
+					Result = InFuture.Get();
+				else
+					Result = &InFuture.Get();
 				Promise.Resume();
 			}
-			else
+			else if constexpr (!std::is_void_v<T>)
 			{
-				// If T is void, Get() returns an int (5.3) or int& (5.4), which
-				// is harmless to process; await_resume will ignore it.
-
 				// It's normally dangerous to expose a pointer to a local, but
 				auto Value = InFuture.Get(); // This will be alive while...
 				Result = &Value;
 				Promise.Resume(); // ...await_resume moves from it here
+			}
+			else
+			{
+				// await_resume expects a non-null pointer from Then
+				Result = reinterpret_cast<decltype(Result)>(-1);
+				Promise.Resume();
 			}
 		});
 	}

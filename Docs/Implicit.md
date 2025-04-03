@@ -66,6 +66,9 @@ TCoroutine<> Example(TTask<int> Task)
 
 ### TFuture\<T\>
 
+> [!WARNING]
+> TFuture's API is unstable in the engine itself; it is not recommended for use.
+
 Awaiting a TFuture consumes it, and resumes the coroutine once it has completed
 on the same thread that would be used by TFuture::Then or Next.
 The coroutine will continue synchronously on its current thread if the future
