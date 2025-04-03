@@ -32,7 +32,6 @@
 #include "UE5Coro/LatentAwaiter.h"
 #include "Engine/World.h"
 #include "UE5Coro/CoroutineAwaiter.h"
-#include "UE5CoroDelegateCallbackTarget.h"
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
@@ -94,40 +93,6 @@ FLatentAwaiter GenericUntil(double Time)
 	reinterpret_cast<double&>(State) = Time;
 	return FLatentAwaiter(State, &WaitUntilTime<GetTime>, std::true_type());
 }
-
-class [[nodiscard]] FUntilDelegateState final
-	: public std::enable_shared_from_this<FUntilDelegateState>
-{
-	TStrongObjectPtr<UUE5CoroDelegateCallbackTarget> Target;
-	// This object is on the game thread, but the delegate might not be
-	std::atomic<bool> bExecuted = false;
-
-public:
-	explicit FUntilDelegateState(UUE5CoroDelegateCallbackTarget* Target)
-		: Target(Target) { }
-
-	void Init()
-	{
-		Target->Init([Weak = weak_from_this()](void*)
-		{
-			if (auto Strong = Weak.lock())
-				Strong->bExecuted = true;
-		});
-	}
-
-	static bool ShouldResume(void* State, bool bCleanup)
-	{
-		auto& This = *static_cast<std::shared_ptr<FUntilDelegateState>*>(State);
-		if (bCleanup) [[unlikely]]
-		{
-			if (This->Target.IsValid())
-				This->Target->MarkAsGarbage();
-			delete &This;
-			return false;
-		}
-		return This->bExecuted;
-	}
-};
 }
 
 FLatentAwaiter Latent::NextTick()
@@ -148,24 +113,6 @@ FLatentAwaiter Latent::Until(std::function<bool()> Function)
 	checkf(Function, TEXT("Provided function is empty"));
 	return FLatentAwaiter(new std::function(std::move(Function)),
 	                      &WaitUntilPredicate, std::false_type());
-}
-
-auto Latent::UntilCoroutine(TCoroutine<> Coroutine)
-	-> TLatentCoroutineAwaiter<void, false>
-{
-	return TLatentCoroutineAwaiter<void, false>(std::move(Coroutine));
-}
-
-std::tuple<FLatentAwaiter, UObject*> Private::UntilDelegateCore()
-{
-	checkf(IsInGameThread(), TEXT("")
-	       "Awaiting delegates this way is only available on the game thread. "
-	       "Awaiting delegates directly works on any thread.");
-	auto* Target = NewObject<UUE5CoroDelegateCallbackTarget>();
-	auto* State = new auto(std::make_shared<FUntilDelegateState>(Target));
-	(*State)->Init();
-	return {FLatentAwaiter(State, &FUntilDelegateState::ShouldResume,
-	                       std::false_type()), Target};
 }
 
 FLatentAwaiter Latent::Seconds(double Seconds)

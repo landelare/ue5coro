@@ -48,13 +48,6 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentAwaitTest, "UE5Coro.Handle.Await.Latent"
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
-// For testing UntilCoroutine
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#pragma warning(disable:4996)
-#endif
-
 namespace
 {
 TCoroutine<> Wait5(TLatentContext<> Context)
@@ -95,19 +88,6 @@ void DoTest(FAutomationTestBase& Test)
 		// cancellation, because it happens asynchronously on the game thread
 		Test.TestFalse("Not done yet", Coro.IsDone());
 		World.Tick();
-		Test.TestTrue("Done", Coro.IsDone());
-	}
-
-	{
-		auto Coro = World.Run(CORO
-		{
-			co_await UntilCoroutine(Wait5(static_cast<UWorld*>(World)));
-		});
-		World.EndTick();
-		Coro.Cancel();
-		Test.TestFalse("Not done yet", Coro.IsDone());
-		World.Tick();
-		// Expecting identical behavior in async and latent
 		Test.TestTrue("Done", Coro.IsDone());
 	}
 }

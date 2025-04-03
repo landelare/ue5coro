@@ -94,18 +94,6 @@ FVoidCoroutine Example(FLatentActionInfo LatentInfo)
 }
 ```
 
-### auto UntilCoroutine(TCoroutine<> Coroutine)
-
-This function is obsolete.
-[Await the coroutine handle directly](Implicit.md#tcoroutinet) instead, which
-will pick an appropriate implementation based on the awaiting coroutine's
-[execution mode](Coroutine.md#execution-modes).
-
-### auto UntilDelegate(T& Delegate)
-
-This function is obsolete.
-[Await the delegate directly](Implicit.md#delegates) instead.
-
 ### auto Seconds(double Seconds)
 ### auto UnpausedSeconds(double Seconds)
 ### auto RealSeconds(double Seconds)

@@ -58,19 +58,6 @@ UE5CORO_API auto Until(std::function<bool()> Function)
 
 #pragma endregion
 
-/** Resumes the coroutine after the provided other coroutine completes, but the
- *  wait itself is forced to latent mode regardless of the awaiting coroutine's
- *  execution mode. */
-[[deprecated("This wrapper is no longer needed.")]]
-UE5CORO_API auto UntilCoroutine(TCoroutine<> Coroutine)
-	-> Private::TLatentCoroutineAwaiter<void, false>;
-
-/** Resumes the coroutine after the delegate executes.
- *  Delegate parameters are ignored, a return value is not provided. */
-[[deprecated("This wrapper is no longer needed.")]]
-auto UntilDelegate(Private::TIsDelegate auto& Delegate)
-	-> Private::FLatentAwaiter;
-
 #pragma region Time
 
 /** Resumes the coroutine the specified amount of seconds later.
@@ -441,30 +428,6 @@ struct [[nodiscard]] UE5CORO_API TAsyncQueryAwaiterRV : TAsyncQueryAwaiter<T>
 static_assert(sizeof(TAsyncQueryAwaiterRV<FHitResult>) == sizeof(FLatentAwaiter));
 static_assert(sizeof(TAsyncQueryAwaiterRV<FOverlapResult>) ==
               sizeof(FLatentAwaiter));
-}
-
-auto UE5Coro::Latent::UntilDelegate(Private::TIsDelegate auto& Delegate)
-	-> Private::FLatentAwaiter
-{
-	using namespace UE5Coro::Private;
-	auto [Awaiter, Target] = UntilDelegateCore();
-
-	using FDelegate = std::remove_reference_t<decltype(Delegate)>;
-	if constexpr (TIsMulticastDelegate<FDelegate>)
-	{
-		if constexpr (TIsDynamicDelegate<FDelegate>)
-		{
-			FScriptDelegate D;
-			D.BindUFunction(Target, NAME_Core);
-			Delegate.Add(D);
-		}
-		else
-			Delegate.AddUFunction(Target, NAME_Core);
-	}
-	else
-		Delegate.BindUFunction(Target, NAME_Core);
-
-	return std::move(Awaiter);
 }
 
 template<std::derived_from<UObject> T>

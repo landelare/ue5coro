@@ -73,7 +73,6 @@ struct TAwaitTransform
 };
 
 extern thread_local bool GDestroyedEarly;
-UE5CORO_API std::tuple<class FLatentAwaiter, UObject*> UntilDelegateCore();
 enum class ELatentExitReason : uint8;
 class FAllAwaiter;
 class FAnyAwaiter;
@@ -84,6 +83,7 @@ class FCancellationAwaiter;
 class FEventAwaiter;
 class FHttpAwaiter;
 class FLatentChainAwaiter;
+class FLatentAwaiter;
 class FLatentPromise;
 class FNewThreadAwaiter;
 struct FPackageLoadAwaiter;
