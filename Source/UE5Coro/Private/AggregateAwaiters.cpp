@@ -160,3 +160,30 @@ int FRaceAwaiter::await_resume() noexcept
 	       TEXT("Internal error: resuming with unknown result"));
 	return Data->Index;
 }
+
+bool FLatentAggregate::ShouldResume(void* State, bool bCleanup)
+{
+	auto* This = static_cast<FLatentAggregate*>(State);
+	if (bCleanup)
+	{
+		for (auto& Handle : This->Handles)
+			Handle.Cancel();
+		This->Release();
+		return false;
+	}
+	return This->Remaining <= 0;
+}
+
+void FLatentAggregate::Release()
+{
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: expected to be released on the game thread"));
+	checkf(RefCount > 0, TEXT("Internal error: RefCount underflow"));
+	if (--RefCount == 0)
+		delete this;
+}
+
+int FLatentAnyAwaiter::await_resume()
+{
+	return static_cast<FLatentAggregate*>(State)->First;
+}

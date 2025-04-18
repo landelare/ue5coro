@@ -1,19 +1,21 @@
 # Aggregate awaiters
 
-These awaiters are in the `UE5Coro` namespace, and allow you to combine multiple
-awaitables or TCoroutines into one operation.
+These awaiters allow you to combine multiple awaitables or TCoroutines into one
+operation.
 
 The return values of the functions are copyable and allow one concurrent
 co_await.
 Once the first await completes, further awaits return the same value (except for
 WhenAll, which is `void`) synchronously on the calling thread.
 
-The calling coroutine will resume on a thread corresponding to one of the
-parameters passed in.
+A coroutine awaiting WhenAny, WhenAll, and Race will resume on a thread
+corresponding to one of the parameters passed in.
 For instance, if all parameters would resume on the game thread when awaited
 directly, their aggregate is guaranteed to resume on the game thread, but if one
-of them would resume on another thread, then the aggregate might resume on the
-game thread or that other thread.
+of them would resume on another thread, then the aggregate will resume on either
+the game thread, or that other thread.
+
+The Latent versions of WhenAny and WhenAll always resume on the game thread.
 
 ### auto WhenAny(TAwaitable auto&&... Awaitables)
 ### auto WhenAny(const TArray\<TCoroutine\<\>\>& Coroutines)
@@ -48,6 +50,19 @@ DoSomethingUsefulBeforeAwaiting();
 int FirstAwaiter = co_await WhenAny(std::move(Awaiter1), std::move(Awaiter2));
 ```
 
+### auto Latent::WhenAny(TLatentContext\<const UObject\> LatentContext, TAwaitable auto&&... Awaitables)
+
+For advanced use on the game thread only.
+This function works like the regular WhenAny, but the parameters are awaited in
+latent mode, with the provided context.
+
+Example:
+```cpp
+using namespace UE5Coro::Latent;
+
+bool bTimedOut = !!co_await WhenAny(this, Task, Latent::Seconds(1));
+```
+
 ### auto Race(TArray\<TCoroutine\<\>\> Coroutines)
 ### auto Race(TCoroutine\<T\>... Coroutines)
 
@@ -57,10 +72,13 @@ Completion includes **un**successful completions.
 
 Parameters may only be TCoroutines, not anything awaitable, since awaiters are
 not directly cancelable.
-Both overloads behave identically .
+Both overloads behave identically.
 
 If zero coroutines are racing, Race immediately succeeds and a negative value is
 returned from the co_await expression (0 would mean the first coroutine).
+
+There is no RaceLatent.
+The input coroutines have already determined their execution modes.
 
 Example:
 ```cpp
@@ -90,4 +108,17 @@ for (int i = 0; i < 100; ++i)
     Tasks.Add(ExpensiveAsyncCoroutine(i));
 DoSomethingUsefulBeforeAwaiting();
 co_await WhenAll(Tasks);
+```
+
+### auto Latent::WhenAll(TLatentContext\<const UObject\> LatentContext, TAwaitable auto&&... Awaitables)
+
+For advanced use on the game thread only.
+This function works like the regular WhenAll, but the parameters are awaited in
+latent mode, with the provided context.
+
+Example:
+```cpp
+using namespace UE5Coro::Latent;
+
+co_await WhenAll(this, TaskA, TaskB);
 ```

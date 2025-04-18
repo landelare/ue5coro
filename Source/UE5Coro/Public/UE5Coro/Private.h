@@ -83,6 +83,7 @@ class FCancellationAwaiter;
 class FEventAwaiter;
 class FHttpAwaiter;
 class FLatentChainAwaiter;
+class FLatentAnyAwaiter;
 class FLatentAwaiter;
 class FLatentPromise;
 class FNewThreadAwaiter;

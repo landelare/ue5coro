@@ -151,3 +151,11 @@ For more details, see the Seconds family of functions right above this section.
 
 These functions return world-sensitive awaiters.
 The async counterpart of UntilRealTime is UE5Coro::Async::UntilPlatformTime.
+
+### auto WhenAny(TLatentContext\<const UObject\> LatentContext, TAwaitable auto&&... Awaitables)
+
+Documented [here](Aggregate.md#auto-latentwhenanytlatentcontextconst-uobject-latentcontext-tawaitable-auto-awaitables).
+
+### auto WhenAll(TLatentContext\<const UObject\> LatentContext, TAwaitable auto&&... Awaitables)
+
+Documented [here](Aggregate.md#auto-latentwhenalltlatentcontextconst-uobject-latentcontext-tawaitable-auto-awaitables).

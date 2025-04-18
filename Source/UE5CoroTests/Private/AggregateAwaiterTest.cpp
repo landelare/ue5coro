@@ -50,7 +50,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAggregateLatentTest, "UE5Coro.Aggregate.Latent
 
 namespace
 {
-template<typename... T>
+template<bool bLatent, typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
 	FTestWorld World;
@@ -63,7 +63,12 @@ void DoTest(FAutomationTestBase& Test)
 			Test.TestEqual("Empty any", co_await WhenAny(), -1);
 			++State;
 			static_assert(std::is_void_v<decltype(WhenAll().await_resume())>);
-			co_await WhenAll();
+			static_assert(
+				std::is_void_v<decltype(Latent::WhenAll(nullptr).await_resume())>);
+			if constexpr (bLatent)
+				co_await Latent::WhenAll(World.operator->());
+			else
+				co_await WhenAll();
 			++State;
 			Test.TestEqual("Empty race", co_await Race(), -1);
 			++State;
@@ -90,7 +95,10 @@ void DoTest(FAutomationTestBase& Test)
 				++State;
 			});
 			++State;
-			co_await WhenAll(A, B);
+			if constexpr (bLatent)
+				co_await Latent::WhenAll(World.operator->(), A, B);
+			else
+				co_await WhenAll(A, B);
 			++State;
 		});
 		World.EndTick();
@@ -98,6 +106,11 @@ void DoTest(FAutomationTestBase& Test)
 		World.Tick();
 		Test.TestEqual("First tick", State, 5); // A resumed
 		World.Tick();
+		if constexpr (bLatent)
+		{
+			Test.TestEqual("Extra tick", State, 6); // B resumed
+			World.Tick(); // Latent::WhenAll will observe the result in this Tick
+		}
 		Test.TestEqual("Second tick", State, 7); // B and outer resumed
 		World.Tick();
 	}
@@ -121,17 +134,21 @@ void DoTest(FAutomationTestBase& Test)
 				++State;
 			});
 			++State;
-			First = co_await WhenAny(A, B);
+			if constexpr (bLatent)
+				First = co_await Latent::WhenAny(World.operator->(), A, B);
+			else
+				First = co_await WhenAny(A, B);
 			++State;
 		});
 		World.EndTick();
 		Test.TestEqual("Initial state", State, 4); // All 3 coroutines suspended
 		Test.TestFalse("Not resumed yet", First.has_value());
 		World.Tick();
-		Test.TestEqual("First tick", State, 6); // A and outer resumed
+		// A resumed, Latent::WhenAny hasn't observed it yet
+		Test.TestEqual("First tick", State, bLatent ? 5 : 6);
+		World.Tick(); // Latent::WhenAny and B both happen during this Tick
 		Test.TestEqual("Resumer index", *First, 0);
-		World.Tick();
-		Test.TestEqual("Second tick", State, 7); // B resumed
+		Test.TestEqual("Last tick", State, 7); // B resumed
 		World.Tick();
 	}
 
@@ -139,15 +156,24 @@ void DoTest(FAutomationTestBase& Test)
 		std::optional<int> First;
 		World.Run(CORO
 		{
+			// Completion: C, D, A, B
 			auto A = World.Run(CORO { co_await Ticks(3); });
 			auto B = World.Run(CORO { co_await Ticks(4); });
 			auto C = World.Run(CORO { co_await Ticks(1); });
 			auto D = World.Run(CORO { co_await Ticks(2); });
-			First = co_await WhenAny(A, B, C, D); // Completion: C, D, A, B
+			if constexpr (bLatent)
+				First = co_await Latent::WhenAny(World.operator->(), A, B, C, D);
+			else
+				First = co_await WhenAny(A, B, C, D);
 		});
 		World.EndTick();
 		Test.TestFalse("Not resumed yet", First.has_value());
 		World.Tick();
+		if constexpr (bLatent)
+		{
+			Test.TestFalse("Not resumed yet", First.has_value());
+			World.Tick();
+		}
 		Test.TestEqual("Resumer index", *First, 2);
 		World.Tick();
 	}
@@ -159,7 +185,11 @@ void DoTest(FAutomationTestBase& Test)
 			auto A = Ticks(1);
 			auto B = Ticks(2);
 			co_await Ticks(3);
-			First = co_await WhenAny(std::move(A), std::move(B));
+			if constexpr (bLatent)
+				First = co_await Latent::WhenAny(World.operator->(),
+				                                 std::move(A), std::move(B));
+			else
+				First = co_await WhenAny(std::move(A), std::move(B));
 		});
 		World.EndTick();
 		Test.TestFalse("Not resumed yet", First.has_value());
@@ -178,11 +208,17 @@ void DoTest(FAutomationTestBase& Test)
 		{
 			auto A = Ticks(1);
 			auto B = Ticks(2);
-			First = co_await WhenAny(std::move(A), std::move(B));
+			if constexpr (bLatent)
+				First = co_await Latent::WhenAny(World.operator->(),
+				                                 std::move(A), std::move(B));
+			else
+				First = co_await WhenAny(std::move(A), std::move(B));
 		});
 		World.EndTick();
 		Test.TestFalse("Not resumed yet", First.has_value());
 		World.Tick();
+		IF_CORO_LATENT_AND(bLatent)
+			World.Tick(); // Latent-in-latent needs an extra tick to resolve
 		Test.TestEqual("Resumer index", *First, 0);
 		World.Tick();
 	}
@@ -195,12 +231,17 @@ void DoTest(FAutomationTestBase& Test)
 			auto B = Ticks(2);
 			auto C = Ticks(3);
 			auto D = Ticks(4);
+			// Always async to test nested async-in-latent awaits
 			auto E = WhenAll(std::move(A), std::move(C));
 			auto F = WhenAny(std::move(B), std::move(D));
 			auto E2 = E;
 			auto F2 = F;
 			State = 1;
-			co_await WhenAll(std::move(E2), std::move(F2));
+			if constexpr (bLatent)
+				co_await Latent::WhenAll(World.operator->(),
+				                         std::move(E2), std::move(F2));
+			else
+				co_await WhenAll(std::move(E2), std::move(F2));
 			State = 2;
 		});
 		World.EndTick();
@@ -210,6 +251,8 @@ void DoTest(FAutomationTestBase& Test)
 		World.Tick();
 		Test.TestEqual("Hasn't resumed yet", State, 1);
 		World.Tick();
+		IF_CORO_LATENT_AND(bLatent)
+			World.Tick(); // Async-in-latent needs an extra tick to resolve
 		Test.TestEqual("Resumed", State, 2);
 		World.Tick();
 	}
@@ -295,12 +338,14 @@ void DoTest(FAutomationTestBase& Test)
 
 bool FAggregateAsyncTest::RunTest(const FString& Parameters)
 {
-	DoTest<>(*this);
+	DoTest<false>(*this);
+	DoTest<true>(*this);
 	return true;
 }
 
 bool FAggregateLatentTest::RunTest(const FString& Parameters)
 {
-	DoTest<FLatentActionInfo>(*this);
+	DoTest<false, FLatentActionInfo>(*this);
+	DoTest<true, FLatentActionInfo>(*this);
 	return true;
 }
