@@ -34,6 +34,7 @@
 #include "UE5Coro.h"
 
 using namespace UE5Coro;
+using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFastCancelTestAsyncST,
@@ -62,6 +63,41 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFastCancelTestLatentMT,
 
 namespace
 {
+class FTestCancelableAwaiter
+	: public Private::TCancelableAwaiter<FTestCancelableAwaiter>
+{
+	FAutomationTestBase& Test;
+	std::atomic<bool> bCanceled = false;
+
+public:
+	explicit FTestCancelableAwaiter(FAutomationTestBase& Test)
+		: TCancelableAwaiter(&Cancel), Test(Test) { }
+
+	FTestCancelableAwaiter(FTestCancelableAwaiter&& Other)
+		: FTestCancelableAwaiter(Other.Test) { Other.bCanceled = true; }
+
+	~FTestCancelableAwaiter() { Test.TestTrue("Canceled", bCanceled); }
+
+	void Suspend(FPromise& Promise)
+	{
+		UE::TUniqueLock Lock(Promise.GetLock());
+		if (!Promise.RegisterCancelableAwaiter(this))
+			FAsyncYieldAwaiter::Suspend(Promise);
+	}
+
+	static void Cancel(void* This, FPromise& Promise)
+	{
+		auto* Awaiter = static_cast<FTestCancelableAwaiter*>(This);
+		if (Promise.UnregisterCancelableAwaiter<false>())
+		{
+			Awaiter->bCanceled = true;
+			FAsyncYieldAwaiter::Suspend(Promise);
+		}
+	}
+
+	void await_resume() { Test.AddError("Awaiter was resumed"); }
+};
+
 template<bool bMultithreaded, typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
@@ -198,6 +234,33 @@ void DoTest(FAutomationTestBase& Test)
 		Test.TestTrue("Coroutine done", Coro2.IsDone());
 		Coro1Event.Trigger();
 		Test.TestTrue("Coro1 done", Coro1.IsDone());
+		Test.TestFalse("Coroutine was canceled", bWrong);
+	}
+
+	for (int i = 0; i <= 1; ++i)
+	{
+		FAwaitableEvent Event;
+		std::atomic<bool> bDone = false, bWrong = false;
+		auto Coro = World.Run(CORO
+		{
+			ON_SCOPE_EXIT { bDone = true; };
+			if constexpr (bMultithreaded)
+				co_await Async::MoveToTask();
+			if (i % 2)
+				co_await WhenAll(Event, FTestCancelableAwaiter(Test));
+			else
+				co_await WhenAny(Event, FTestCancelableAwaiter(Test));
+			bWrong = true;
+		});
+		World.EndTick();
+		World.Tick();
+		Test.TestFalse("Not done yet 1", bDone);
+		Test.TestFalse("Not done yet 2", bWrong);
+		Coro.Cancel();
+		FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
+		Test.TestTrue("Coroutine done", Coro.IsDone());
+		Event.Trigger();
+		World.Tick();
 		Test.TestFalse("Coroutine was canceled", bWrong);
 	}
 }

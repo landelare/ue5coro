@@ -3,17 +3,22 @@
 These awaiters allow you to combine multiple awaitables or TCoroutines into one
 operation.
 
+They support expedited cancellation.
+
 The return values of the functions are copyable and allow one concurrent
 co_await.
 Once the first await completes, further awaits return the same value (except for
 WhenAll, which is `void`) synchronously on the calling thread.
 
 A coroutine awaiting WhenAny, WhenAll, and Race will resume on a thread
-corresponding to one of the parameters passed in.
+corresponding to one of the parameters passed in, or on the thread that canceled
+the coroutine.
 For instance, if all parameters would resume on the game thread when awaited
-directly, their aggregate is guaranteed to resume on the game thread, but if one
-of them would resume on another thread, then the aggregate will resume on either
-the game thread, or that other thread.
+directly, and the coroutine is never canceled, or only canceled from the game
+thread (a common case), their aggregate is guaranteed to resume on the game
+thread, but if one of them would resume on another thread, or the coroutine
+might be canceled from another thread, then it will resume on either the game
+thread, or that other thread.
 
 The Latent versions of WhenAny and WhenAll always resume on the game thread.
 

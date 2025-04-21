@@ -34,21 +34,44 @@
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
 
+void FAggregateAwaiter::Cancel(void* This, FPromise& Promise)
+{
+	auto* Awaiter = static_cast<FAggregateAwaiter*>(This);
+	if (Promise.UnregisterCancelableAwaiter<false>())
+	{
+		TArray<TCoroutine<>> Handles;
+		{
+			auto* Data = Awaiter->Data.get();
+			UE::TUniqueLock Lock(Data->Lock);
+			verifyf(!std::exchange(Data->bCanceled, true),
+			        TEXT("Internal error: double cancellation"));
+			verifyf(std::exchange(Data->Promise, nullptr) == &Promise,
+			        TEXT("Internal error: expected active awaiter"));
+			Handles = std::move(Data->Handles);
+		}
+		FAsyncYieldAwaiter::Suspend(Promise);
+		for (auto& Coro : Handles) // Cancel all inner coroutines
+			Coro.Cancel();
+	}
+}
+
 int FAggregateAwaiter::GetResumerIndex() const
 {
 	checkf(Data->Count <= 0, TEXT("Internal error: resuming too early"));
 	checkf(Data->Count == 0 || Data->Index != -1,
 	       TEXT("Internal error: resuming with no result"));
+	checkf(!Data->bCanceled, TEXT("Internal error: resuming after cancellation"));
 	return Data->Index;
 }
 
 FAggregateAwaiter::FAggregateAwaiter(auto All,
                                      const TArray<TCoroutine<>>& Coroutines)
-	: Data(std::make_shared<FData>(All.value ? Coroutines.Num()
+	: TCancelableAwaiter(&Cancel),
+	  Data(std::make_shared<FData>(All.value ? Coroutines.Num()
 	                                         : Coroutines.Num() ? 1 : 0))
 {
 	for (int i = 0; i < Coroutines.Num(); ++i)
-		Consume(Data, i, Coroutines[i]);
+		Data->Handles.Add(Consume(Data, i, Coroutines[i]));
 }
 template UE5CORO_API FAggregateAwaiter::FAggregateAwaiter(
 	std::false_type, const TArray<TCoroutine<>>&);
@@ -60,6 +83,8 @@ bool FAggregateAwaiter::await_ready()
 	checkf(Data, TEXT("Attempting to await moved-from aggregate awaiter"));
 	Data->Lock.Lock();
 	checkf(!Data->Promise, TEXT("Attempting to reuse aggregate awaiter"));
+	checkf(!Data->bCanceled,
+	       TEXT("Attempting to reuse canceled aggregate awaiter"));
 
 	// Unlock if ready and resume immediately by returning true,
 	// otherwise carry the lock to await_suspend/Suspend
@@ -73,8 +98,15 @@ void FAggregateAwaiter::Suspend(FPromise& Promise)
 {
 	checkf(Data->Lock.IsLocked(), TEXT("Internal error: lock was not taken"));
 	checkf(!Data->Promise, TEXT("Attempting to reuse aggregate awaiter"));
+	checkf(!Data->bCanceled,
+	       TEXT("Attempting to reuse canceled aggregate awaiter"));
 
-	Data->Promise = &Promise;
+	UE::TUniqueLock Lock(Promise.GetLock());
+
+	if (Promise.RegisterCancelableAwaiter(this))
+		Data->Promise = &Promise;
+	else
+		FAsyncYieldAwaiter::Suspend(Promise);
 	Data->Lock.Unlock();
 }
 
