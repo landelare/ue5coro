@@ -200,6 +200,9 @@ struct TLatentContext final
 		: Target(Target), World(Target->GetWorld()) { }
 	TLatentContext(T* Target, UWorld* World) noexcept
 		: Target(Target), World(World) { }
+	template<typename U> requires std::convertible_to<U*, T*>
+	TLatentContext(const TLatentContext<U>& Other)
+		: Target(Other.Target), World(Other.World) { }
 
 	/** Makes this type useful as a `this` replacement in lambdas. */
 	T* operator->() const noexcept { return Target; }
