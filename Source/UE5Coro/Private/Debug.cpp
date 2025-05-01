@@ -31,10 +31,10 @@
 
 #include "UE5Coro/Debug.h"
 
+#if UE5CORO_DEBUG
 using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Debug;
 
-#if UE5CORO_DEBUG
 FEventLogEntry Debug::GEventLog[GMaxEvents];
 std::atomic<int> Debug::GNextEvent = 0;
 
