@@ -126,7 +126,8 @@ FAllAwaiter UE5Coro::WhenAll(const TArray<TCoroutine<>>& Coroutines)
 }
 
 FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
-	: Data(std::make_shared<FData>(std::move(Array)))
+	: TCancelableAwaiter(&Cancel),
+	  Data(std::make_shared<FData>(std::move(Array)))
 {
 	// Add a continuation to every coroutine, but any one of them might
 	// invalidate the array
@@ -145,8 +146,8 @@ FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
 		{
 			UE::TDynamicUniqueLock Lock(Data->Lock);
 
-			// Nothing to do if this wasn't the first one
-			if (Data->Index != -1)
+			// Nothing to do if this wasn't the first one, or the race is canceled
+			if (Data->Index != -1 || Data->bCanceled)
 				return;
 			Data->Index = i;
 
@@ -157,15 +158,42 @@ FRaceAwaiter::FRaceAwaiter(TArray<TCoroutine<>>&& Array)
 			if (auto* Promise = Data->Promise)
 			{
 				Lock.Unlock();
-				Promise->Resume();
+				if (Promise->UnregisterCancelableAwaiter<true>())
+					Promise->Resume();
 			}
 		});
+	}
+}
+
+FRaceAwaiter::~FRaceAwaiter()
+{
+	UE::TUniqueLock Lock(Data->Lock);
+	Data->bCanceled = true;
+	if (Data->Index == -1)
+		for (auto& Handle : Data->Handles)
+			Handle.Cancel();
+}
+
+void FRaceAwaiter::Cancel(void* This, FPromise& Promise)
+{
+	auto* Awaiter = static_cast<FRaceAwaiter*>(This);
+	if (Promise.UnregisterCancelableAwaiter<false>())
+	{
+		UE::TUniqueLock Lock(Awaiter->Data->Lock);
+		checkf(Awaiter->Data->Promise,
+		       TEXT("Internal error: expected active awaiter"));
+		verifyf(!std::exchange(Awaiter->Data->bCanceled, true),
+		        TEXT("Internal error: unexpected double cancellation"));
+		for (auto& Handle : Awaiter->Data->Handles)
+			Handle.Cancel();
+		FAsyncYieldAwaiter::Suspend(Promise);
 	}
 }
 
 bool FRaceAwaiter::await_ready()
 {
 	Data->Lock.Lock();
+	checkf(!Data->bCanceled, TEXT("Attempting to reuse canceled awaiter"));
 	if (Data->Handles.Num() == 0 || Data->Index != -1)
 	{
 		Data->Lock.Unlock();
@@ -179,8 +207,14 @@ void FRaceAwaiter::Suspend(FPromise& Promise)
 {
 	// Expecting a lock from await_ready
 	checkf(Data->Lock.IsLocked(), TEXT("Internal error: lock not held"));
+	checkf(!Data->bCanceled, TEXT("Attempting to reuse canceled awaiter"));
 	checkf(!Data->Promise, TEXT("Unexpected double race await"));
-	Data->Promise = &Promise;
+
+	UE::TUniqueLock Lock(Promise.GetLock());
+	if (Promise.RegisterCancelableAwaiter(this))
+		Data->Promise = &Promise;
+	else
+		FAsyncYieldAwaiter::Suspend(Promise);
 	Data->Lock.Unlock();
 }
 

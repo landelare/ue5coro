@@ -154,11 +154,13 @@ public:
 	void await_resume() noexcept { }
 };
 
-class [[nodiscard]] UE5CORO_API FRaceAwaiter : public TAwaiter<FRaceAwaiter>
+class [[nodiscard]] UE5CORO_API FRaceAwaiter final
+	: public TCancelableAwaiter<FRaceAwaiter>
 {
 	struct FData
 	{
 		UE::FMutex Lock;
+		bool bCanceled = false;
 		int Index = -1;
 		TArray<TCoroutine<>> Handles;
 		FPromise* Promise = nullptr;
@@ -168,8 +170,11 @@ class [[nodiscard]] UE5CORO_API FRaceAwaiter : public TAwaiter<FRaceAwaiter>
 	};
 	std::shared_ptr<FData> Data;
 
+	static void Cancel(void*, FPromise&);
+
 public:
 	explicit FRaceAwaiter(TArray<TCoroutine<>>&&);
+	~FRaceAwaiter();
 	[[nodiscard]] bool await_ready();
 	void Suspend(FPromise&);
 	int await_resume() noexcept;

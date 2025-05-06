@@ -263,6 +263,61 @@ void DoTest(FAutomationTestBase& Test)
 		World.Tick();
 		Test.TestFalse("Coroutine was canceled", bWrong);
 	}
+
+	{
+		FEventRef CoroToTest;
+		std::atomic<bool> bDone = false, bInnerCancel = false;
+		auto Inner = World.Run(CORO
+		{
+			FOnCoroutineCanceled _([&] { bInnerCancel = true; });
+			co_await Latent::Seconds(2);
+		});
+		auto Coro = World.Run(CORO
+		{
+			ON_SCOPE_EXIT { bDone = true; };
+			if constexpr (bMultithreaded)
+				co_await Async::MoveToTask();
+			CoroToTest->Trigger();
+			co_await Race(Inner);
+		});
+		World.EndTick();
+		CoroToTest->Wait();
+		World.Tick();
+		Test.TestFalse("Not done yet 1", bDone);
+		Test.TestFalse("Not done yet 2", bInnerCancel);
+		Coro.Cancel();
+		FTestHelper::PumpGameThread(World, [&] { return bDone.load(); });
+		Test.TestTrue("Coroutine done", Coro.IsDone());
+		World.Tick();
+		Test.TestTrue("Inner coroutine was canceled", bInnerCancel);
+	}
+
+	{
+		FEventRef CoroToTest;
+		bool bCanceled = false;
+		std::atomic<bool> bWrong = false;
+		auto Coro1 = World.Run(CORO
+		{
+			FOnCoroutineCanceled _([&] { bCanceled = true; });
+			for (;;)
+				co_await Latent::NextTick();
+		});
+		auto Coro2 = World.Run(CORO
+		{
+			if constexpr (bMultithreaded)
+				co_await Async::MoveToTask();
+			CoroToTest->Trigger();
+			co_await Race(Coro1);
+			bWrong = true;
+		});
+		World.EndTick();
+		CoroToTest->Wait();
+		Coro2.Cancel();
+		Test.TestFalse("Cancellation not processed yet", bCanceled);
+		World.Tick();
+		FTestHelper::PumpGameThread(World, [&] { return bCanceled; });
+		Test.TestFalse("Direct cancel", bWrong);
+	}
 }
 }
 

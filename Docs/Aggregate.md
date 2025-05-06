@@ -85,6 +85,11 @@ returned from the co_await expression (0 would mean the first coroutine).
 There is no RaceLatent.
 The input coroutines have already determined their execution modes.
 
+Canceling a coroutine that's currently awaiting Race() will process
+cancellations immediately.
+If the return value of Race is destroyed for any reason, the race and all
+coroutines participating in it will be canceled, even if it wasn't awaited.
+
 Example:
 ```cpp
 using namespace UE5Coro;

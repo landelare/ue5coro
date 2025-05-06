@@ -264,7 +264,6 @@ void DoTest(FAutomationTestBase& Test)
 			auto A = World.Run(CORO
 			{
 				ON_SCOPE_EXIT { State = 2; };
-				co_await Ticks(5);
 				for (;;)
 					co_await NextTick();
 			});
@@ -279,8 +278,11 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		World.EndTick();
 		World.Tick(); // NextTick
-		Test.TestEqual("State", State, 1);
-		World.Tick(); // A needs to poll to process the cancellation from Race
+		IF_CORO_LATENT
+		{
+			Test.TestEqual("State", State, 1);
+			World.Tick(); // A needs to poll to process the cancellation from Race
+		}
 		Test.TestEqual("State", State, 2);
 		Test.TestEqual("Return value", Coro.GetResult(), 1);
 	}
@@ -332,6 +334,20 @@ void DoTest(FAutomationTestBase& Test)
 			Event.Trigger();
 			Test.TestEqual("State outside", State, i + 12);
 		}
+	}
+
+	{
+		bool bCanceled = false;
+		auto Coro = World.Run(CORO
+		{
+			FOnCoroutineCanceled _([&] { bCanceled = true; });
+			co_await Ticks(5);
+		});
+		World.EndTick();
+		std::ignore = Race(Coro);
+		Test.TestFalse("Cancellation not processed yet", bCanceled);
+		World.Tick();
+		Test.TestTrue("Canceled", bCanceled);
 	}
 }
 }
