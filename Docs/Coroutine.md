@@ -47,21 +47,21 @@ hidden pin(s) might appear on the node graph, but this is harmless and does not
 affect behavior as long as these pins remain disconnected.
 If desired, affected nodes may be recreated to fix their visuals.
 
-## Return types
+## Result types
 
 TCoroutine\<T\> lets a coroutine co_return T.
 TCoroutine\<\> is the same type as TCoroutine\<void\>.
 The \<\> may be omitted if the compiler can deduce the type:
 `TCoroutine Coro = Foo();`
 
-A (non-void) coroutine return type must be at least _DefaultConstructible_,
+A (non-void) coroutine result type must be at least _DefaultConstructible_,
 _MoveAssignable_, and _Destructible_.
 Full functionality also requires _CopyConstructible_.
 It's possible that a coroutine completes without providing a return value.
-In this case, the return value is a default-constructed T.
+In this case, the result is a default-constructed T.
 
 TCoroutine\<T\> implicitly converts to TCoroutine\<\> to provide a
-return-type-erased handle to the coroutine invocation.
+result-type-erased handle to the coroutine invocation.
 It is safe to object slice a TCoroutine\<T\> to TCoroutine\<\> and static_cast
 it back to the original type (with exactly the same T).
 
@@ -330,7 +330,7 @@ Full functionality also requires _CopyConstructible_.
 Control leaving the body of a coroutine returning TCoroutine\<T\> (T≠void)
 without a co_return statement is undefined behavior, unless the coroutine was
 successfully [canceled](Cancellation.md).
-In this case, its return value will be a default-constructed T().
+In this case, its result will be a default-constructed T().
 
 TCoroutine has various methods on it to interact with the coroutine from
 synchronous/blocking code that isn't coroutine aware.

@@ -42,12 +42,12 @@ namespace UE5Coro
  *  These objects do not represent ownership of the coroutine and do not need to
  *  be stored. Copies will refer to the same coroutine.
  *  TCoroutine<T> objects may be safely object sliced to TCoroutine<>, providing
- *  a return-type-erased handle to the same coroutine.
+ *  a result-type-erased handle to the same coroutine.
  *  @tparam T Optional result type of the coroutine. @p void if not provided. */
 template<typename T = void>
 class TCoroutine;
 
-// Common functionality for TCoroutines of all return types.
+// Common functionality for TCoroutines of all result types.
 template<>
 class UE5CORO_API TCoroutine<>
 {
@@ -62,7 +62,7 @@ protected:
 		: Extras(std::move(Extras)) { }
 
 public:
-	/** A coroutine that has already completed with no return value. */
+	/** A coroutine that has already completed with no result. */
 	static const TCoroutine CompletedCoroutine;
 
 	/** A coroutine that has already completed with the provided value. */
@@ -125,7 +125,7 @@ public:
 	[[nodiscard]] std::strong_ordering operator<=>(const TCoroutine&) const noexcept;
 };
 
-// Extra functionality for coroutines with non-void return types.
+// Extra functionality for coroutines with non-void result types.
 template<typename T>
 class TCoroutine : public TCoroutine<>
 {
@@ -133,6 +133,8 @@ protected:
 	using TCoroutine<>::TCoroutine;
 
 public:
+	using FResultType = T;
+
 	using TCoroutine<>::ContinueWith;
 	using TCoroutine<>::ContinueWithWeak;
 
