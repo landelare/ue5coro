@@ -152,6 +152,28 @@ For more details, see the Seconds family of functions right above this section.
 These functions return world-sensitive awaiters.
 The async counterpart of UntilRealTime is UE5Coro::Async::UntilPlatformTime.
 
+### auto SecondsForActor(AActor* Actor, double Seconds)
+### auto UnpausedSecondsForActor(AActor* Actor, double Seconds)
+
+These behave similarly to Seconds and UnpausedSeconds, respectively, but they
+also take the actor's custom time dilation into account.
+
+The result of their await expressions is true if the actor is still alive and
+the provided amount of time has elapsed, false if the actor was destroyed and
+the delay was cut short as a result.
+
+These functions return world-sensitive awaiters.
+
+Example:
+```cpp
+using namespace UE5Coro::Latent;
+
+FVoidCoroutine Example(AActor* Actor, FLatentActionInfo LatentInfo)
+{
+    bool bCompleted = co_await SecondsForActor(Actor, 1);
+}
+```
+
 ### auto WhenAny(TLatentContext\<const UObject\> LatentContext, TAwaitable auto&&... Awaitables)
 
 Documented [here](Aggregate.md#auto-latentwhenanytlatentcontextconst-uobject-latentcontext-tawaitable-auto-awaitables).

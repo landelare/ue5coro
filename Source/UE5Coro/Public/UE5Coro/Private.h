@@ -80,6 +80,7 @@ class FAsyncAwaiter;
 class FAsyncTimeAwaiter;
 class FAsyncYieldAwaiter;
 class FCancellationAwaiter;
+struct FCustomTimeDilationAwaiter;
 class FEventAwaiter;
 class FHttpAwaiter;
 class FLatentChainAwaiter;

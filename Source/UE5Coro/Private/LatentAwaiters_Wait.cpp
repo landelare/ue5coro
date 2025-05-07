@@ -93,6 +93,69 @@ FLatentAwaiter GenericUntil(double Time)
 	reinterpret_cast<double&>(State) = Time;
 	return FLatentAwaiter(State, &WaitUntilTime<GetTime>, std::true_type());
 }
+
+struct FCustomTimeDilationAwaiterState
+{
+	TWeakObjectPtr<AActor> Actor;
+	double Remaining;
+	double PreviousTime;
+};
+}
+
+template<auto GetTime>
+struct FCustomTimeDilationAwaiter::TState : FCustomTimeDilationAwaiterState
+{
+	explicit TState(AActor* InActor, double InRemaining)
+	{
+#if ENABLE_NAN_DIAGNOSTIC
+		if (FMath::IsNaN(Remaining))
+		{
+			logOrEnsureNanError(TEXT("Latent wait started with NaN time"));
+		}
+#endif
+		checkf(IsInGameThread(),
+		       TEXT("Latent awaiters may only be used on the game thread"));
+		checkf(::IsValid(GWorld),
+		       TEXT("This awaiter may only be used in the context of a valid world"));
+		Actor = InActor;
+		Remaining = InRemaining;
+		PreviousTime = (GWorld->*GetTime)();
+	}
+
+	static bool ShouldResume(void* State, bool bCleanup)
+	{
+		auto* This = static_cast<TState*>(State);
+		if (bCleanup) [[unlikely]]
+		{
+			delete This;
+			return false;
+		}
+
+		auto* Actor = This->Actor.Get();
+		if (!Actor)
+			return true;
+
+		checkf(::IsValid(GWorld),
+		       TEXT("Internal error: latent poll outside of a valid world"));
+		auto Time = (GWorld->*GetTime)();
+		auto DeltaSeconds = Time - std::exchange(This->PreviousTime, Time);
+		DeltaSeconds *= Actor->CustomTimeDilation;
+		This->Remaining -= DeltaSeconds;
+		return This->Remaining <= 0;
+	}
+};
+
+template<auto GetTime>
+FCustomTimeDilationAwaiter::FCustomTimeDilationAwaiter(TState<GetTime>* State)
+	: FLatentAwaiter(State, &TState<GetTime>::ShouldResume, std::true_type())
+{
+}
+
+bool FCustomTimeDilationAwaiter::await_resume()
+{
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: expected resumption on the game thread"));
+	return static_cast<FCustomTimeDilationAwaiterState*>(State)->Actor.IsValid();
 }
 
 FLatentAwaiter Latent::NextTick()
@@ -118,6 +181,21 @@ FLatentAwaiter Latent::Until(std::function<bool()> Function)
 FLatentAwaiter Latent::Seconds(double Seconds)
 {
 	return GenericUntil<&UWorld::GetTimeSeconds, true>(Seconds);
+}
+
+FCustomTimeDilationAwaiter Latent::SecondsForActor(AActor* Actor, double Seconds)
+{
+	return FCustomTimeDilationAwaiter(
+		new FCustomTimeDilationAwaiter::TState<&UWorld::GetTimeSeconds>(
+			Actor, Seconds));
+}
+
+FCustomTimeDilationAwaiter Latent::UnpausedSecondsForActor(AActor* Actor,
+                                                           double Seconds)
+{
+	return FCustomTimeDilationAwaiter(
+		new FCustomTimeDilationAwaiter::TState<&UWorld::GetUnpausedTimeSeconds>(
+			Actor, Seconds));
 }
 
 FLatentAwaiter Latent::UnpausedSeconds(double Seconds)

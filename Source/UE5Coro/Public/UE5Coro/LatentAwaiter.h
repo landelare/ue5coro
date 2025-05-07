@@ -65,8 +65,20 @@ UE5CORO_API auto Until(std::function<bool()> Function)
 UE5CORO_API auto Seconds(double Seconds) -> Private::FLatentAwaiter;
 
 /** Resumes the coroutine the specified amount of seconds later.
+ *  The provided actor's custom time dilation is taken into account.
+ *  Affected by pause. */
+UE5CORO_API auto SecondsForActor(AActor* Actor, double Seconds)
+	-> Private::FCustomTimeDilationAwaiter;
+
+/** Resumes the coroutine the specified amount of seconds later.
  *  This is affected by time dilation only, NOT pause. */
 UE5CORO_API auto UnpausedSeconds(double Seconds) -> Private::FLatentAwaiter;
+
+/** Resumes the coroutine the specified amount of seconds later.
+ *  The provided actor's custom time dilation is taken into account.
+ *  Unaffected by pause. */
+UE5CORO_API auto UnpausedSecondsForActor(AActor* Actor, double Seconds)
+	-> Private::FCustomTimeDilationAwaiter;
 
 /** Resumes the coroutine the specified amount of seconds later.
  *  This is not affected by pause or time dilation. */
@@ -342,6 +354,13 @@ public:
 };
 
 static_assert(std::is_standard_layout_v<FLatentAwaiter>);
+
+struct [[nodiscard]] UE5CORO_API FCustomTimeDilationAwaiter final : FLatentAwaiter
+{
+	template<auto> struct TState;
+	template<auto T> explicit FCustomTimeDilationAwaiter(TState<T>*);
+	bool await_resume();
+};
 
 namespace AsyncLoad
 {
