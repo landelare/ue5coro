@@ -32,6 +32,7 @@
 #include "GASTestWorld.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/EngineVersionComparison.h"
+#include "Tasks/GameplayTask_WaitDelay.h"
 #include "UE5CoroGASTestGameplayAbility.h"
 
 using namespace UE5Coro::Private::Test;
@@ -122,6 +123,21 @@ void DoTest(FAutomationTestBase& Test,
 		World.Run(UUE5CoroGASTestGameplayAbility::StaticClass());
 	} // Force cancel by destroying the world
 	Test.TestEqual("Canceled", State, 2);
+
+	if (bInstanced)
+	{
+		{
+			FGASTestWorld World;
+			UUE5CoroGASTestGameplayAbility::Reset();
+			World.Run(UUE5CoroGASTestGameplayAbility::StaticClass());
+			FTestHelper::PumpGameThread(World, [&] { return State == 4; });
+			Test.TestTrue("Active task",
+			              !!TObjectIterator<UGameplayTask_WaitDelay>());
+		} // Force cancel by destroying the world while the task is active
+		Test.TestFalse("Task destroyed",
+		               !!TObjectIterator<UGameplayTask_WaitDelay>());
+		Test.TestEqual("Canceled with task", State, 7);
+	}
 }
 }
 

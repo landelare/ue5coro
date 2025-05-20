@@ -30,8 +30,13 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "UE5CoroTaskCallbackTarget.h"
+#include "UE5CoroGAS/UE5CoroGameplayAbility.h"
 
 void UUE5CoroTaskCallbackTarget::Core()
 {
+	checkf(IsInGameThread(), TEXT("Internal error: expected gameplay task to "
+	                              "end on the game thread"));
+	if (IsValid(Owner))
+		Owner->Tasks.Remove(this);
 	bExecuted = true;
 }

@@ -44,7 +44,7 @@ namespace
 bool GCoroutineEnded = false;
 FPredictionKey GCurrentPredictionKey;
 
-using FCallbackTargetPtr = TStrongObjectPtr<UUE5CoroTaskCallbackTarget>;
+using FCallbackTargetPtr = TWeakObjectPtr<UUE5CoroTaskCallbackTarget>;
 
 // Workaround for member IsTemplate being unreliable in destructors
 bool IsTemplate(UObject* Object)
@@ -131,6 +131,9 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object, bool bAutoActivate
 	checkf(IsValid(Object), TEXT("Attempting to await invalid object"));
 
 	auto* Target = NewObject<UUE5CoroTaskCallbackTarget>(this);
+	Target->Owner = this;
+	Tasks.Add(Target);
+
 	FScriptDelegate Delegate;
 	Delegate.BindUFunction(Target, NAME_Core);
 	FindDelegate(Object->GetClass())->AddDelegate(std::move(Delegate), Object);
@@ -144,8 +147,8 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object, bool bAutoActivate
 			Action->Activate();
 	}
 
-	// The comment above TStrongObjectPtr promises that it is trivially movable
 	static_assert(sizeof(FCallbackTargetPtr) <= sizeof(void*));
+	static_assert(std::is_trivially_copyable_v<FCallbackTargetPtr>);
 	void* Data;
 	new (&Data) FCallbackTargetPtr(Target);
 	return FLatentAwaiter(Data, &ShouldResumeTask, std::true_type());
@@ -237,10 +240,14 @@ bool UUE5CoroGameplayAbility::ShouldResumeTask(void* State, bool bCleanup)
 {
 	static_assert(sizeof(FCallbackTargetPtr) <= sizeof(void*));
 	auto& Ptr = reinterpret_cast<FCallbackTargetPtr&>(State);
+	auto* Target = Ptr.Get();
 	if (bCleanup) [[unlikely]]
 	{
+		if (Target && IsValid(Target->Owner))
+			Target->Owner->Tasks.Remove(Target);
 		Ptr.~FCallbackTargetPtr();
 		return false;
 	}
-	return Ptr->bExecuted;
+	// The task being destroyed means it's technically ending
+	return !Target || Target->bExecuted;
 }
