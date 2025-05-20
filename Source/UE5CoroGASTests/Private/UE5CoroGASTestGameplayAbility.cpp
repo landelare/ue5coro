@@ -84,6 +84,8 @@ FAbilityCoroutine UUE5CoroGASTestGameplayAbility::ExecuteAbility(
 	if constexpr (true)
 #endif
 	{
+		FOnCoroutineCanceled _([this] { State = 7; });
+
 		// UGameplayTask_WaitDelay is MinimalAPI
 		auto* Class = UGameplayTask_WaitDelay::StaticClass();
 		auto* Fn = Class->FindFunctionByName("TaskWaitDelay");

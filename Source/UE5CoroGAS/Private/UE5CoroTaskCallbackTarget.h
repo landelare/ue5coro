@@ -41,6 +41,9 @@ class UUE5CoroTaskCallbackTarget final : public UObject
 	GENERATED_BODY()
 
 public:
+	UPROPERTY()
+	TObjectPtr<class UUE5CoroGameplayAbility> Owner;
+
 	bool bExecuted = false;
 	UFUNCTION() void Core();
 };
