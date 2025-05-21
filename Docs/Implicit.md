@@ -195,3 +195,87 @@ public:
     }
 };
 ```
+
+#### Generic workarounds
+
+To work with functions that are not supported by [Async::Chain](AsyncChain.md),
+callbacks that aren't using Unreal's delegate system, or delegates that require
+you to do something between binding them and awaiting them,
+[FAwaitableEvent](Threading.md#fawaitableevent) can be used as a workaround.
+
+If it is being awaited when the callback is invoked, `Trigger()` will call back
+into the coroutine synchronously, otherwise, it will let the coroutine through
+synchronously if the callback has already happened.
+
+The following workaround should work for nearly everything that supports lambdas:
+
+```c++
+using namespace UE5Coro;
+
+TCoroutine<> Example()
+{
+    FAwaitableEvent Event;
+
+    int Data1, Data2;
+    imaginary_library_delegate_t<int, int> Delegate([&](int Param1, int Param2)
+    {
+        Data1 = Param1;
+        Data2 = Param2;
+        Event.Trigger();
+    });
+    some_imaginary_library_function(Delegate);
+    // Directly-passed lambdas are more or less the same:
+    // another_imaginary_library_function([&](int Param1, int Param2){...});
+    co_await Event;
+    // Data1 and Data2 are known to be valid here
+}
+```
+
+This example demonstrates using `shared_ptr` with an interface-like type that
+needs to be subclassed, and the `co_await` being optional:
+
+```c++
+using namespace UE5Coro;
+
+TCoroutine<> Example()
+{
+    struct FMyListener final : imaginary_library_listener_t
+    {
+        std::shared_ptr<FAwaitableEvent> Event;
+        virtual void execute_callback() override { Event->Trigger(); }
+    };
+
+    // FAwaitableEvent is immovable and non-copyable, but shared_ptr isn't
+    auto Event = std::make_shared<FAwaitableEvent>();
+    FMyListener Listener;
+    Listener.Event = Event;
+    some_imaginary_library_function(std::move(Listener));
+
+    if (bSomething)
+        co_await *Event;
+
+    // Even if !bSomething, the shared_ptr keeps the event alive here, but
+    // depending on the semantics of some_imaginary_library_function, Listener
+    // going out of scope when this coroutine ends might need explicit handling.
+}
+```
+
+Many C libraries take raw function pointers, precluding lambda captures, but
+they often support specifying a custom `void*` that will be passed back to it:
+
+```c++
+using namespace UE5Coro;
+
+TCoroutine<> Example()
+{
+    FAwaitableEvent Event;
+    void (*Fn)(void*) = [](void* UserData)
+    {
+        static_cast<FAwaitableEvent*>(UserData)->Trigger();
+    };
+
+    some_imaginary_c_library_function(Fn, &Event);
+    co_await Event; // The unconditional co_await keeps &Event valid here
+    // Unregister the function pointer from the C library here, if required
+}
+```
