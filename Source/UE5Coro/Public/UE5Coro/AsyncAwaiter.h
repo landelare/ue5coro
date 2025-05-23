@@ -297,21 +297,20 @@ struct TAwaitTransform<P, TFuture<T>>
 	TFutureAwaiter<T> operator()(TFuture<T>&) = delete;
 };
 
-template<typename>
-struct TDelegateAwaiterFor;
-template<typename T, typename R, typename... A>
-struct TDelegateAwaiterFor<R (T::*)(A...) const>
+template<typename D, typename T, typename R, typename... A>
+struct TDelegateAwaiterFor<D, R (T::*)(A...) const>
 {
-	using type = std::conditional_t<TIsDynamicDelegate<T>,
-	                                TDynamicDelegateAwaiter<R, A...>,
-	                                TDelegateAwaiter<R, A...>>;
+	static_assert(TIsDynamicDelegate<D> == TIsDynamicDelegate<T>);
+	using type = std::conditional_t<TIsDynamicDelegate<D>,
+	                                TDynamicDelegateAwaiter<D, R, A...>,
+	                                TDelegateAwaiter<D, R, A...>>;
 };
 
 template<typename P, TIsDelegate T>
 struct TAwaitTransform<P, T>
 {
 	static_assert(!std::is_reference_v<T>);
-	static constexpr auto ExecutePtr()
+	static consteval auto ExecutePtr()
 	{
 		if constexpr (TIsSparseDelegate<T>)
 		{
@@ -323,7 +322,7 @@ struct TAwaitTransform<P, T>
 		else
 			return &T::Execute;
 	}
-	using FAwaiter = typename TDelegateAwaiterFor<decltype(ExecutePtr())>::type;
+	using FAwaiter = typename TDelegateAwaiterFor<T, decltype(ExecutePtr())>::type;
 
 	FAwaiter operator()(T& Delegate) { return FAwaiter(Delegate); }
 
@@ -404,40 +403,34 @@ public:
 	void Suspend(FPromise& InPromise);
 };
 
-template<typename R, typename... A>
+template<typename D, typename R, typename... A>
 class [[nodiscard]] TDelegateAwaiter : public FDelegateAwaiter
 {
+	static_assert(!TIsDynamicDelegate<D>);
 	using ThisClass = TDelegateAwaiter;
 	using FResult = std::conditional_t<sizeof...(A) != 0, TTuple<A...>, void>;
+	D& Delegate;
 	TTuple<A...>* Result = nullptr;
 
 public:
-	template<typename T>
-	explicit TDelegateAwaiter(T& Delegate)
+	explicit TDelegateAwaiter(D& Delegate) : Delegate(Delegate) { }
+	UE_NONCOPYABLE(TDelegateAwaiter);
+
+	template<typename P>
+	void await_suspend(std::coroutine_handle<P> Coro)
 	{
-		static_assert(!TIsDynamicDelegate<T>);
-		if constexpr (TIsMulticastDelegate<T>)
+		if constexpr (TIsMulticastDelegate<D>)
 		{
 			auto Handle = Delegate.AddRaw(this,
 			                              &ThisClass::template ResumeWith<A...>);
-			Cleanup = [Handle, &Delegate] { Delegate.Remove(Handle); };
+			Cleanup = [this, Handle] { Delegate.Remove(Handle); };
 		}
 		else
 		{
 			Delegate.BindRaw(this, &ThisClass::template ResumeWith<A...>);
-			Cleanup = [&Delegate] { Delegate.Unbind(); };
+			Cleanup = [this] { Delegate.Unbind(); };
 		}
-	}
-	UE_NONCOPYABLE(TDelegateAwaiter);
-
-	template<typename... T>
-	R ResumeWith(T... Args)
-	{
-		TTuple<T...> Values(std::forward<T>(Args)...);
-		Result = &Values; // This exposes a pointer to a local, but...
-		Resume(); // ...it's only read by await_resume, right here
-		// The coroutine might have completed, destroying this object
-		return R();
+		FDelegateAwaiter::await_suspend(Coro);
 	}
 
 	FResult await_resume()
@@ -446,22 +439,37 @@ public:
 		if constexpr (sizeof...(A) != 0)
 			return std::move(*Result);
 	}
+
+private:
+	template<typename... T>
+	R ResumeWith(T... Args) // Intentionally not T&&
+	{
+		TTuple<T...> Values(std::forward<T>(Args)...);
+		Result = &Values; // This exposes a pointer to a local, but...
+		Resume(); // ...it's only read by await_resume, right here
+		// The coroutine might have completed, destroying this object
+		return R();
+	}
 };
 
-template<typename R, typename... A>
+template<typename D, typename R, typename... A>
 class [[nodiscard]] TDynamicDelegateAwaiter : public FDelegateAwaiter
 {
+	static_assert(TIsDynamicDelegate<D>);
 	using FResult = std::conditional_t<sizeof...(A) != 0,
 	                                   TDecayedPayload<A...>&, void>;
 	using FPayload = std::conditional_t<std::is_void_v<R>, TDecayedPayload<A...>,
 	                                    TDecayedPayload<A..., R>>;
-	TDecayedPayload<A...>* Result; // Missing R, for the coroutine
+	D& Delegate;
+	TDecayedPayload<A...>* Result = nullptr; // Missing R, for the coroutine
 
 public:
-	template<typename T>
-	explicit TDynamicDelegateAwaiter(T& InDelegate)
+	explicit TDynamicDelegateAwaiter(D& Delegate) : Delegate(Delegate) { }
+	UE_NONCOPYABLE(TDynamicDelegateAwaiter);
+
+	template<typename P>
+	void await_suspend(std::coroutine_handle<P> Handle)
 	{
-		static_assert(TIsDynamicDelegate<T>);
 		// SetupCallbackTarget sets Cleanup and ties Target's lifetime to this
 		auto* Target = SetupCallbackTarget([this](void* Params)
 		{
@@ -473,16 +481,16 @@ public:
 				static_cast<FPayload*>(Params)->template get<sizeof...(A)>() = R();
 		});
 
-		if constexpr (TIsMulticastDelegate<T>)
+		if constexpr (TIsMulticastDelegate<D>)
 		{
-			FScriptDelegate Delegate;
-			Delegate.BindUFunction(Target, NAME_Core);
-			InDelegate.Add(Delegate);
+			FScriptDelegate ScriptDelegate;
+			ScriptDelegate.BindUFunction(Target, NAME_Core);
+			Delegate.Add(ScriptDelegate);
 		}
 		else
-			InDelegate.BindUFunction(Target, NAME_Core);
+			Delegate.BindUFunction(Target, NAME_Core);
+		FDelegateAwaiter::await_suspend(Handle);
 	}
-	UE_NONCOPYABLE(TDynamicDelegateAwaiter);
 
 	FResult await_resume()
 	{
