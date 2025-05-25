@@ -37,12 +37,44 @@
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
-using namespace UE5CoroGAS::Private;
+using namespace UE5Coro::Private::GAS;
+
+namespace UE5Coro::Private::GAS
+{
+struct FActivationKey final : private FGameplayAbilityActivationInfo
+{
+	FActivationKey() = default;
+	FActivationKey(const FGameplayAbilityActivationInfo& Info)
+		: FGameplayAbilityActivationInfo(Info) { }
+
+	void Reset()
+	{
+		*this = {};
+	}
+
+	bool IsValid() const noexcept
+	{
+		return GetActivationPredictionKey().IsValidKey();
+	}
+
+	bool operator==(const FActivationKey& Other) const noexcept
+	{
+		return ActivationMode == Other.ActivationMode &&
+		       GetActivationPredictionKey() == Other.GetActivationPredictionKey();
+	}
+
+	friend int32 GetTypeHash(const FActivationKey& Key) noexcept
+	{
+		return GetTypeHash(Key.GetActivationPredictionKey()) ^
+		       Key.ActivationMode;
+	}
+};
+}
 
 namespace
 {
 bool GCoroutineEnded = false;
-FPredictionKey GCurrentPredictionKey;
+FActivationKey GCurrentActivation;
 
 using FCallbackTargetPtr = TWeakObjectPtr<UUE5CoroTaskCallbackTarget>;
 
@@ -80,31 +112,10 @@ FMulticastDelegateProperty* FindDelegate(UClass* Class)
 }
 }
 
-namespace UE5CoroGAS::Private
-{
-struct FStrictPredictionKey : FPredictionKey
-{
-	FStrictPredictionKey(const FPredictionKey& Key) noexcept
-		: FPredictionKey(Key) { }
-
-	bool operator==(const FStrictPredictionKey& Other) const noexcept
-	{
-		return FPredictionKey::operator==(Other) && Base == Other.Base;
-	}
-};
-static_assert(sizeof(FStrictPredictionKey) == sizeof(FPredictionKey));
-
-int32 GetTypeHash(const FStrictPredictionKey& Key) noexcept // ADL
-{
-	return GetTypeHash(static_cast<const FPredictionKey&>(Key)) ^
-	       Key.Base << 16;
-}
-}
-
 UUE5CoroGameplayAbility::UUE5CoroGameplayAbility()
 {
 	if (::IsTemplate(this))
-		Activations = new TMap<FStrictPredictionKey, TAbilityPromise<ThisClass>*>;
+		Activations = new TMap<FActivationKey, TAbilityPromise<ThisClass>*>;
 	else
 		Activations = GetDefault<ThisClass>(GetClass())->Activations;
 	checkf(Activations, TEXT("Internal error: non-template object before CDO"));
@@ -165,7 +176,7 @@ void UUE5CoroGameplayAbility::ActivateAbility(
 
 	checkf(IsInGameThread(),
 	       TEXT("Internal error: expected GA activation on the game thread"));
-	GCurrentPredictionKey = ActivationInfo.GetActivationPredictionKey();
+	GCurrentActivation = ActivationInfo;
 	checkf(!TAbilityPromise<ThisClass>::bCalledFromActivate,
 	       TEXT("Internal error: ActivateAbility recursion"));
 	TAbilityPromise<ThisClass>::bCalledFromActivate = true;
@@ -173,6 +184,7 @@ void UUE5CoroGameplayAbility::ActivateAbility(
 	                                      TriggerEventData);
 	checkf(!TAbilityPromise<ThisClass>::bCalledFromActivate,
 	       TEXT("Did you implement ExecuteAbility with a coroutine?"));
+	GCurrentActivation.Reset();
 
 	Coroutine.ContinueWithWeak(this, [=, this, ActorInfoCopy = *ActorInfo]
 	{
@@ -201,12 +213,12 @@ void UUE5CoroGameplayAbility::EndAbility(
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility,
 	                  bWasCanceled);
 
-	auto PredictionKey = ActivationInfo.GetActivationPredictionKey();
-	if (!PredictionKey.IsValidKey())
+	FActivationKey ActivationKey(ActivationInfo);
+	if (!ActivationKey.IsValid())
 		return;
 
 	TAbilityPromise<ThisClass>* Promise;
-	bool bFound = Activations->RemoveAndCopyValue(PredictionKey, Promise);
+	bool bFound = Activations->RemoveAndCopyValue(ActivationKey, Promise);
 
 	// Nothing to do if the coroutine has ended already
 	if (bCoroutineEnded)
@@ -228,12 +240,12 @@ void UUE5CoroGameplayAbility::CoroutineStarting(TAbilityPromise<ThisClass>* Prom
 {
 	checkf(IsInGameThread(),
 	       TEXT("Internal error: expected coroutine on the game thread"));
-	checkf(GCurrentPredictionKey.IsValidKey(),
-	       TEXT("Attempting to start ability with invalid prediction key"));
-	checkf(!Activations->Contains(GCurrentPredictionKey),
-	       TEXT("Overlapping ability activations with the same prediction key"));
+	checkf(GCurrentActivation.IsValid(),
+	       TEXT("Attempting to start ability with invalid activation"));
+	checkf(!Activations->Contains(GCurrentActivation),
+	       TEXT("Overlapping ability activations with the same info"));
 	// The promise object is not fully constructed yet, but its address is known
-	Activations->Add(GCurrentPredictionKey, Promise);
+	Activations->Add(GCurrentActivation, Promise);
 }
 
 bool UUE5CoroGameplayAbility::ShouldResumeTask(void* State, bool bCleanup)
