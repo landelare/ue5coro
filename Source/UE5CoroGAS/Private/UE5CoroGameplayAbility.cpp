@@ -224,8 +224,9 @@ void UUE5CoroGameplayAbility::EndAbility(
 	if (bCoroutineEnded)
 		return;
 
-	// If the coroutine hasn't ended, why was it not in the map?
-	checkf(bFound, TEXT("Internal error: unexpected EndAbility call"));
+	// This can happen if EndAbility is replicated in single-process multiplayer
+	if (!bFound)
+		return;
 
 	// Cancel the coroutine. Depending on instancing policy, there will be a
 	// second, forced cancellation coming when the latent action manager
