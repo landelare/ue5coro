@@ -37,8 +37,6 @@
 #include "UE5CoroGAS/AbilityPromise.h"
 #include "UE5CoroGameplayAbility.generated.h"
 
-namespace UE5CoroGAS::Private { struct FStrictPredictionKey; }
-
 /** Usage summary:
  *  - Override ExecuteAbility with a coroutine instead of ActivateAbility
  *  - Call CommitAbility like usual, but do *NOT* call EndAbility
@@ -53,7 +51,7 @@ class UE5COROGAS_API UUE5CoroGameplayAbility : public UGameplayAbility
 
 	// One shared per class to support every instancing policy including derived
 	// classes changing their minds at runtime. The real one is on the CDO.
-	TMap<UE5CoroGAS::Private::FStrictPredictionKey,
+	TMap<UE5Coro::Private::GAS::FActivationKey,
 	     UE5Coro::Private::TAbilityPromise<ThisClass>*>* Activations;
 
 	UPROPERTY()

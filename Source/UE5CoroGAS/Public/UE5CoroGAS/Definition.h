@@ -30,3 +30,8 @@
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
+
+namespace UE5Coro::Private::GAS
+{
+struct FActivationKey;
+}

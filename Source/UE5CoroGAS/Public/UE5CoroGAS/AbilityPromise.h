@@ -77,7 +77,7 @@ protected:
 	                         const FGameplayEventData*);
 
 public:
-	GAS::FAbilityCoroutine get_return_object() noexcept;
+	UE5Coro::GAS::FAbilityCoroutine get_return_object() noexcept;
 };
 
 template<typename T>
