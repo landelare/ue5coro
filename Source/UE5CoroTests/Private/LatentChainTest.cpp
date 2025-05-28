@@ -40,12 +40,14 @@ using namespace UE5Coro;
 using namespace UE5Coro::Latent;
 using namespace UE5Coro::Private::Test;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncChainTest, "UE5Coro.Chain.Async",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentChainTestAsync,
+                                 "UE5Coro.LatentChain.Async",
                                  EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentChainTest, "UE5Coro.Chain.Latent",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentChainTestLatent,
+                                 "UE5Coro.LatentChain.Latent",
                                  EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
@@ -188,13 +190,13 @@ void DoTest(FAutomationTestBase& Test)
 }
 }
 
-bool FAsyncChainTest::RunTest(const FString& Parameters)
+bool FLatentChainTestAsync::RunTest(const FString& Parameters)
 {
 	DoTest<>(*this);
 	return true;
 }
 
-bool FLatentChainTest::RunTest(const FString& Parameters)
+bool FLatentChainTestLatent::RunTest(const FString& Parameters)
 {
 	DoTest<FLatentActionInfo>(*this);
 	return true;
