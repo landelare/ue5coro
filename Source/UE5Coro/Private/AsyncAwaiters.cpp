@@ -169,19 +169,35 @@ void FNewThreadAwaiter::Suspend(FPromise& Promise)
 	new FAutoStartResumeRunnable(Promise, Priority, Affinity, Flags);
 }
 
-FDelegateAwaiter::FDelegateAwaiter()
+template<>
+FDelegateAwaiter<false>::FDelegateAwaiter()
+{
+}
+
+template<>
+FDelegateAwaiter<true>::FDelegateAwaiter()
 	: TCancelableAwaiter(&Cancel)
 {
 }
 
 #if UE5CORO_DEBUG
-FDelegateAwaiter::~FDelegateAwaiter()
+template<bool bCancelable>
+FDelegateAwaiter<bCancelable>::~FDelegateAwaiter()
 {
 	checkf(!Promise, TEXT("Internal error: destroying active awaiter"));
 }
 #endif
 
-void FDelegateAwaiter::Suspend(FPromise& InPromise)
+template<>
+void FDelegateAwaiter<false>::Suspend(FPromise& InPromise)
+{
+	checkf(!Promise, TEXT("Internal error: unexpected double suspend"));
+	checkf(Cleanup, TEXT("Internal error: awaiter was not set up"));
+	Promise = &InPromise;
+}
+
+template<>
+void FDelegateAwaiter<true>::Suspend(FPromise& InPromise)
 {
 	checkf(!Promise, TEXT("Internal error: unexpected double suspend"));
 	checkf(Cleanup, TEXT("Internal error: awaiter not set up"));
@@ -195,7 +211,9 @@ void FDelegateAwaiter::Suspend(FPromise& InPromise)
 	}
 }
 
-void FDelegateAwaiter::Cancel(void* This, FPromise& Promise)
+template<bool bCancelable>
+void FDelegateAwaiter<bCancelable>::Cancel(void* This, FPromise& Promise)
+	requires bCancelable
 {
 	if (Promise.UnregisterCancelableAwaiter<false>())
 	{
@@ -208,7 +226,17 @@ void FDelegateAwaiter::Cancel(void* This, FPromise& Promise)
 	}
 }
 
-void FDelegateAwaiter::Resume()
+template<>
+void FDelegateAwaiter<false>::Resume()
+{
+	checkf(Cleanup, TEXT("Internal error: awaiter not set up"));
+	Cleanup();
+	if (auto* P = Promise.exchange(nullptr))
+		P->Resume();
+}
+
+template<>
+void FDelegateAwaiter<true>::Resume()
 {
 	checkf(Cleanup, TEXT("Internal error: awaiter not set up"));
 	if (auto* P = Promise.exchange(nullptr);
@@ -219,7 +247,9 @@ void FDelegateAwaiter::Resume()
 	}
 }
 
-UObject* FDelegateAwaiter::SetupCallbackTarget(std::function<void(void*)> Fn)
+template<bool bCancelable>
+UObject* FDelegateAwaiter<bCancelable>::SetupCallbackTarget(
+	std::function<void(void*)> Fn)
 {
 	FGCScopeGuard _;
 	auto* Target = NewObject<UUE5CoroDelegateCallbackTarget>();
@@ -233,4 +263,10 @@ UObject* FDelegateAwaiter::SetupCallbackTarget(std::function<void(void*)> Fn)
 		Target->MarkAsGarbage();
 	};
 	return Target;
+}
+
+namespace UE5Coro::Private
+{
+template class FDelegateAwaiter<false>;
+template class FDelegateAwaiter<true>;
 }
