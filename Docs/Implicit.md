@@ -105,6 +105,10 @@ or Broadcast().
 Doing so Binds or Adds to the delegate, and Unbinds/Removes the binding when the
 coroutine resumes.
 
+> [!NOTE]
+> To await an engine function that expects an already-bound delegate, use
+> [Async::Chain](AsyncChain.md).
+
 The following engine delegates are supported, including any number of parameters,
 with or without return values:
 * TDelegate (DECLARE_DELEGATE, ~~DECLARE_TS_DELEGATE~~[^ts])
