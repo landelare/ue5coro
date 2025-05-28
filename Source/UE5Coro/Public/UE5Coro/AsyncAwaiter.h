@@ -297,13 +297,13 @@ struct TAwaitTransform<P, TFuture<T>>
 	TFutureAwaiter<T> operator()(TFuture<T>&) = delete;
 };
 
-template<typename D, typename T, typename R, typename... A>
-struct TDelegateAwaiterFor<D, R (T::*)(A...) const>
+template<bool bCancelable, typename D, typename T, typename R, typename... A>
+struct TDelegateAwaiterFor<bCancelable, D, R (T::*)(A...) const>
 {
 	static_assert(TIsDynamicDelegate<D> == TIsDynamicDelegate<T>);
 	using type = std::conditional_t<TIsDynamicDelegate<D>,
-	                                TDynamicDelegateAwaiter<D, R, A...>,
-	                                TDelegateAwaiter<D, R, A...>>;
+		TDynamicDelegateAwaiter<bCancelable, D, R, A...>,
+		TDelegateAwaiter<bCancelable, D, R, A...>>;
 };
 
 template<typename P, TIsDelegate T>
@@ -322,7 +322,8 @@ struct TAwaitTransform<P, T>
 		else
 			return &T::Execute;
 	}
-	using FAwaiter = typename TDelegateAwaiterFor<T, decltype(ExecutePtr())>::type;
+	using FAwaiter = typename TDelegateAwaiterFor<
+		!std::is_same_v<P, FNonCancelable>, T, decltype(ExecutePtr())>::type;
 
 	FAwaiter operator()(T& Delegate) { return FAwaiter(Delegate); }
 
@@ -382,10 +383,13 @@ public:
 	TType<N>& get() { return this->Values.template Get<N>(); }
 };
 
+template<bool bCancelable>
 class [[nodiscard]] UE5CORO_API FDelegateAwaiter
-	: public TCancelableAwaiter<FDelegateAwaiter>
+	: public std::conditional_t<bCancelable,
+	                            TCancelableAwaiter<FDelegateAwaiter<bCancelable>>,
+	                            TAwaiter<FDelegateAwaiter<bCancelable>>>
 {
-	static void Cancel(void*, FPromise&);
+	static void Cancel(void*, FPromise&) requires bCancelable;
 
 protected:
 	std::atomic<FPromise*> Promise = nullptr;
@@ -403,8 +407,8 @@ public:
 	void Suspend(FPromise& InPromise);
 };
 
-template<typename D, typename R, typename... A>
-class [[nodiscard]] TDelegateAwaiter : public FDelegateAwaiter
+template<bool bCancelable, typename D, typename R, typename... A>
+class [[nodiscard]] TDelegateAwaiter : public FDelegateAwaiter<bCancelable>
 {
 	static_assert(!TIsDynamicDelegate<D>);
 	using ThisClass = TDelegateAwaiter;
@@ -423,14 +427,14 @@ public:
 		{
 			auto Handle = Delegate.AddRaw(this,
 			                              &ThisClass::template ResumeWith<A...>);
-			Cleanup = [this, Handle] { Delegate.Remove(Handle); };
+			this->Cleanup = [this, Handle] { Delegate.Remove(Handle); };
 		}
 		else
 		{
 			Delegate.BindRaw(this, &ThisClass::template ResumeWith<A...>);
-			Cleanup = [this] { Delegate.Unbind(); };
+			this->Cleanup = [this] { Delegate.Unbind(); };
 		}
-		FDelegateAwaiter::await_suspend(Coro);
+		FDelegateAwaiter<bCancelable>::await_suspend(Coro);
 	}
 
 	FResult await_resume()
@@ -446,14 +450,15 @@ private:
 	{
 		TTuple<T...> Values(std::forward<T>(Args)...);
 		Result = &Values; // This exposes a pointer to a local, but...
-		Resume(); // ...it's only read by await_resume, right here
+		this->Resume(); // ...it's only read by await_resume, right here
 		// The coroutine might have completed, destroying this object
 		return R();
 	}
 };
 
-template<typename D, typename R, typename... A>
-class [[nodiscard]] TDynamicDelegateAwaiter : public FDelegateAwaiter
+template<bool bCancelable, typename D, typename R, typename... A>
+class [[nodiscard]] TDynamicDelegateAwaiter
+	: public FDelegateAwaiter<bCancelable>
 {
 	static_assert(TIsDynamicDelegate<D>);
 	using FResult = std::conditional_t<sizeof...(A) != 0,
@@ -471,11 +476,11 @@ public:
 	void await_suspend(std::coroutine_handle<P> Handle)
 	{
 		// SetupCallbackTarget sets Cleanup and ties Target's lifetime to this
-		auto* Target = SetupCallbackTarget([this](void* Params)
+		auto* Target = this->SetupCallbackTarget([this](void* Params)
 		{
 			// This matches the hack in TBaseUFunctionDelegateInstance::Execute
 			Result = static_cast<TDecayedPayload<A...>*>(Params);
-			Resume();
+			this->Resume();
 			// The coroutine might have completed, deleting the awaiter
 			if constexpr (!std::is_void_v<R>)
 				static_cast<FPayload*>(Params)->template get<sizeof...(A)>() = R();
@@ -489,7 +494,7 @@ public:
 		}
 		else
 			Delegate.BindUFunction(Target, NAME_Core);
-		FDelegateAwaiter::await_suspend(Handle);
+		FDelegateAwaiter<bCancelable>::await_suspend(Handle);
 	}
 
 	FResult await_resume()
