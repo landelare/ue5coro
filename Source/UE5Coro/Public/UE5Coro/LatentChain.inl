@@ -63,11 +63,6 @@ concept TWorldContext = std::same_as<std::decay_t<T>, UObject*> ||
 template<typename T>
 concept TLatentInfo = std::same_as<std::decay_t<T>, FLatentActionInfo>;
 
-template<typename T>
-using TForwardRef =
-	std::conditional_t<std::is_lvalue_reference_v<T>,
-	                   std::reference_wrapper<std::remove_reference_t<T>>, T&&>;
-
 // Terminator
 template<bool, bool bInfo, typename...>
 struct FLatentChain
