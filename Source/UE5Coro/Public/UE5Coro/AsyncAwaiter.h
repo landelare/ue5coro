@@ -43,6 +43,21 @@
 
 namespace UE5Coro::Async
 {
+/** co_await Chain(...) calls the function with a delegate bound to one of its
+ *  parameters, resumes the coroutine when that delegate is triggered.
+ *  The result of the await expression is the same as if the delegate was
+ *  awaited directly. Do not call without immediately co_awaiting the result. */
+template<typename... FnParams>
+auto Chain(auto (*Function)(FnParams...), auto&&... Args);
+
+/** co_await Chain(...) calls the method on the provided object with a delegate
+ *  bound to one of its parameters, resumes the coroutine when that delegate is
+ *  triggered.
+ *  The result of the await expression is the same as if the delegate was
+ *  awaited directly. Do not call without immediately co_awaiting the result. */
+template<typename Class, typename... FnParams>
+auto Chain(Class* Object, auto (Class::*Function)(FnParams...), auto&&... Args);
+
 /** Returns an object that, when co_awaited, suspends the calling coroutine and
  *  resumes it on the provided named thread.
  *
@@ -519,4 +534,6 @@ struct std::tuple_element<N, UE5Coro::Private::TDecayedPayload<T...>>
 {
 	using type = std::tuple_element_t<N, std::tuple<T...>>;
 };
+
+#include "AsyncChain.inl"
 #pragma endregion

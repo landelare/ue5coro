@@ -115,6 +115,10 @@ template<typename>
 constexpr bool bFalse = false;
 
 template<typename T>
+using TForwardRef = std::conditional_t<std::is_lvalue_reference_v<T>,
+	std::reference_wrapper<std::remove_reference_t<T>>, T&&>;
+
+template<typename T>
 concept TIsSparseDelegate = std::derived_from<T, FSparseDelegate>;
 
 template<typename T>
@@ -137,6 +141,10 @@ concept TIsDelegate =
 	std::derived_from<T, FDefaultDelegateUserPolicy::FDelegateExtras> ||
 	std::derived_from<T, FDefaultTSDelegateUserPolicy::FDelegateExtras> ||
 	TIsDynamicDelegate<T> || TIsMulticastDelegate<T>;
+
+template<typename T>
+concept TIsDelegateOrPointer = TIsDelegate<std::remove_reference_t<T>> ||
+                               TIsDelegate<std::remove_pointer_t<T>>;
 
 template<typename T>
 concept TIsUObjectPtr = std::convertible_to<T, const UObject*> &&

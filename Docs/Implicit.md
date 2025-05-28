@@ -105,6 +105,10 @@ or Broadcast().
 Doing so Binds or Adds to the delegate, and Unbinds/Removes the binding when the
 coroutine resumes.
 
+> [!NOTE]
+> To await an engine function that expects an already-bound delegate, use
+> [Async::Chain](AsyncChain.md).
+
 The following engine delegates are supported, including any number of parameters,
 with or without return values:
 * TDelegate (DECLARE_DELEGATE, ~~DECLARE_TS_DELEGATE~~[^ts])
@@ -125,7 +129,12 @@ this way does not require a UFUNCTION or even a UCLASS at all.
 > [!CAUTION]
 > Thread safety and synchronization is your responsibility: there are no checks
 > or other measures taken against data races when the await expression starts
-> (Bind/Add) or finishes (Unbind/Remove).
+> (Bind/Add) or finishes (Unbind/Remove/UObject invalidation).
+>
+> The coroutine being resumed again after it has unbound from the delegate is
+> undefined behavior.
+> This can occur if something copies a non-DYNAMIC delegate while it's bound,
+> then uses the copy.
 >
 > Similarly, coroutine cancellation itself is thread safe, but most Unreal
 > delegates are not.

@@ -121,6 +121,7 @@ coroutines.
 * [AI](Docs/AI.md) integration (MoveTo, pathfinding...)
 * [Animation awaiters](Docs/Animation.md) (montages, notifies...)
 * [Async awaiters](Docs/Async.md) (multithreading, synchronization...)
+  * [Async chain](Docs/AsyncChain.md) (universal wrapper for functions taking delegates)
 * [HTTP](Docs/Http.md) (asynchronous HTTP requests)
 * [Implicit awaiters](Docs/Implicit.md) (certain engine types are directly
   co_awaitable, without wrappers)
