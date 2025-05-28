@@ -40,12 +40,14 @@ using namespace UE5Coro::Latent;
 using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAsyncChainCancelTest, "UE5Coro.Chain.Cancel.Async",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentChainCancelTestAsync,
+                                 "UE5Coro.LatentChain.Cancel.Async",
                                  EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentChainCancelTest, "UE5Coro.Chain.Cancel.Latent",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLatentChainCancelTestLatent,
+                                 "UE5Coro.LatentChain.Cancel.Latent",
                                  EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
@@ -106,13 +108,13 @@ void DoTest(FAutomationTestBase& Test)
 }
 }
 
-bool FAsyncChainCancelTest::RunTest(const FString& Parameters)
+bool FLatentChainCancelTestAsync::RunTest(const FString& Parameters)
 {
 	DoTest<>(*this);
 	return true;
 }
 
-bool FLatentChainCancelTest::RunTest(const FString& Parameters)
+bool FLatentChainCancelTestLatent::RunTest(const FString& Parameters)
 {
 	DoTest<FLatentActionInfo>(*this);
 	return true;
