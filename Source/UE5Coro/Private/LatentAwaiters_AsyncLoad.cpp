@@ -170,6 +170,17 @@ FLatentAwaiter Latent::AsyncLoadObjects(TArray<FSoftObjectPath> Paths,
 	                      &FLatentLoader::ShouldResume, std::false_type());
 }
 
+FAsyncPreloadAwaiter Latent::AsyncPreloadPrimaryAssets(
+	const TArray<FPrimaryAssetId>& AssetsToLoad,
+	const TArray<FName>& LoadBundles, bool bLoadRecursive,
+	TAsyncLoadPriority Priority)
+{
+	return FAsyncPreloadAwaiter(
+		new auto(UAssetManager::Get().PreloadPrimaryAssets(
+			AssetsToLoad, LoadBundles, bLoadRecursive, FStreamableDelegate(),
+			Priority)));
+}
+
 FLatentAwaiter Latent::AsyncLoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad,
                                              const TArray<FName>& LoadBundles,
                                              TAsyncLoadPriority Priority)
@@ -218,6 +229,30 @@ auto Latent::AsyncLoadPackage(const FPackagePath& Path,
 	return FPackageLoadAwaiter(Path, PackageNameToCreate, PackageFlags,
 	                           PIEInstanceID, PackagePriority,
 	                           InstancingContext);
+}
+
+FAsyncPreloadAwaiter::FAsyncPreloadAwaiter(TSharedPtr<FStreamableHandle>* State)
+	: FLatentAwaiter(State, &ShouldResume, std::false_type())
+{
+}
+
+TSharedPtr<FStreamableHandle> FAsyncPreloadAwaiter::await_resume()
+{
+	return *static_cast<TSharedPtr<FStreamableHandle>*>(State);
+}
+
+bool FAsyncPreloadAwaiter::ShouldResume(void* State, bool bCleanup)
+{
+	auto& Handle = *static_cast<TSharedPtr<FStreamableHandle>*>(State);
+	if (bCleanup) [[unlikely]]
+	{
+		delete &Handle;
+		return false;
+	}
+
+	// This condition matches FLoadAssetActionBase::UpdateOperation().
+	// !Handle is how UAssetManager reports an instant/synchronous finish.
+	return !Handle || Handle->HasLoadCompleted() || Handle->WasCanceled();
 }
 
 FPackageLoadAwaiter::FPackageLoadAwaiter(

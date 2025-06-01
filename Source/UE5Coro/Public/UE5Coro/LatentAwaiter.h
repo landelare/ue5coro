@@ -160,6 +160,16 @@ UE5CORO_API auto AsyncLoadObjects(TArray<FSoftObjectPath>,
 	TAsyncLoadPriority = FStreamableManager::DefaultAsyncLoadPriority)
 	-> Private::FLatentAwaiter;
 
+/** Asynchronously starts preloading the assets at the given paths, resumes once
+ *  they're preloaded. The await expression results in the same TSharedPtr that
+ *  the UAssetManager function returns.
+ *  This must be stored, or the assets might get unloaded. */
+UE5CORO_API auto AsyncPreloadPrimaryAssets(
+	const TArray<FPrimaryAssetId>& AssetsToLoad,
+	const TArray<FName>& LoadBundles, bool bLoadRecursive,
+	TAsyncLoadPriority Priority = FStreamableManager::DefaultAsyncLoadPriority)
+	-> Private::FAsyncPreloadAwaiter;
+
 /** Asynchronously starts loading the primary asset with any bundles specified,
  *  resumes once they're loaded.
  *  The asset will stay in memory until explicitly unloaded. */
@@ -367,6 +377,17 @@ namespace AsyncLoad
 template<int> // Switches between non-exported types
 UE5CORO_API TArray<UObject*> InternalResume(void*);
 }
+
+struct [[nodiscard]] UE5CORO_API FAsyncPreloadAwaiter final : FLatentAwaiter
+{
+	explicit FAsyncPreloadAwaiter(TSharedPtr<FStreamableHandle>*);
+	FAsyncPreloadAwaiter(FAsyncPreloadAwaiter&&) = default;
+	[[nodiscard]] TSharedPtr<FStreamableHandle> await_resume();
+
+private:
+	static bool ShouldResume(void*, bool);
+};
+static_assert(sizeof(FAsyncPreloadAwaiter) == sizeof(FLatentAwaiter));
 
 template<typename T, int HiddenType>
 struct [[nodiscard]] TAsyncLoadAwaiter final : FLatentAwaiter

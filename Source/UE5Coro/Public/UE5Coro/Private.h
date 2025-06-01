@@ -77,6 +77,7 @@ enum class ELatentExitReason : uint8;
 class FAllAwaiter;
 class FAnyAwaiter;
 class FAsyncAwaiter;
+struct FAsyncPreloadAwaiter;
 class FAsyncTimeAwaiter;
 class FAsyncYieldAwaiter;
 class FCancellationAwaiter;
