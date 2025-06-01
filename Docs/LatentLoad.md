@@ -48,6 +48,27 @@ if (AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(Class))
     SpawnedActor->Act();
 ```
 
+### auto AsyncPreloadPrimaryAssets(const TArray\<FPrimaryAssetId\>& AssetsToLoad, const TArray\<FName\>& LoadBundles, bool bLoadRecursive, TAsyncLoadPriority Priority = FStreamableManager::DefaultAsyncLoadPriority)
+
+This function starts preloading the assets specified by their primary asset IDs.
+Its return value may be awaited to suspend the coroutine until the preload has
+completed.
+
+The await expression results in the TSharedPtr\<FStreamableHandle\> from
+UAssetManager, which **must** be stored to prevent the assets from being
+unloaded.
+
+To not have to deal with the handle manually, see the more convenient
+AsyncLoadPrimaryAsset\<T\> and AsyncLoadPrimaryAssets\<T\> functions below.
+
+Example:
+```c++
+using namespace UE5Coro::Latent;
+
+TSharedPtr<FStreamableHandle> Handle = co_await AsyncPreloadPrimaryAssets(
+    Assets, Bundles, bRecursive, Priority);
+```
+
 ### auto AsyncLoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad, const TArray\<FName\>& LoadBundles = \{\}, TAsyncLoadPriority Priority = FStreamableManager::DefaultAsyncLoadPriority)
 ### auto AsyncLoadPrimaryAsset\<T\>(FPrimaryAssetId AssetToLoad, const TArray\<FName\>& LoadBundles = \{\}, TAsyncLoadPriority Priority = FStreamableManager::DefaultAsyncLoadPriority)
 ### auto AsyncLoadPrimaryAssets(TArray\<FPrimaryAssetId\> AssetsToLoad, const TArray\<FName\>& LoadBundles = \{\}, TAsyncLoadPriority Priority = FStreamableManager::DefaultAsyncLoadPriority)
