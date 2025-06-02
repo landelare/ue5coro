@@ -37,8 +37,6 @@
 #include "UE5CoroGAS/AbilityPromises.h"
 #include "UE5CoroGameplayAbility.generated.h"
 
-namespace UE5CoroGAS::Private { struct FStrictPredictionKey; }
-
 /**
  * Usage summary:
  * - Override ExecuteAbility instead of ActivateAbility
@@ -50,12 +48,16 @@ UCLASS(Abstract, NotBlueprintable)
 class UE5COROGAS_API UUE5CoroGameplayAbility : public UGameplayAbility
 {
 	GENERATED_BODY()
+	friend class UUE5CoroTaskCallbackTarget;
 	friend UE5Coro::Private::TAbilityPromise<ThisClass>;
 
 	// One shared per class to support every instancing policy including derived
 	// classes changing their minds at runtime. The real one is on the CDO.
-	TMap<UE5CoroGAS::Private::FStrictPredictionKey,
+	TMap<UE5Coro::Private::GAS::FActivationKey,
 	     UE5Coro::Private::TAbilityPromise<ThisClass>*>* Activations;
+
+	UPROPERTY()
+	TSet<TObjectPtr<UUE5CoroTaskCallbackTarget>> Tasks;
 
 public:
 	UUE5CoroGameplayAbility();

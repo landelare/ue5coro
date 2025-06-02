@@ -37,12 +37,46 @@
 
 using namespace UE5Coro;
 using namespace UE5Coro::Private;
-using namespace UE5CoroGAS::Private;
+using namespace UE5Coro::Private::GAS;
+
+namespace UE5Coro::Private::GAS
+{
+struct FActivationKey final : private FGameplayAbilityActivationInfo
+{
+	FActivationKey() = default;
+	FActivationKey(const FGameplayAbilityActivationInfo& Info)
+		: FGameplayAbilityActivationInfo(Info) { }
+
+	void Reset()
+	{
+		*this = {};
+	}
+
+	bool IsValid() const noexcept
+	{
+		return GetActivationPredictionKey().IsValidKey();
+	}
+
+	bool operator==(const FActivationKey& Other) const noexcept
+	{
+		return ActivationMode == Other.ActivationMode &&
+		       GetActivationPredictionKey() == Other.GetActivationPredictionKey();
+	}
+
+	friend int32 GetTypeHash(const FActivationKey& Key) noexcept
+	{
+		return GetTypeHash(Key.GetActivationPredictionKey()) ^
+		       Key.ActivationMode;
+	}
+};
+}
 
 namespace
 {
 bool GCoroutineEnded = false;
-FPredictionKey GCurrentPredictionKey;
+FActivationKey GCurrentActivation;
+
+using FCallbackTargetPtr = TWeakObjectPtr<UUE5CoroTaskCallbackTarget>;
 
 // Workaround for member IsTemplate being unreliable in destructors
 bool IsTemplate(UObject* Object)
@@ -54,30 +88,10 @@ bool IsTemplate(UObject* Object)
 }
 }
 
-namespace UE5CoroGAS::Private
-{
-struct FStrictPredictionKey : FPredictionKey
-{
-	FStrictPredictionKey(const FPredictionKey& Key) noexcept
-		: FPredictionKey(Key) { }
-
-	bool operator==(const FStrictPredictionKey& Other) const noexcept
-	{
-		return FPredictionKey::operator==(Other) && Base == Other.Base;
-	}
-};
-
-int32 GetTypeHash(const FStrictPredictionKey& Key) noexcept // ADL
-{
-	return GetTypeHash(static_cast<const FPredictionKey&>(Key)) ^
-	       Key.Base << 16;
-}
-}
-
 UUE5CoroGameplayAbility::UUE5CoroGameplayAbility()
 {
 	if (::IsTemplate(this))
-		Activations = new TMap<FStrictPredictionKey, TAbilityPromise<ThisClass>*>;
+		Activations = new TMap<FActivationKey, TAbilityPromise<ThisClass>*>;
 	else
 		Activations = GetDefault<ThisClass>(GetClass())->Activations;
 	checkf(Activations, TEXT("Internal error: non-template object before CDO"));
@@ -119,6 +133,9 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object)
 	auto* DelegateProp = CastFieldChecked<FMulticastDelegateProperty>(Property);
 
 	auto* Target = NewObject<UUE5CoroTaskCallbackTarget>(this);
+	Target->Owner = this;
+	Tasks.Add(Target);
+
 	FScriptDelegate Delegate;
 	Delegate.BindUFunction(Target, NAME_Core);
 	DelegateProp->AddDelegate(std::move(Delegate), Object);
@@ -129,7 +146,11 @@ FLatentAwaiter UUE5CoroGameplayAbility::Task(UObject* Object)
 	else if (auto* Action = Cast<UBlueprintAsyncActionBase>(Object))
 		Action->Activate();
 
-	return FLatentAwaiter(new TStrongObjectPtr(Target), &ShouldResumeTask);
+	static_assert(sizeof(FCallbackTargetPtr) <= sizeof(void*));
+	static_assert(std::is_trivially_copyable_v<FCallbackTargetPtr>);
+	void* Data;
+	new (&Data) FCallbackTargetPtr(Target);
+	return FLatentAwaiter(Data, &ShouldResumeTask);
 }
 
 void UUE5CoroGameplayAbility::ActivateAbility(
@@ -143,7 +164,7 @@ void UUE5CoroGameplayAbility::ActivateAbility(
 
 	checkf(IsInGameThread(),
 	       TEXT("Internal error: Expected GA activation on the game thread"));
-	GCurrentPredictionKey = ActivationInfo.GetActivationPredictionKey();
+	GCurrentActivation = ActivationInfo;
 	checkf(!TAbilityPromise<ThisClass>::bCalledFromActivate,
 	       TEXT("Internal error: ActivateAbility recursion"));
 	TAbilityPromise<ThisClass>::bCalledFromActivate = true;
@@ -151,6 +172,7 @@ void UUE5CoroGameplayAbility::ActivateAbility(
 	                                TriggerEventData);
 	checkf(!TAbilityPromise<ThisClass>::bCalledFromActivate,
 	       TEXT("Did you implement ExecuteAbility with a coroutine?"));
+	GCurrentActivation.Reset();
 
 #if UE5CORO_CPP20
 	Coroutine.ContinueWithWeak(this, [=, ActorInfoCopy = *ActorInfo, this]
@@ -183,19 +205,20 @@ void UUE5CoroGameplayAbility::EndAbility(
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility,
 	                  bWasCanceled);
 
-	auto PredictionKey = ActivationInfo.GetActivationPredictionKey();
-	if (!PredictionKey.IsValidKey())
+	FActivationKey ActivationKey(ActivationInfo);
+	if (!ActivationKey.IsValid())
 		return;
 
 	TAbilityPromise<ThisClass>* Promise;
-	bool bFound = Activations->RemoveAndCopyValue(PredictionKey, Promise);
+	bool bFound = Activations->RemoveAndCopyValue(ActivationKey, Promise);
 
 	// Nothing to do if the coroutine has ended already
 	if (bCoroutineEnded)
 		return;
 
-	// If the coroutine hasn't ended, why was it not in the map?
-	checkf(bFound, TEXT("Internal error: Unexpected EndAbility call"));
+	// This can happen if EndAbility is replicated in single-process multiplayer
+	if (!bFound)
+		return;
 
 	// Cancel the coroutine. Depending on instancing policy, there will be a
 	// second, forced cancellation coming when the latent action manager
@@ -209,21 +232,26 @@ void UUE5CoroGameplayAbility::CoroutineStarting(TAbilityPromise<ThisClass>* Prom
 {
 	checkf(IsInGameThread(),
 	       TEXT("Internal error: expected coroutine on the game thread"));
-	checkf(GCurrentPredictionKey.IsValidKey(),
-	       TEXT("Attempting to start ability with invalid prediction key"));
-	checkf(!Activations->Contains(GCurrentPredictionKey),
-	       TEXT("Overlapping ability activations with the same prediction key"));
+	checkf(GCurrentActivation.IsValid(),
+	       TEXT("Attempting to start ability with invalid activation"));
+	checkf(!Activations->Contains(GCurrentActivation),
+	       TEXT("Overlapping ability activations with the same info"));
 	// Promise is not fully-constructed yet, but its address is known
-	Activations->Add(GCurrentPredictionKey, Promise);
+	Activations->Add(GCurrentActivation, Promise);
 }
 
 bool UUE5CoroGameplayAbility::ShouldResumeTask(void* State, bool bCleanup)
 {
-	auto* Ptr = static_cast<TStrongObjectPtr<UUE5CoroTaskCallbackTarget>*>(State);
-	if (UNLIKELY(bCleanup))
+	static_assert(sizeof(FCallbackTargetPtr) <= sizeof(void*));
+	auto& Ptr = reinterpret_cast<FCallbackTargetPtr&>(State);
+	auto* Target = Ptr.Get();
+	if (bCleanup) [[unlikely]]
 	{
-		delete Ptr;
+		if (Target && IsValid(Target->Owner))
+			Target->Owner->Tasks.Remove(Target);
+		Ptr.~FCallbackTargetPtr();
 		return false;
 	}
-	return (*Ptr)->bExecuted;
+	// The task being destroyed means it's technically ending
+	return !Target || Target->bExecuted;
 }

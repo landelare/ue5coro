@@ -18,4 +18,7 @@
 			<Item Name="[Promise or retval]" Optional="true">Promise</Item>
 		</Expand>
 	</Type>
+	<Type Name="UE5Coro::Private::GAS::FActivationKey">
+		<DisplayString>{{Mode={ActivationMode}, PredictionKey={PredictionKeyWhenActivated.Current}}}</DisplayString>
+	</Type>
 </AutoVisualizer>

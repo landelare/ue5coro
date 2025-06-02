@@ -48,6 +48,7 @@ namespace UE5Coro
 namespace Private
 {
 class FAbilityPromise;
+namespace GAS { struct FActivationKey; }
 }
 
 namespace GAS
@@ -78,7 +79,7 @@ protected:
 	explicit FAbilityPromise(UObject&, UWorld* = nullptr);
 
 public:
-	GAS::FAbilityCoroutine get_return_object() noexcept;
+	UE5Coro::GAS::FAbilityCoroutine get_return_object() noexcept;
 	FFinalSuspend final_suspend() noexcept;
 };
 
@@ -99,7 +100,7 @@ public:
 
 // C++17 SFINAE helpers
 template<typename...>
-using TAbilityCoroutine = GAS::FAbilityCoroutine;
+using TAbilityCoroutine = UE5Coro::GAS::FAbilityCoroutine;
 
 template<typename Base, typename Derived>
 using TAbilityCoroutineIfBaseOf = TAbilityCoroutine<
