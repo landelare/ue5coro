@@ -5,10 +5,6 @@ UE5Coro implements C++20
 Unreal Engine 5 with a focus on gameplay logic, convenience, and providing
 seamless integration with the engine.
 
-> [!NOTE]
-> Support for C++17, older compilers, platforms, and engine versions is
-> available in the legacy UE5Coro 1.x series.
-
 There's built-in support for easy authoring of latent UFUNCTIONs.
 Change the return type of a latent UFUNCTION to make it a coroutine, and you get
 all the FPendingLatentAction boilerplate for free, with BP-safe multithreading
