@@ -125,8 +125,10 @@ bool FLatentAwaiter::ShouldResume()
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	checkf(State, TEXT("Attempting to poll invalid latent awaiter"));
+	checkf(IsValid(), TEXT("Attempting to poll invalid latent awaiter"));
 #if UE5CORO_DEBUG
+	checkf(Resume != reinterpret_cast<bool (*)(void*, bool)>(0xEEEEEEEEEEEEEEEE),
+	       TEXT("Latent awaiter use after free"));
 	// If you hit this ensure, the awaiter will probably misbehave.
 	// Use an async awaiter instead (if possible), or ensure that the co_await
 	// finishes before changing worlds by, e.g., canceling its coroutine.
