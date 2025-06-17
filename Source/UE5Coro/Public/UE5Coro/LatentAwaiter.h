@@ -450,7 +450,6 @@ struct [[nodiscard]] UE5CORO_API TAsyncQueryAwaiter : FLatentAwaiter
 	                            auto&&...);
 
 	// Workaround for not being able to rvalue overload await_resume
-	TAsyncQueryAwaiter& operator co_await() & { return *this; }
 	TAsyncQueryAwaiterRV<T>& operator co_await() &&;
 
 	const TArray<T>& await_resume();
