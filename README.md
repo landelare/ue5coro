@@ -13,19 +13,27 @@ support out of the box:
 UFUNCTION(BlueprintCallable, meta = (Latent, LatentInfo = LatentInfo))
 FVoidCoroutine Example(FLatentActionInfo LatentInfo)
 {
-    UE_LOGFMT(LogTemp, Display, "Started");
+    UE_LOGFMT(LogTemp, Display, "Before delay");
     co_await UE5Coro::Latent::Seconds(1); // Does not block the game thread!
-    UE_LOGFMT(LogTemp, Display, "Done");
-    co_await UE5Coro::Async::MoveToThread(ENamedThreads::AnyThread);
-    auto Value = HeavyComputation();
+    UE_LOGFMT(LogTemp, Display, "After delay");
+
+    // Moving out of the game thread is as easy...
+    co_await UE5Coro::Async::MoveToTask();
+    UE_LOGFMT(LogTemp, Display, "In game thread: {0}", IsInGameThread());
+    FString Value = TEXT("Imagine this was expensive to compute");
+
+    // ...as moving back in:
     co_await UE5Coro::Async::MoveToGameThread();
-    UseComputedValue(Value);
+    UE_LOGFMT(LogTemp, Display, "In game thread: {0}", IsInGameThread());
+    UE_LOGFMT(LogTemp, Display, "Value: {0}", Value);
 }
 ```
 
-This coroutine will automatically track its target UObject across threads, so
-even if its owning object is destroyed before it finishes, it won't crash due to
-a dangling `this` on the game thread.
+This is a real, working example!
+Try putting it into an actor class.
+You can even destroy the actor while the coroutine is running.
+Latent coroutines will automatically track their target UObject, and clean up
+early if needed.
 
 Even the coroutine return type is hidden from BP to not disturb designers:
 
