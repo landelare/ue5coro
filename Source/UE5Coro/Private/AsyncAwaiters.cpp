@@ -65,10 +65,15 @@ struct FAutoStartResumeRunnable final : FRunnable
 	{
 		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this]
 		{
-			FRunnableThread* ThreadPtr;
+			FRunnableThread* ThreadPtr = Thread.load();
+
 			// Rare case of exiting so quickly, Thread is still nullptr
-			while ((ThreadPtr = Thread.load()) == nullptr) [[unlikely]]
-				FPlatformProcess::Yield();
+			if (ThreadPtr == nullptr) [[unlikely]]
+			{
+				Exit(); // Try again later from another AsyncTask
+				return;
+			}
+
 			ThreadPtr->WaitForCompletion();
 			delete ThreadPtr;
 			delete this;
