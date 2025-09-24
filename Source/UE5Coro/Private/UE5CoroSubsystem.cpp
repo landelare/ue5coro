@@ -101,10 +101,14 @@ void UUE5CoroSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// ProcessLatentActions refuses to work on non-BP classes.
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+	// ProcessLatentActions refuses to work on non-BP classes before UE5.5.
 	GetClass()->ClassFlags |= CLASS_CompiledFromBlueprint;
+#endif
 	GetWorld()->GetLatentActionManager().ProcessLatentActions(this, DeltaTime);
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 	GetClass()->ClassFlags &= ~CLASS_CompiledFromBlueprint;
+#endif
 }
 
 TStatId UUE5CoroSubsystem::GetStatId() const
