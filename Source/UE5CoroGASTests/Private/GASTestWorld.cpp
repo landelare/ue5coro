@@ -44,7 +44,9 @@ FGASTestWorld::FGASTestWorld()
 	bTestWorldActive = true;
 
 	Avatar = World->SpawnActor<AUE5CoroGASTestAvatar>();
+	Player = NewObject<ULocalPlayer>(GEngine);
 	Controller = World->SpawnActor<APlayerController>();
+	Controller->Player = Player;
 	Controller->Possess(Avatar);
 	Tick();
 }
@@ -52,6 +54,7 @@ FGASTestWorld::FGASTestWorld()
 FGASTestWorld::~FGASTestWorld()
 {
 	Avatar->Destroy();
+	Player->MarkAsGarbage();
 	Controller->Destroy();
 	bTestWorldActive = false;
 }

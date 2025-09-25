@@ -45,6 +45,7 @@ class FGASTestWorld : public FTestWorld
 
 public:
 	AUE5CoroGASTestAvatar* Avatar;
+	ULocalPlayer* Player;
 	APlayerController* Controller;
 
 	FGASTestWorld();
