@@ -278,10 +278,14 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		World.EndTick();
 		World.Tick(); // NextTick
-		IF_CORO_LATENT
+		IF_CORO_LATENT_OR(UE_VERSION_NEWER_THAN_OR_EQUAL(5, 7, 0))
 		{
 			Test.TestEqual("State", State, 1);
-			World.Tick(); // A needs to poll to process the cancellation from Race
+			// Latent: Coroutine A needs to poll once to process the
+			//         cancellation from Race
+			// Async, UE5.7: the latent action added by co_await NextTick()
+			//               will not be processed until the next tick
+			World.Tick();
 		}
 		Test.TestEqual("State", State, 2);
 		Test.TestEqual("Return value", Coro.GetResult(), 1);

@@ -46,6 +46,11 @@ constexpr EAutomationTestFlags::Type EAutomationTestFlags_ApplicationContextMask
 #define IF_CORO_ASYNC_OR(Condition) if constexpr (sizeof...(T) != 1 || (Condition))
 #define IF_CORO_LATENT if constexpr (sizeof...(T) == 1)
 #define IF_CORO_LATENT_AND(Condition) if constexpr (sizeof...(T) == 1 && (Condition))
+#define IF_CORO_LATENT_OR(Condition) if constexpr (sizeof...(T) == 1 || (Condition))
+
+#ifndef UE_VERSION_NEWER_THAN_OR_EQUAL
+#define UE_VERSION_NEWER_THAN_OR_EQUAL(X, Y, Z) (!(UE_VERSION_OLDER_THAN(X, Y, Z)))
+#endif
 
 namespace UE5Coro::Private::Test
 {

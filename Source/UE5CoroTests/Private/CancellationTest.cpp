@@ -246,6 +246,15 @@ void DoTest(FAutomationTestBase& Test)
 		}
 		bContinue = true;
 		World.Tick();
+#if UE_VERSION_NEWER_THAN_OR_EQUAL(5, 7, 0)
+		// UE5.7 does not process newly-added latent actions in the current tick
+		IF_CORO_ASYNC
+		{
+			// co_await NextTick() starts a new latent action in async mode
+			Test.TestFalse("Cancellation pending (UE5.7)", bDone);
+			World.Tick();
+		}
+#endif
 		Test.TestTrue("Canceled", bDone);
 		Test.TestFalse("Not successful", Coro.WasSuccessful());
 	}
