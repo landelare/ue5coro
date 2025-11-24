@@ -31,55 +31,43 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
-#include "UE5Coro/Definition.h"
-#include "UE5Coro/Private.h"
+#include "Internationalization/ITextFormatArgumentModifier.h"
 
 namespace UE5Coro::Private::Debug
 {
-/** These utilities are sometimes used to debug UE5Coro itself. */
-#define UE5CORO_PRIVATE_USE_DEBUG_ALLOCATOR 0
-
-#if UE5CORO_DEBUG
-constexpr int GMaxEvents = 100;
-constexpr bool bLogThread = false;
-
-struct FThreadedEventLogEntry
+/** This class supports being used for localization only, without being tied to
+ *  debugging. If it is enabled for global use (off by default):
+ *
+ *  Use "{Condition}|conditional(Format string)" to only insert the formatted
+ *  parameter if Condition is truthy. Nested format strings are supported.
+ *  Unreal will not evaluate this modifier if Condition is not provided, make
+ *  sure to always provide some value for it!
+ *
+ *  Falsy values are false, 0, 0U, ±0.0f, ±0.0, "", all genders, and anything
+ *  else that formats to an empty string. Everything else is truthy.
+ *
+ *  For example, to quote a string, without resulting in "" for an empty string:
+ *  "{String}|conditional(\"{String}\")" */
+class FConditionalModifier : public ITextFormatArgumentModifier
 {
-	const char* Message;
-	uint32 Thread;
-	FThreadedEventLogEntry(const char* Message = nullptr)
-		: Message(Message), Thread(FPlatformTLS::GetCurrentThreadId()) { }
+	FTextFormat Format;
+
+	explicit FConditionalModifier(FTextFormat Format);
+
+public:
+	// Used by default to not collide with a user-defined |conditional
+	static constexpr TCHAR LongKeyword[] = TEXT("ue5coro_conditional");
+	static constexpr TCHAR ShortKeyword[] = TEXT("conditional");
+	UE5CORODEBUG_API static TSharedPtr<ITextFormatArgumentModifier> Create(
+		const FTextFormatString& Format,
+		TSharedRef<const FTextFormatPatternDefinition> PatternDef);
+
+	virtual bool Validate(const FCultureRef& Culture,
+	                      TArray<FString>& OutValidationErrors) const override;
+	virtual void Evaluate(const FFormatArgumentValue& Value,
+	                      const FPrivateTextFormatArguments& FormatArgs,
+	                      FString& OutResult) const override;
+	virtual void GetFormatArgumentNames(TArray<FString>&) const override;
+	virtual void EstimateLength(int32&, bool&) const override;
 };
-using FEventLogEntry = std::conditional_t<bLogThread,
-                                          FThreadedEventLogEntry, const char*>;
-extern UE5CORO_API FEventLogEntry GEventLog[GMaxEvents];
-extern UE5CORO_API std::atomic<int> GNextEvent;
-
-extern UE5CORO_API std::atomic<int> GLastDebugID;
-extern UE5CORO_API std::atomic<int> GActiveCoroutines;
-
-inline void ClearEvents()
-{
-	std::ranges::fill(GEventLog, FEventLogEntry());
-	GNextEvent = 0;
-}
-
-void Use(auto&&)
-{
-}
-
-#define UE5CORO_PRIVATE_DEBUG_EVENT(...) do { \
-	namespace D = ::UE5Coro::Private::Debug; \
-	D::GEventLog[D::GNextEvent++] = #__VA_ARGS__; \
-	FPlatformMisc::MemoryBarrier(); } while (false)
-#endif
-
-#if UE5CORO_ENABLE_COROUTINE_TRACKING
-extern UE5CORO_API UE::FMutex GTrackerLock;
-extern UE5CORO_API TSet<FPromise*> GPromises;
-
-void TrackPromise(FPromise*);
-void ForgetPromise(FPromise*);
-#endif
 }

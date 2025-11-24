@@ -31,55 +31,33 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
-#include "UE5Coro/Definition.h"
-#include "UE5Coro/Private.h"
+#if WITH_GAMEPLAY_DEBUGGER_MENU
+#include "GameplayDebuggerCategory.h"
 
 namespace UE5Coro::Private::Debug
 {
-/** These utilities are sometimes used to debug UE5Coro itself. */
-#define UE5CORO_PRIVATE_USE_DEBUG_ALLOCATOR 0
-
-#if UE5CORO_DEBUG
-constexpr int GMaxEvents = 100;
-constexpr bool bLogThread = false;
-
-struct FThreadedEventLogEntry
+class FUE5CoroCategory : public FGameplayDebuggerCategory
 {
-	const char* Message;
-	uint32 Thread;
-	FThreadedEventLogEntry(const char* Message = nullptr)
-		: Message(Message), Thread(FPlatformTLS::GetCurrentThreadId()) { }
+	using Super = FGameplayDebuggerCategory;
+
+	struct FDataPack
+	{
+		void Serialize(FArchive& Ar);
+
+		TArray<FText> RunningCoroutines;
+		int HiddenCoroutines = 0;
+	} DataPack;
+
+	static FTextFormat CoroutineInfoFormatAsync;
+	static FTextFormat CoroutineInfoFormatLatent;
+	static FTextFormat HiddenCoroutinesFormat;
+
+public:
+	FUE5CoroCategory();
+	static void InitLocalization();
+	virtual void CollectData(APlayerController*, AActor*) override;
+	virtual void DrawData(APlayerController*,
+	                      FGameplayDebuggerCanvasContext&) override;
 };
-using FEventLogEntry = std::conditional_t<bLogThread,
-                                          FThreadedEventLogEntry, const char*>;
-extern UE5CORO_API FEventLogEntry GEventLog[GMaxEvents];
-extern UE5CORO_API std::atomic<int> GNextEvent;
-
-extern UE5CORO_API std::atomic<int> GLastDebugID;
-extern UE5CORO_API std::atomic<int> GActiveCoroutines;
-
-inline void ClearEvents()
-{
-	std::ranges::fill(GEventLog, FEventLogEntry());
-	GNextEvent = 0;
 }
-
-void Use(auto&&)
-{
-}
-
-#define UE5CORO_PRIVATE_DEBUG_EVENT(...) do { \
-	namespace D = ::UE5Coro::Private::Debug; \
-	D::GEventLog[D::GNextEvent++] = #__VA_ARGS__; \
-	FPlatformMisc::MemoryBarrier(); } while (false)
 #endif
-
-#if UE5CORO_ENABLE_COROUTINE_TRACKING
-extern UE5CORO_API UE::FMutex GTrackerLock;
-extern UE5CORO_API TSet<FPromise*> GPromises;
-
-void TrackPromise(FPromise*);
-void ForgetPromise(FPromise*);
-#endif
-}

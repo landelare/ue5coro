@@ -205,6 +205,12 @@ void FLatentPromise::CreateLatentAction(const FLatentActionInfo& LatentInfo)
 	LatentAction = new FPendingLatentCoroutine(Extras, LatentInfo);
 }
 
+UObject* FLatentPromise::GetCallbackTarget() const
+{
+	auto* Pending = static_cast<FPendingLatentCoroutine*>(LatentAction);
+	return Pending->GetLatentInfo().CallbackTarget;
+}
+
 FLatentPromise::~FLatentPromise()
 {
 	checkf(IsInGameThread(),

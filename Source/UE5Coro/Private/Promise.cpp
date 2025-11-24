@@ -64,6 +64,10 @@ FPromise::FPromise(std::shared_ptr<FPromiseExtras> InExtras,
 	Extras->DebugID = ++Debug::GLastDebugID;
 	Extras->DebugPromiseType = PromiseType;
 #endif
+#if UE5CORO_ENABLE_COROUTINE_TRACKING
+	Extras->DebugPromiseType = PromiseType;
+	Debug::TrackPromise(this);
+#endif
 }
 
 FPromise::~FPromise()
@@ -71,6 +75,9 @@ FPromise::~FPromise()
 #if UE5CORO_DEBUG
 	verifyf(--Debug::GActiveCoroutines >= 0,
 	        TEXT("Internal error: promise tracking derailed"));
+#endif
+#if UE5CORO_ENABLE_COROUTINE_TRACKING
+	Debug::ForgetPromise(this);
 #endif
 	// Expecting the lock to be taken by a derived destructor
 	checkf(Extras->Lock.IsLocked(), TEXT("Internal error: lock not held"));

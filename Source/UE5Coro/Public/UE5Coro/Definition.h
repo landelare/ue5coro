@@ -35,6 +35,10 @@
 #define UE5CORO_DEBUG (UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT)
 #endif
 
+#ifndef UE5CORO_ENABLE_COROUTINE_TRACKING
+#define UE5CORO_ENABLE_COROUTINE_TRACKING 0
+#endif
+
 #ifndef UE5CORO_PRIVATE_ALLOW_DIRECT_INCLUDE
 #error Do not #include individual headers directly. Use "UE5Coro.h"
 #endif

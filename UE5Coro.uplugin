@@ -28,6 +28,11 @@
 			"LoadingPhase": "PreDefault"
 		},
 		{
+			"Name": "UE5CoroDebug",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
 			"Name": "UE5CoroGAS",
 			"Type": "Runtime",
 			"LoadingPhase": "PreDefault"

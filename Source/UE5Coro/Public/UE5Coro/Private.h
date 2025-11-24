@@ -78,6 +78,7 @@ class FAllAwaiter;
 class FAnyAwaiter;
 class FAsyncAwaiter;
 struct FAsyncPreloadAwaiter;
+class FAsyncPromise;
 class FAsyncTimeAwaiter;
 class FAsyncYieldAwaiter;
 class FCancellationAwaiter;
@@ -98,6 +99,7 @@ class FTaskAwaiter;
 class FThreadPoolAwaiter;
 class FTwoLives;
 struct FNonCancelable;
+namespace Debug { class FUE5CoroCategory; }
 namespace Test { class FTestHelper; }
 template<typename> struct TAnimAwaiter;
 template<typename, int> struct TAsyncLoadAwaiter;

@@ -47,10 +47,20 @@ public class UE5Coro : UE5CoroModuleRules
 
 public abstract class UE5CoroModuleRules : ModuleRules
 {
+	/// <summary>
+	/// Change this to <see langword="true" /> from a Target.cs to enable the
+	/// backend functionality required by the Gameplay Debugger integration.
+	/// Doing so will increase runtime overhead.
+	/// </summary>
+	public static bool bEnableCoroutineTracking = false;
+
 	protected UE5CoroModuleRules(ReadOnlyTargetRules Target)
 		: base(Target)
 	{
 		bUseUnity = false;
+
+		if (bEnableCoroutineTracking)
+			PublicDefinitions.Add("UE5CORO_ENABLE_COROUTINE_TRACKING");
 
 		PublicDependencyModuleNames.AddRange(new[]
 		{

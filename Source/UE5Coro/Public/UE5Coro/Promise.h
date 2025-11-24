@@ -159,7 +159,7 @@ struct FLatentFinalSuspend final
 /** Fields of FPromise that may be alive after the coroutine is done. */
 struct [[nodiscard]] UE5CORO_API FPromiseExtras
 {
-#if UE5CORO_DEBUG
+#if UE5CORO_DEBUG || UE5CORO_ENABLE_COROUTINE_TRACKING
 	int DebugID = -1;
 	const TCHAR* DebugPromiseType = nullptr;
 	const TCHAR* DebugName = nullptr;
@@ -216,6 +216,7 @@ extern thread_local FPromise* GCurrentPromise;
 class [[nodiscard]] UE5CORO_API FPromise
 {
 	friend void TCoroutine<>::SetDebugName(const TCHAR*);
+	friend Debug::FUE5CoroCategory;
 
 	FCancellationTracker CancellationTracker;
 
@@ -287,6 +288,7 @@ public:
 class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
 {
 	friend FLatentFinalSuspend;
+	friend Debug::FUE5CoroCategory;
 	friend Test::FTestHelper;
 
 	static int UUID;
@@ -303,6 +305,7 @@ class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
 
 	void CreateLatentAction(const UObject*);
 	void CreateLatentAction(const FLatentActionInfo&);
+	UObject* GetCallbackTarget() const;
 
 protected:
 	explicit FLatentPromise(std::shared_ptr<FPromiseExtras>, const auto&...);

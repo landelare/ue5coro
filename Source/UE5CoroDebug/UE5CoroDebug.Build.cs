@@ -29,57 +29,32 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
+using UnrealBuildTool;
 
-#include "CoreMinimal.h"
-#include "UE5Coro/Definition.h"
-#include "UE5Coro/Private.h"
-
-namespace UE5Coro::Private::Debug
+public class UE5CoroDebug : UE5CoroModuleRules
 {
-/** These utilities are sometimes used to debug UE5Coro itself. */
-#define UE5CORO_PRIVATE_USE_DEBUG_ALLOCATOR 0
+	/// <summary>
+	/// If set to <see langword="true" /> from a Target.cs, the
+	/// <c>|conditional</c> text format modifier is made available globally.
+	/// It is recommended to either enable this in every Target.cs, or none of them.
+	/// </summary>
+	/// <remarks>
+	/// Ordinarily, a longer alias is used internally, which is removed from
+	/// Shipping builds.
+	/// </remarks>
+	public static bool bRegisterConditionalTextFormatArgumentModifier = false;
 
-#if UE5CORO_DEBUG
-constexpr int GMaxEvents = 100;
-constexpr bool bLogThread = false;
+	public UE5CoroDebug(ReadOnlyTargetRules Target)
+		: base(Target)
+	{
+		PrivateDependencyModuleNames.AddRange(new[]
+		{
+			"UE5Coro",
+		});
 
-struct FThreadedEventLogEntry
-{
-	const char* Message;
-	uint32 Thread;
-	FThreadedEventLogEntry(const char* Message = nullptr)
-		: Message(Message), Thread(FPlatformTLS::GetCurrentThreadId()) { }
-};
-using FEventLogEntry = std::conditional_t<bLogThread,
-                                          FThreadedEventLogEntry, const char*>;
-extern UE5CORO_API FEventLogEntry GEventLog[GMaxEvents];
-extern UE5CORO_API std::atomic<int> GNextEvent;
+		if (bRegisterConditionalTextFormatArgumentModifier)
+			PrivateDefinitions.Add("UE5CORO_PRIVATE_REGISTER_SHORT_MODIFIER");
 
-extern UE5CORO_API std::atomic<int> GLastDebugID;
-extern UE5CORO_API std::atomic<int> GActiveCoroutines;
-
-inline void ClearEvents()
-{
-	std::ranges::fill(GEventLog, FEventLogEntry());
-	GNextEvent = 0;
-}
-
-void Use(auto&&)
-{
-}
-
-#define UE5CORO_PRIVATE_DEBUG_EVENT(...) do { \
-	namespace D = ::UE5Coro::Private::Debug; \
-	D::GEventLog[D::GNextEvent++] = #__VA_ARGS__; \
-	FPlatformMisc::MemoryBarrier(); } while (false)
-#endif
-
-#if UE5CORO_ENABLE_COROUTINE_TRACKING
-extern UE5CORO_API UE::FMutex GTrackerLock;
-extern UE5CORO_API TSet<FPromise*> GPromises;
-
-void TrackPromise(FPromise*);
-void ForgetPromise(FPromise*);
-#endif
+		SetupGameplayDebuggerSupport(Target, bAddAsPublicDependency: true);
+	}
 }
