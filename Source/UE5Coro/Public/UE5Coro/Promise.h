@@ -110,6 +110,9 @@ struct UE5CORO_API FCoroutineScope final
 {
 	FPromise* Promise;
 	FPromise* PreviousPromise;
+	bool bHasWorld = false;
+	UWorld* World;
+	UWorld* PreviousWorld;
 
 	explicit FCoroutineScope(FPromise*);
 	~FCoroutineScope();
@@ -212,10 +215,17 @@ public:
 };
 
 extern thread_local FPromise* GCurrentPromise;
+UE5CORO_API extern UWorldProxy GCurrentCoroWorld;
+inline UWorld* GetBestWorld()
+{
+	// Must be called from the game thread, this is guarded by a checkSlow
+	return IsValid(GCurrentCoroWorld) ? GCurrentCoroWorld : GWorld;
+}
 
 class [[nodiscard]] UE5CORO_API FPromise
 {
 	friend void TCoroutine<>::SetDebugName(const TCHAR*);
+	friend FCoroutineScope;
 	friend Debug::FUE5CoroCategory;
 
 	FCancellationTracker CancellationTracker;
@@ -239,6 +249,7 @@ protected:
 public:
 	static FPromise& Current();
 	UE::FMutex& GetLock();
+	virtual UWorld* GetWorld() const; // nullptr if not associated with a world
 
 	[[nodiscard]] bool RegisterCancelableAwaiter(void*);
 	template<bool bLock> [[nodiscard]] bool UnregisterCancelableAwaiter();
@@ -314,6 +325,7 @@ protected:
 	virtual void ThreadSafeDestroy() final override;
 
 public:
+	virtual UWorld* GetWorld() const override;
 	virtual void Resume() override;
 	void LatentActionDestroyed();
 	void CancelFromWithin();

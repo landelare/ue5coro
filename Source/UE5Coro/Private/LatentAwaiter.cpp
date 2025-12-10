@@ -96,7 +96,7 @@ FLatentAwaiter::FLatentAwaiter(void* State, bool (*Resume)(void*, bool),
                                auto WorldSensitive) noexcept(!UE5CORO_DEBUG)
 	: State(State), Resume(Resume)
 #if UE5CORO_DEBUG
-	, OriginalWorld(WorldSensitive.value ? GWorld : nullptr)
+	, OriginalWorld(WorldSensitive.value ? GetBestWorld() : nullptr)
 #endif
 {
 	checkf(IsInGameThread(),
@@ -142,7 +142,7 @@ bool FLatentAwaiter::ShouldResume()
 	// If you hit this ensure, the awaiter will probably misbehave.
 	// Use an async awaiter instead (if possible), or ensure that the co_await
 	// finishes before changing worlds by, e.g., canceling its coroutine.
-	ensureMsgf(!OriginalWorld || OriginalWorld == GWorld,
+	ensureMsgf(!OriginalWorld || OriginalWorld == GetBestWorld(),
 	           TEXT("World changed since awaiter creation"));
 #endif
 	return (*Resume)(State, false);
@@ -152,15 +152,16 @@ void FLatentAwaiter::Suspend(FAsyncPromise& Promise)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	checkf(::IsValid(GWorld),
+	auto* World = GetBestWorld();
+	checkf(::IsValid(World),
 	       TEXT("Awaiting this can only be done in the context of a valid world"));
 
 	// Prepare a latent action on the subsystem and transfer ownership to that
-	auto* Sys = GWorld->GetSubsystem<UUE5CoroSubsystem>();
+	auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
 	auto* Latent = new FPendingAsyncCoroutine(Promise, *this);
 	auto LatentInfo = Sys->MakeLatentInfo();
-	GWorld->GetLatentActionManager().AddNewAction(LatentInfo.CallbackTarget,
-	                                              LatentInfo.UUID, Latent);
+	World->GetLatentActionManager().AddNewAction(LatentInfo.CallbackTarget,
+	                                             LatentInfo.UUID, Latent);
 }
 
 void FLatentAwaiter::Suspend(FLatentPromise& Promise)

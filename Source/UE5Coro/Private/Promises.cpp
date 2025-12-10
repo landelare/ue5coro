@@ -242,6 +242,12 @@ void FLatentPromise::ThreadSafeDestroy()
 	       TEXT("Internal error: latent exit reason not restored"));
 }
 
+UWorld* FLatentPromise::GetWorld() const
+{
+	std::ignore = FPromise::GetWorld(); // Run debug checks
+	return World.Get();
+}
+
 void FLatentPromise::Resume()
 {
 	// Is the latent action gone, but ownership extended?

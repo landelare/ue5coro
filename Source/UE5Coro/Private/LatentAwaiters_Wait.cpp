@@ -46,14 +46,15 @@ bool WaitUntilFrame(void* State, bool)
 template<auto GetTime>
 bool WaitUntilTime(void* State, bool bCleanup)
 {
-	// Don't attempt to access GWorld in this case, it could be nullptr
+	// Don't attempt to access a world in this case, it could be nullptr
 	if (bCleanup) [[unlikely]]
 		return false;
 
 	auto& TargetTime = reinterpret_cast<double&>(State);
-	checkf(IsValid(GWorld),
+	auto* World = GetBestWorld();
+	checkf(IsValid(World),
 	       TEXT("Internal error: latent poll outside of a valid world"));
-	return (GWorld->*GetTime)() >= TargetTime;
+	return (World->*GetTime)() >= TargetTime;
 }
 
 bool WaitUntilPredicate(void* State, bool bCleanup)
@@ -79,13 +80,14 @@ FLatentAwaiter GenericUntil(double Time)
 #endif
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
-	checkf(IsValid(GWorld),
+	auto* World = GetBestWorld();
+	checkf(IsValid(World),
 	       TEXT("This function may only be used in the context of a valid world"));
 
 	if constexpr (bTimeIsOffset)
-		Time += (GWorld->*GetTime)();
+		Time += (World->*GetTime)();
 
-	ensureMsgf((GWorld->*GetTime)() <= Time,
+	ensureMsgf((World->*GetTime)() <= Time,
 	           TEXT("Latent wait will finish immediately"));
 
 	// Definition.h validates that a double fits into a void*
@@ -115,11 +117,12 @@ struct FCustomTimeDilationAwaiter::TState : FCustomTimeDilationAwaiterState
 #endif
 		checkf(IsInGameThread(),
 		       TEXT("Latent awaiters may only be used on the game thread"));
-		checkf(::IsValid(GWorld),
+		auto* World = GetBestWorld();
+		checkf(::IsValid(World),
 		       TEXT("This awaiter may only be used in the context of a valid world"));
 		Actor = InActor;
 		Remaining = InRemaining;
-		PreviousTime = (GWorld->*GetTime)();
+		PreviousTime = (World->*GetTime)();
 	}
 
 	static bool ShouldResume(void* State, bool bCleanup)
@@ -135,9 +138,10 @@ struct FCustomTimeDilationAwaiter::TState : FCustomTimeDilationAwaiterState
 		if (!Actor)
 			return true;
 
-		checkf(::IsValid(GWorld),
+		auto* World = GetBestWorld();
+		checkf(::IsValid(World),
 		       TEXT("Internal error: latent poll outside of a valid world"));
-		auto Time = (GWorld->*GetTime)();
+		auto Time = (World->*GetTime)();
 		auto DeltaSeconds = Time - std::exchange(This->PreviousTime, Time);
 		DeltaSeconds *= Actor->CustomTimeDilation;
 		This->Remaining -= DeltaSeconds;

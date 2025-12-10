@@ -82,10 +82,11 @@ struct FLatentChain<true, bInfo, Type, Types...>
 {
 	static void Call(auto&& Fn, FLatentActionInfo LatentInfo, auto&&... Args)
 	{
-		checkf(IsValid(GWorld),
+		auto* World = GetBestWorld();
+		checkf(IsValid(World),
 		       TEXT("Could not chain latent action: no valid world found"));
 		FLatentChain<false, bInfo, Types...>::Call(
-			std::bind_front(std::forward<decltype(Fn)>(Fn), &*GWorld),
+			std::bind_front(std::forward<decltype(Fn)>(Fn), World),
 			std::move(LatentInfo),
 			std::forward<decltype(Args)>(Args)...);
 	}
@@ -160,15 +161,16 @@ Private::FLatentChainAwaiter ChainEx(auto&& Function, auto&&... Args)
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent awaiters may only be used on the game thread"));
+	auto* World = Private::GetBestWorld();
 	if constexpr ((... || (std::is_placeholder_v<std::decay_t<decltype(Args)>> == 1)))
-		checkf(IsValid(GWorld),
+		checkf(IsValid(World),
 		       TEXT("Could not chain latent action: no valid world found for _1"));
 	static_assert((... || (std::is_placeholder_v<std::decay_t<decltype(Args)>> == 2)),
 	              "The _2 parameter for LatentInfo is mandatory");
 
 	auto [LatentInfo, Done] = Private::MakeLatentInfo();
 	std::bind(std::forward<decltype(Function)>(Function),
-	          std::forward<decltype(Args)>(Args)...)(&*GWorld, LatentInfo);
+	          std::forward<decltype(Args)>(Args)...)(World, LatentInfo);
 	return Private::FLatentChainAwaiter(Done);
 }
 }

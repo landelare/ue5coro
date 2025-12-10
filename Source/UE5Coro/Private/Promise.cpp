@@ -35,18 +35,33 @@
 using namespace UE5Coro::Private;
 
 thread_local FPromise* UE5Coro::Private::GCurrentPromise = nullptr;
+UWorldProxy UE5Coro::Private::GCurrentCoroWorld;
 thread_local bool UE5Coro::Private::GDestroyedEarly = false;
 
 FCoroutineScope::FCoroutineScope(FPromise* Promise)
 	: Promise(Promise),
 	  PreviousPromise(std::exchange(GCurrentPromise, Promise))
 {
+	if (IsInGameThread())
+		if (auto* PromiseWorld = Promise->GetWorld())
+		{
+			bHasWorld = true;
+			World = PromiseWorld;
+			PreviousWorld = std::exchange(GCurrentCoroWorld, World);
+		}
 }
 
 FCoroutineScope::~FCoroutineScope()
 {
 	verifyf(std::exchange(GCurrentPromise, PreviousPromise) == Promise,
 	        TEXT("Internal error: coroutine tracking derailed"));
+	if (bHasWorld)
+	{
+		checkf(IsInGameThread(),
+		       TEXT("Internal error: unexpected cross-thread world scope"));
+		verifyf(std::exchange(GCurrentCoroWorld, PreviousWorld) == World,
+		        TEXT("Internal error: world tracking derailed"));
+	}
 }
 
 bool FPromiseExtras::IsComplete() const
@@ -142,6 +157,13 @@ FPromise& FPromise::Current()
 UE::FMutex& FPromise::GetLock()
 {
 	return Extras->Lock;
+}
+
+UWorld* FPromise::GetWorld() const
+{
+	checkf(IsInGameThread(), TEXT("Internal error: attempted to read coroutine "
+	                              "world from outside the game thread"));
+	return nullptr;
 }
 
 bool FPromise::RegisterCancelableAwaiter(void* Awaiter)
