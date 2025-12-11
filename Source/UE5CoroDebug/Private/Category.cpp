@@ -61,7 +61,8 @@ void FUE5CoroCategory::InitLocalization()
 {
 	// Compile text formats after the modifier has been registered
 	CoroutineInfoFormatAsync = LOCTEXT("CoroutineInfoAsync",
-		"Async #{ID}{Name}|ue5coro_conditional( \"{Name}\")");
+		"Async #{ID}{Name}|ue5coro_conditional( \"{Name}\")"
+		"{Ticking}|ue5coro_conditional( [Ticking])");
 	CoroutineInfoFormatLatent = LOCTEXT("CoroutineInfoLatent",
 		"Latent #{ID}{Name}|ue5coro_conditional( \"{Name}\")"
 		"{Object}|ue5coro_conditional( on {Object})"
@@ -90,9 +91,14 @@ void FUE5CoroCategory::CollectData(APlayerController* PlayerController,
 
 		FText CoroInfo;
 		if (FCString::Strcmp(Extras->DebugPromiseType, TEXT("Latent")))
+		{
+			auto* AsyncPromise = static_cast<FAsyncPromise*>(Promise);
+			bool bTicking = GTickingAsyncPromises.Contains(AsyncPromise);
 			CoroInfo = FText::FormatNamed(CoroutineInfoFormatAsync,
 				TEXT("ID"), Extras->DebugID,
-				TEXT("Name"), FText::FromString(Extras->DebugName));
+				TEXT("Name"), FText::FromString(Extras->DebugName),
+				TEXT("Ticking"), bTicking);
+		}
 		else
 		{
 			auto* LatentPromise = static_cast<FLatentPromise*>(Promise);

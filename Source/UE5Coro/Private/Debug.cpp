@@ -45,6 +45,7 @@ std::atomic<int> Debug::GActiveCoroutines = 0;
 #if UE5CORO_ENABLE_COROUTINE_TRACKING
 UE::FMutex Debug::GTrackerLock;
 TSet<FPromise*> Debug::GPromises;
+TSet<FAsyncPromise*> Debug::GTickingAsyncPromises;
 
 void Debug::TrackPromise(FPromise* Promise)
 {
@@ -56,5 +57,17 @@ void Debug::ForgetPromise(FPromise* Promise)
 {
 	UE::TUniqueLock Lock(GTrackerLock);
 	GPromises.Remove(Promise);
+}
+
+void Debug::TrackTickingAsyncPromise(FAsyncPromise* Promise)
+{
+	UE::TUniqueLock Lock(GTrackerLock);
+	GTickingAsyncPromises.Add(Promise);
+}
+
+void Debug::ForgetTickingAsyncPromise(FAsyncPromise* Promise)
+{
+	UE::TUniqueLock Lock(GTrackerLock);
+	GTickingAsyncPromises.Remove(Promise);
 }
 #endif

@@ -78,8 +78,11 @@ void Use(auto&&)
 #if UE5CORO_ENABLE_COROUTINE_TRACKING
 extern UE5CORO_API UE::FMutex GTrackerLock;
 extern UE5CORO_API TSet<FPromise*> GPromises;
+extern UE5CORO_API TSet<FAsyncPromise*> GTickingAsyncPromises;
 
 void TrackPromise(FPromise*);
 void ForgetPromise(FPromise*);
+void TrackTickingAsyncPromise(FAsyncPromise*);
+void ForgetTickingAsyncPromise(FAsyncPromise*);
 #endif
 }

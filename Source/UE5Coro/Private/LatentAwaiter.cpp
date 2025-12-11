@@ -31,6 +31,7 @@
 
 #include "UE5Coro/LatentAwaiter.h"
 #include "LatentActions.h"
+#include "UE5Coro/Debug.h"
 #include "UE5Coro/Promise.h"
 #include "UE5Coro/UE5CoroSubsystem.h"
 
@@ -48,6 +49,9 @@ public:
 	                       const FLatentAwaiter& InAwaiter)
 		: Promise(&Promise), Awaiter(InAwaiter)
 	{
+#if UE5CORO_ENABLE_COROUTINE_TRACKING
+		Debug::TrackTickingAsyncPromise(&Promise);
+#endif
 	}
 
 	UE_NONCOPYABLE(FPendingAsyncCoroutine);
@@ -63,6 +67,9 @@ public:
 			UE::TUniqueLock Lock(Promise->GetLock());
 			Promise->Cancel(false);
 		}
+#if UE5CORO_ENABLE_COROUTINE_TRACKING
+		Debug::ForgetTickingAsyncPromise(Promise);
+#endif
 		Promise->Resume(); // The latent action ended, which is a kind of result
 	}
 
@@ -76,6 +83,9 @@ public:
 			Response.DoneIf(true);
 
 			// Ownership moves back to the coroutine itself
+#if UE5CORO_ENABLE_COROUTINE_TRACKING
+			Debug::ForgetTickingAsyncPromise(Promise);
+#endif
 			std::exchange(Promise, nullptr)->Resume();
 		}
 	}
