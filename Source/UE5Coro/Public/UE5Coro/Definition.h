@@ -35,6 +35,7 @@
 #define UE5CORO_DEBUG (UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT)
 #endif
 
+// Don't edit this, see Docs/GameplayDebugger.md for instructions
 #ifndef UE5CORO_ENABLE_COROUTINE_TRACKING
 #define UE5CORO_ENABLE_COROUTINE_TRACKING 0
 #endif

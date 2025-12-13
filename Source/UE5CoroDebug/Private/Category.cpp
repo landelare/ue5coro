@@ -218,7 +218,8 @@ void FUE5CoroCategory::DrawData(APlayerController* PlayerController,
 	}
 #else
 	Canvas.Print(FColor::Red, LOCTEXT("NoCoroutineTracking",
-		"Debugger unavailable: UE5Coro was not built with coroutine tracking."
+		"Debugger unavailable: UE5Coro was not built with coroutine tracking.\n"
+		"See the Gameplay Debugger page of the documentation on how to enable it."
 	).ToString());
 #endif
 }
