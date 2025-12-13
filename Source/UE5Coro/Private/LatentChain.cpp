@@ -40,6 +40,8 @@ std::tuple<FLatentActionInfo, FTwoLives*> Private::MakeLatentInfo()
 	auto* World = GetBestWorld();
 	checkf(IsValid(World), TEXT("Internal error: unguarded world access"));
 	auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
+	checkf(::IsValid(Sys), TEXT("This functionality may not be used when the "
+	                            "world is not fully initialized"));
 	// Will be Released by the FLatentAwaiter from the caller
 	// and UUE5CoroSubsystem on the latent action's completion.
 	auto* Done = new FTwoLives;

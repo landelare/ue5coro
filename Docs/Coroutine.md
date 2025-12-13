@@ -111,6 +111,11 @@ Class member functions are also responsible for tracking the lifetime of their
 objects: resuming a coroutine on a deleted object is just as bad as calling a
 function on one if it attempts to access `this`.
 
+> [!WARNING]
+> Manual lifetime management with C++ coroutines is extremely difficult.
+> Latent mode, non-static UCLASS member coroutines are recommended, even for
+> multithreading.
+
 BlueprintCallable and/or BlueprintPure coroutine UFUNCTIONs in async mode will
 synchronously continue BP execution at the first co_await or co_return, and the
 rest of the coroutine will execute independently.
@@ -129,6 +134,7 @@ valid.
 In this case, attempt to move the co_await to a different point in time, use an
 async equivalent to the affected latent awaiter, if available, or change the
 coroutine's execution mode to latent.
+Failing to do so might result in undefined behavior.
 
 Most of the memory associated with a coroutine is freed when control leaves the
 coroutine body, either explicitly via co_return, or implicitly, by falling off

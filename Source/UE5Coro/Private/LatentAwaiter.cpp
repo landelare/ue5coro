@@ -158,6 +158,8 @@ void FLatentAwaiter::Suspend(FAsyncPromise& Promise)
 
 	// Prepare a latent action on the subsystem and transfer ownership to that
 	auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
+	checkf(::IsValid(Sys), TEXT("Latent awaiters may not be used when the "
+	                            "world is not fully initialized"));
 	auto* Latent = new FPendingAsyncCoroutine(Promise, *this);
 	auto LatentInfo = Sys->MakeLatentInfo();
 	World->GetLatentActionManager().AddNewAction(LatentInfo.CallbackTarget,
