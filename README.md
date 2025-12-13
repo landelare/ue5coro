@@ -158,6 +158,8 @@ coroutines.
 * [Aggregate awaiters](Docs/Aggregate.md) (WhenAny, WhenAll, Race...)
 * [Latent timelines](Docs/LatentTimeline.md) (smooth interpolation on tick)
 * [Threading primitives](Docs/Threading.md) (semaphores, events...)
+* [Gameplay Debugger](Docs/GameplayDebugger.md) integration and
+  [localization](Docs/GameplayDebugger.md#the-conditional-modifier) tools
 
 # Installation
 
