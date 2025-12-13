@@ -44,10 +44,14 @@ class FUE5CoroCategory : public FGameplayDebuggerCategory
 	{
 		void Serialize(FArchive& Ar);
 
+		FText ExcludedActorHeader;
 		TArray<FText> RunningCoroutines;
+		TArray<FText> RunningCoroutinesOnTarget;
 		int HiddenCoroutines = 0;
+		int HiddenCoroutinesOnTarget = 0;
 	} DataPack;
 
+	static FTextFormat ExcludedActorFormat;
 	static FTextFormat CoroutineInfoFormatAsync;
 	static FTextFormat CoroutineInfoFormatLatent;
 	static FTextFormat HiddenCoroutinesFormat;

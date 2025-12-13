@@ -31,6 +31,7 @@
 
 #if WITH_GAMEPLAY_DEBUGGER_MENU
 #include "Category.h"
+#include "Engine/Font.h"
 #include "UE5Coro.h"
 
 #define LOCTEXT_NAMESPACE "UE5Coro"
@@ -40,15 +41,23 @@ namespace UE5Coro::Private::Debug
 TAutoConsoleVariable<int> CVarMaxDisplayedCoroutines(
 	TEXT("UE5Coro.MaxDisplayedCoroutines"), 20,
 	TEXT("Show at most this many coroutines in the Gameplay Debugger."));
+TAutoConsoleVariable<int> CVarMaxDisplayedCoroutinesOnTarget(
+	TEXT("UE5Coro.MaxDisplayedCoroutinesOnTarget"), 5,
+	TEXT("Show at most this many coroutines above the selected actor in the "
+	     "Gameplay Debugger."));
 
+FTextFormat FUE5CoroCategory::ExcludedActorFormat;
 FTextFormat FUE5CoroCategory::CoroutineInfoFormatAsync;
 FTextFormat FUE5CoroCategory::CoroutineInfoFormatLatent;
 FTextFormat FUE5CoroCategory::HiddenCoroutinesFormat;
 
 void FUE5CoroCategory::FDataPack::Serialize(FArchive& Ar)
 {
+	Ar << ExcludedActorHeader;
 	Ar << RunningCoroutines;
+	Ar << RunningCoroutinesOnTarget;
 	Ar << HiddenCoroutines;
+	Ar << HiddenCoroutinesOnTarget;
 }
 
 FUE5CoroCategory::FUE5CoroCategory()
@@ -60,6 +69,8 @@ FUE5CoroCategory::FUE5CoroCategory()
 void FUE5CoroCategory::InitLocalization()
 {
 	// Compile text formats after the modifier has been registered
+	ExcludedActorFormat = LOCTEXT("ExcludedActor",
+		"Running coroutines, excluding {Actor}:");
 	CoroutineInfoFormatAsync = LOCTEXT("CoroutineInfoAsync",
 		"Async #{ID}{Name}|ue5coro_conditional( \"{Name}\")"
 		"{Ticking}|ue5coro_conditional( [Ticking])");
@@ -77,42 +88,74 @@ void FUE5CoroCategory::CollectData(APlayerController* PlayerController,
 	Super::CollectData(PlayerController, Actor);
 
 #if UE5CORO_ENABLE_COROUTINE_TRACKING
-	int LinesLeft = CVarMaxDisplayedCoroutines.GetValueOnGameThread();
+	int MaxLines = CVarMaxDisplayedCoroutines.GetValueOnGameThread();
+	int MaxLinesOnTarget =
+		CVarMaxDisplayedCoroutinesOnTarget.GetValueOnGameThread();
+	int OverflowLines = 0;
+	int OverflowLinesOnTarget = 0;
 
 	DataPack = {};
+	if (Actor)
+		DataPack.ExcludedActorHeader = FText::FormatNamed(ExcludedActorFormat,
+			TEXT("Actor"), FText::FromString(Actor->GetName()));
 
 	UE::TUniqueLock Lock(GTrackerLock);
 	for (FPromise* Promise : GPromises)
 	{
-		if (!LinesLeft--)
-			break;
+		// There is an early-return opportunity if there is no selected actor
+		if (!Actor && DataPack.RunningCoroutines.Num() == MaxLines)
+		{
+			DataPack.HiddenCoroutines = GPromises.Num() -
+			                            DataPack.RunningCoroutines.Num();
+			return;
+		}
 
 		auto* Extras = Promise->Extras.get();
 
-		FText CoroInfo;
 		if (FCString::Strcmp(Extras->DebugPromiseType, TEXT("Latent")))
 		{
 			auto* AsyncPromise = static_cast<FAsyncPromise*>(Promise);
 			bool bTicking = GTickingAsyncPromises.Contains(AsyncPromise);
-			CoroInfo = FText::FormatNamed(CoroutineInfoFormatAsync,
-				TEXT("ID"), Extras->DebugID,
-				TEXT("Name"), FText::FromString(Extras->DebugName),
-				TEXT("Ticking"), bTicking);
+			// Async coroutines are never associated with an actor
+			if (DataPack.RunningCoroutines.Num() < MaxLines)
+				DataPack.RunningCoroutines.Add(FText::FormatNamed(
+					CoroutineInfoFormatAsync,
+					TEXT("ID"), Extras->DebugID,
+					TEXT("Name"), FText::FromString(Extras->DebugName),
+					TEXT("Ticking"), bTicking));
+			else
+				++OverflowLines;
 		}
 		else
 		{
 			auto* LatentPromise = static_cast<FLatentPromise*>(Promise);
-			UObject* Target = LatentPromise->GetCallbackTarget();
-			CoroInfo = FText::FormatNamed(CoroutineInfoFormatLatent,
-				TEXT("ID"), Extras->DebugID,
-				TEXT("Name"), FText::FromString(Extras->DebugName),
-				TEXT("Object"), FText::FromString(Target->GetName()),
-				TEXT("Detached"), !LatentPromise->IsOnGameThread());
+			if (UObject* Target = LatentPromise->GetCallbackTarget();
+			    Actor && Actor == Target)
+			{
+				if (DataPack.RunningCoroutinesOnTarget.Num() < MaxLinesOnTarget)
+					DataPack.RunningCoroutinesOnTarget.Add(FText::FormatNamed(
+						CoroutineInfoFormatLatent,
+						TEXT("ID"), Extras->DebugID,
+						TEXT("Name"), FText::FromString(Extras->DebugName),
+						TEXT("Object"), false, // It's shown on the object
+						TEXT("Detached"), !LatentPromise->IsOnGameThread()));
+				else
+					++OverflowLinesOnTarget;
+			}
+			else if (DataPack.RunningCoroutines.Num() < MaxLines)
+				DataPack.RunningCoroutines.Add(FText::FormatNamed(
+					CoroutineInfoFormatLatent,
+					TEXT("ID"), Extras->DebugID,
+					TEXT("Name"), FText::FromString(Extras->DebugName),
+					TEXT("Object"), FText::FromString(Target->GetName()),
+					TEXT("Detached"), !LatentPromise->IsOnGameThread()));
+			else
+				++OverflowLines;
 		}
-		DataPack.RunningCoroutines.Add(std::move(CoroInfo));
 	}
-	DataPack.HiddenCoroutines =
-		FMath::Max(0, GPromises.Num() - DataPack.RunningCoroutines.Num());
+
+	DataPack.HiddenCoroutines = OverflowLines;
+	DataPack.HiddenCoroutinesOnTarget = OverflowLinesOnTarget;
 #endif
 }
 
@@ -122,11 +165,43 @@ void FUE5CoroCategory::DrawData(APlayerController* PlayerController,
 	Super::DrawData(PlayerController, Canvas);
 
 #if UE5CORO_ENABLE_COROUTINE_TRACKING
+	if (!DataPack.ExcludedActorHeader.IsEmpty())
+		Canvas.Print(DataPack.ExcludedActorHeader.ToString());
 	for (const auto& CoroInfo : DataPack.RunningCoroutines)
 		Canvas.Print(CoroInfo.ToString());
 	if (DataPack.HiddenCoroutines)
 		Canvas.Print(FText::FormatNamed(HiddenCoroutinesFormat,
 			TEXT("Count"), DataPack.HiddenCoroutines).ToString());
+
+	if (auto* Actor = FindLocalDebugActor())
+	{
+		// Match FGameplayDebuggerCategory_AI's overhead text style...
+		auto OverheadCanvas = Canvas;
+		OverheadCanvas.Font = GEngine->GetSmallFont();
+		OverheadCanvas.FontRenderInfo.bEnableShadow = true;
+
+		auto Location = OverheadCanvas.ProjectLocation(
+			Actor->GetActorLocation() +
+			FVector(0, 0, Actor->GetSimpleCollisionHalfHeight()));
+		// ... and its line offset
+		Location.Y += OverheadCanvas.GetLineHeight() * 0.2f;
+
+		auto Print = [&](const FText& Text)
+		{
+			const auto& String = Text.ToString();
+			float Width, Height;
+			OverheadCanvas.MeasureString(String, Width, Height);
+			OverheadCanvas.PrintAt(Location.X - Width / 2,
+			                       Location.Y - Height / 2, String);
+			Location.Y += OverheadCanvas.GetLineHeight();
+		};
+
+		for (const auto& CoroInfo : DataPack.RunningCoroutinesOnTarget)
+			Print(CoroInfo);
+		if (DataPack.HiddenCoroutinesOnTarget)
+			Print(FText::FormatNamed(HiddenCoroutinesFormat,
+				TEXT("Count"), DataPack.HiddenCoroutinesOnTarget));
+	}
 #else
 	Canvas.Print(FColor::Red, LOCTEXT("NoCoroutineTracking",
 		"Debugger unavailable: UE5Coro was not built with coroutine tracking."
