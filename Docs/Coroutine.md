@@ -503,14 +503,44 @@ Cancellation has [its own documentation page](Cancellation.md).
 
 ## Miscellaneous features
 
-### static void TCoroutine\<\>::SetDebugName(const TCHAR* Name)
+### static void TCoroutine\<\>::SetDebugName(FString Name)
 
-When called from within a coroutine, attaches a debug name to the
-currently-executing coroutine, which will be displayed by UE5Coro.natvis.
-This function does nothing in Shipping builds, so calls to it with TEXT literals
-are OK to leave in if you don't want to #ifdef/macro its use.
+When called from within a coroutine returning TCoroutine, attaches a debug name
+to the currently-executing coroutine, which will be displayed by UE5Coro.natvis,
+and the UE5Coro [gameplay debugger](GameplayDebugger.md).
+This function does nothing in Shipping builds by default, but it will activate
+if [coroutine tracking](GameplayDebugger.md#setup) is enabled.
 
-Behavior is undefined if this is called from outside a coroutine.
+Calling SetDebugName from outside a coroutine is undefined behavior.
+
+Examples:
+
+```c++
+// UE5Coro intentionally does not provide macros like these,
+// but feel free to define your own!
+#define MY_SET_COROUTINE_FUNCTION_NAME() do if constexpr (UE5CORO_DEBUG)       \
+    ::UE5Coro::TCoroutine<>::SetDebugName(TEXT("") __FUNCTION__); while (false)
+#define MY_FORMAT_COROUTINE_NAME(Fmt, ...) do if constexpr (UE5CORO_DEBUG)     \
+    ::UE5Coro::TCoroutine<>::SetDebugName(FString::Format(TEXT(Fmt),           \
+                                          {__VA_ARGS__})); while (false)
+
+using namespace UE5Coro;
+
+TCoroutine<> Example()
+{
+    MY_SET_COROUTINE_FUNCTION_NAME();
+    co_await Latent::Seconds(1);
+}
+
+TCoroutine<> DynamicExample()
+{
+    for (int i = 0; i < 100; ++i)
+    {
+        MY_FORMAT_COROUTINE_NAME("DynamicExample {0}% complete", i);
+        co_await Latent::Seconds(0.01);
+    }
+}
+```
 
 ### TCoroutine::operator==, TCoroutine::operator<=>, GetTypeHash, std::hash
 

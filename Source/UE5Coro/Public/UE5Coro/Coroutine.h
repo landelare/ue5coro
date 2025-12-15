@@ -113,8 +113,9 @@ public:
 
 	/** Sets a debug name for the currently-executing coroutine.
 	 *  Only valid to call from within a coroutine returning TCoroutine.
-	 *  Has no effect in release/shipping builds. */
-	static void SetDebugName(const TCHAR* Name);
+	 *  Has no effect in release/shipping builds by default, but it's
+	 *  recommended to avoid evaluating its argument for best performance. */
+	static void SetDebugName(FString Name);
 
 	/** Returns true if the two objects refer to the same coroutine invocation. */
 	[[nodiscard]] bool operator==(const TCoroutine&) const noexcept;

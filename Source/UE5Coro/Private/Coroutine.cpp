@@ -63,12 +63,12 @@ bool TCoroutine<>::WasSuccessful() const noexcept
 	return Extras->bWasSuccessful;
 }
 
-void TCoroutine<>::SetDebugName(const TCHAR* Name)
+void TCoroutine<>::SetDebugName(FString Name)
 {
-#if UE5CORO_DEBUG
+#if UE5CORO_DEBUG || UE5CORO_ENABLE_COROUTINE_TRACKING
 	if (ensureMsgf(GCurrentPromise,
 	               TEXT("Attempting to set a debug name outside a coroutine")))
-		GCurrentPromise->Extras->DebugName = Name;
+		GCurrentPromise->Extras->SetDebugName(std::move(Name));
 #endif
 }
 

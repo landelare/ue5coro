@@ -165,7 +165,13 @@ struct [[nodiscard]] UE5CORO_API FPromiseExtras
 #if UE5CORO_DEBUG || UE5CORO_ENABLE_COROUTINE_TRACKING
 	int DebugID = -1;
 	const TCHAR* DebugPromiseType = nullptr;
-	const TCHAR* DebugName = nullptr;
+	FString DebugName;
+	const TCHAR* DebugNamePtr = nullptr; // For debuggers
+	void SetDebugName(FString&& Name)
+	{
+		DebugName = std::move(Name);
+		DebugNamePtr = *DebugName;
+	}
 #endif
 
 	FEventRef Completed{EEventMode::ManualReset};
@@ -224,7 +230,7 @@ inline UWorld* GetBestWorld()
 
 class [[nodiscard]] UE5CORO_API FPromise
 {
-	friend void TCoroutine<>::SetDebugName(const TCHAR*);
+	friend void TCoroutine<>::SetDebugName(FString);
 	friend FCoroutineScope;
 	friend Debug::FUE5CoroCategory;
 
