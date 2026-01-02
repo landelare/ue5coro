@@ -14,10 +14,14 @@ only references the delegate, and allows callers to bind or unbind later.
 
 > [!CAUTION]
 > Do not chain functions that might call the delegate zero or multiple times.
->
 > Incoming callbacks after the first invoke undefined behavior, unless the
 > delegate is DYNAMIC or the chained function is guaranteed to honor
 > Unbind/Remove on the original delegate that is passed to it.
+>
+> For everything not supported by Async::Chain, or when its suitability or
+> safety is in doubt, there are safe
+> [generic workarounds](Implicit.md#generic-workarounds) that can be used
+> instead.
 
 A direct `co_await` should always be preferred over Async::Chain whenever
 possible.
@@ -28,10 +32,6 @@ of the bound delegate has something to call, even if the coroutine is already
 canceled.
 The cancellation will be processed right after the delegate is triggered, unless
 cancellation is blocked.
-
-For everything not supported by Async::Chain, or when its suitability or safety
-is in doubt, there are safe
-[generic workarounds](Implicit.md#generic-workarounds) that can be used instead.
 
 ### auto Chain(? (*Function)(?...), A&&... Args)
 ### auto Chain(T* Object, ? (T::*Function)(?...), A&&... Args)
