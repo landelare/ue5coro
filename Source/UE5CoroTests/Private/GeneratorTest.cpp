@@ -114,5 +114,24 @@ bool FGeneratorTest::RunTest(const FString& Parameters)
 		TestFalse("Moved from", static_cast<bool>(Count));
 	}
 
+	{
+		TGenerator<int> Gen;
+		TestFalse("Invalid", static_cast<bool>(Gen));
+		TestFalse("Invalid (UE)", static_cast<bool>(Gen.CreateIterator()));
+		TestEqual("Invalid (STL)", Gen.begin(), Gen.end());
+		TestFalse("Can't resume", Gen.Resume());
+	}
+
+	{
+		TGenerator<int> Gen1 = CountUp(3);
+		Gen1.Resume();
+		TestEqual("Resume 1", Gen1.Current(), 1);
+		TGenerator<int> Gen2 = std::move(Gen1);
+		TestFalse("Can't resume moved-from generator", Gen1.Resume());
+		TestEqual("Resume 1 moved", Gen2.Current(), 1);
+		Gen2.Resume();
+		TestEqual("Resume 2", Gen2.Current(), 2);
+	}
+
 	return true;
 }

@@ -61,6 +61,8 @@ private:
 		: Handle(Handle) { }
 
 public:
+	/** Initializes an empty generator that will yield no elements. */
+	TGenerator() = default;
 	TGenerator(const TGenerator&) = delete;
 	TGenerator(TGenerator&& Other) noexcept
 		: Handle(std::exchange(Other.Handle, nullptr)) { }

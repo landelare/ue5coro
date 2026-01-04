@@ -11,6 +11,12 @@ a TArray, as the values are generated and returned one at a time, on demand.
 Generators can also benefit from compiler
 [HALO](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1365r0.pdf).
 
+A default-constructed TGenerator will yield no elements, as if the generator was
+implemented as `{ co_return; }` (but more efficient).<br>
+Moving a generator transfers the coroutine's execution state between the two
+objects without affecting the coroutine itself.
+A moved-from TGenerator becomes identical to a default-constructed one.
+
 There are multiple ways to consume a TGenerator.
 It has methods for direct manipulation, and it provides a highly-efficient
 iterator that is only 1 pointer in size.
