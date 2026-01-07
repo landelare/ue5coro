@@ -164,7 +164,7 @@ struct [[nodiscard]] UE5CORO_API FPromiseExtras
 {
 #if UE5CORO_DEBUG || UE5CORO_ENABLE_COROUTINE_TRACKING
 	int DebugID = -1;
-	const TCHAR* DebugPromiseType = nullptr;
+	const TCHAR* DebugPromiseType = nullptr; // "Async", "Latent", or "Manual"
 	FString DebugName;
 	const TCHAR* DebugNamePtr = nullptr; // For debuggers
 	void SetDebugName(FString&& Name)

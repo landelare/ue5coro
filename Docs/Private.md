@@ -69,6 +69,12 @@ The ownership problem was solved by DetachFromGameThread, which will be
 Crossing over in the opposite direction is much more straightforward; it's
 handled by FPendingAsyncCoroutine (as opposed to FPendingLatentCoroutine).
 
+#### Manual coroutines
+
+Manual coroutines use FAsyncPromise, but they override its promise extras type
+to hold an extra FAwaitableEvent and a second atomic reference counter.
+This is to avoid having two std::shared_ptrs when one is enough.
+
 ### No awaiter base class
 
 This has some pretty obvious limitations, e.g., WhenAny/WhenAll cannot take

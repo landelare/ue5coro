@@ -54,6 +54,7 @@ class FUE5CoroCategory : public FGameplayDebuggerCategory
 	static FTextFormat ExcludedActorFormat;
 	static FTextFormat CoroutineInfoFormatAsync;
 	static FTextFormat CoroutineInfoFormatLatent;
+	static FTextFormat CoroutineInfoFormatManual;
 	static FTextFormat HiddenCoroutinesFormat;
 
 public:

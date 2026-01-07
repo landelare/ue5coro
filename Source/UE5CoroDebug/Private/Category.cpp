@@ -49,6 +49,7 @@ TAutoConsoleVariable<int> CVarMaxDisplayedCoroutinesOnTarget(
 FTextFormat FUE5CoroCategory::ExcludedActorFormat;
 FTextFormat FUE5CoroCategory::CoroutineInfoFormatAsync;
 FTextFormat FUE5CoroCategory::CoroutineInfoFormatLatent;
+FTextFormat FUE5CoroCategory::CoroutineInfoFormatManual;
 FTextFormat FUE5CoroCategory::HiddenCoroutinesFormat;
 
 void FUE5CoroCategory::FDataPack::Serialize(FArchive& Ar)
@@ -78,6 +79,8 @@ void FUE5CoroCategory::InitLocalization()
 		"Latent #{ID}{Name}|ue5coro_conditional( \"{Name}\")"
 		"{Object}|ue5coro_conditional( on {Object})"
 		"{Detached}|ue5coro_conditional( [Detached])");
+	CoroutineInfoFormatManual = LOCTEXT("CoroutineInfoManual",
+		"Manual #{ID}{Name}|ue5coro_conditional( \"{Name}\")");
 	HiddenCoroutinesFormat = LOCTEXT("HiddenCoroutines",
 		"({Count} more coroutine{Count}|plural(other=s) not shown)");
 }
@@ -112,45 +115,56 @@ void FUE5CoroCategory::CollectData(APlayerController* PlayerController,
 
 		auto* Extras = Promise->Extras.get();
 
-		if (FCString::Strcmp(Extras->DebugPromiseType, TEXT("Latent")))
+		switch (TCHAR First = Extras->DebugPromiseType[0])
 		{
-			auto* AsyncPromise = static_cast<FAsyncPromise*>(Promise);
-			bool bTicking = GTickingAsyncPromises.Contains(AsyncPromise);
-			// Async coroutines are never associated with an actor
-			if (DataPack.RunningCoroutines.Num() < MaxLines)
-				DataPack.RunningCoroutines.Add(FText::FormatNamed(
-					CoroutineInfoFormatAsync,
-					TEXT("ID"), Extras->DebugID,
-					TEXT("Name"), FText::FromString(Extras->DebugName),
-					TEXT("Ticking"), bTicking));
-			else
-				++OverflowLines;
-		}
-		else
-		{
-			auto* LatentPromise = static_cast<FLatentPromise*>(Promise);
-			if (UObject* Target = LatentPromise->GetCallbackTarget();
-			    Actor && Actor == Target)
+			case TEXT('A'): // Async
+			case TEXT('M'): // Manual
 			{
-				if (DataPack.RunningCoroutinesOnTarget.Num() < MaxLinesOnTarget)
-					DataPack.RunningCoroutinesOnTarget.Add(FText::FormatNamed(
+				auto* AsyncPromise = static_cast<FAsyncPromise*>(Promise);
+				bool bTicking = GTickingAsyncPromises.Contains(AsyncPromise);
+				// Async coroutines are never associated with an actor
+				if (DataPack.RunningCoroutines.Num() < MaxLines)
+					DataPack.RunningCoroutines.Add(FText::FormatNamed(
+						First == TEXT('A') ? CoroutineInfoFormatAsync
+						                   : CoroutineInfoFormatManual,
+						TEXT("ID"), Extras->DebugID,
+						TEXT("Name"), FText::FromString(Extras->DebugName),
+						TEXT("Ticking"), bTicking));
+				else
+					++OverflowLines;
+				break;
+			}
+			case TEXT('L'): // Latent
+			{
+				auto* LatentPromise = static_cast<FLatentPromise*>(Promise);
+				if (UObject* Target = LatentPromise->GetCallbackTarget();
+				    Actor && Actor == Target)
+				{
+					if (DataPack.RunningCoroutinesOnTarget.Num() <
+					    MaxLinesOnTarget)
+						DataPack.RunningCoroutinesOnTarget.Add(FText::FormatNamed(
+							CoroutineInfoFormatLatent,
+							TEXT("ID"), Extras->DebugID,
+							TEXT("Name"), FText::FromString(Extras->DebugName),
+							TEXT("Object"), false, // It's shown on the object
+							TEXT("Detached"), !LatentPromise->IsOnGameThread()));
+					else
+						++OverflowLinesOnTarget;
+				}
+				else if (DataPack.RunningCoroutines.Num() < MaxLines)
+					DataPack.RunningCoroutines.Add(FText::FormatNamed(
 						CoroutineInfoFormatLatent,
 						TEXT("ID"), Extras->DebugID,
 						TEXT("Name"), FText::FromString(Extras->DebugName),
-						TEXT("Object"), false, // It's shown on the object
+						TEXT("Object"), FText::FromString(Target->GetName()),
 						TEXT("Detached"), !LatentPromise->IsOnGameThread()));
 				else
-					++OverflowLinesOnTarget;
+					++OverflowLines;
+				break;
 			}
-			else if (DataPack.RunningCoroutines.Num() < MaxLines)
-				DataPack.RunningCoroutines.Add(FText::FormatNamed(
-					CoroutineInfoFormatLatent,
-					TEXT("ID"), Extras->DebugID,
-					TEXT("Name"), FText::FromString(Extras->DebugName),
-					TEXT("Object"), FText::FromString(Target->GetName()),
-					TEXT("Detached"), !LatentPromise->IsOnGameThread()));
-			else
-				++OverflowLines;
+			default:
+				check(!"Unexpected coroutine type");
+				break;
 		}
 	}
 
