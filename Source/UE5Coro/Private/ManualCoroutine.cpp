@@ -29,29 +29,59 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#ifndef UE5CORO_PRIVATE_ALLOW_DIRECT_INCLUDE
-#define UE5CORO_PRIVATE_ALLOW_DIRECT_INCLUDE
-#endif
-
-#include "UE5Coro/Definition.h"
-#include "UE5Coro/AggregateAwaiter.h"
-#include "UE5Coro/AnimationAwaiter.h"
-#include "UE5Coro/AsyncAwaiter.h"
-#include "UE5Coro/Cancellation.h"
-#include "UE5Coro/Coroutine.h"
-#include "UE5Coro/CoroutineAwaiter.h"
-#include "UE5Coro/Generator.h"
-#include "UE5Coro/HttpAwaiter.h"
-#include "UE5Coro/LatentAwaiter.h"
-#include "UE5Coro/LatentCallback.h"
-#include "UE5Coro/LatentTimeline.h"
 #include "UE5Coro/ManualCoroutine.h"
-#include "UE5Coro/Private.h"
-#include "UE5Coro/TaskAwaiter.h"
-#include "UE5Coro/TickTimeBudget.h"
-#include "UE5Coro/Threading.h"
-#include "UE5Coro/UnrealTypes.h"
 
-#undef UE5CORO_PRIVATE_ALLOW_DIRECT_INCLUDE
+using namespace UE5Coro;
+using namespace UE5Coro::Private;
+
+TManualCoroutine<void>::TManualCoroutine(FString DebugName)
+	: TCoroutine<>(TManualPromiseExtras<void>::Run(std::move(DebugName)))
+{
+	// Initial refcount is already set to 1
+}
+
+TManualCoroutine<void>::TManualCoroutine(const TManualCoroutine& Other)
+	: TCoroutine<>(Other)
+{
+	TManualPromiseExtras<void>::RawCast(Extras)->AddRef();
+}
+
+TManualCoroutine<void>::~TManualCoroutine()
+{
+	if (TManualPromiseExtras<void>::RawCast(Extras)->Release())
+		Cancel();
+}
+
+TManualCoroutine<void>& TManualCoroutine<void>::operator=(
+	const TManualCoroutine& Other)
+{
+	if (this == &Other)
+		return *this;
+	this->~TManualCoroutine();
+	return *new (this) TManualCoroutine(Other);
+}
+
+void TManualCoroutine<void>::SetResult()
+{
+	bool bSuccessful = TrySetResult();
+	ensureMsgf(bSuccessful, TEXT("The coroutine was already complete"));
+}
+
+bool TManualCoroutine<void>::TrySetResult()
+{
+	auto ExtrasT = TManualPromiseExtras<void>::SharedCast(Extras);
+	auto& Lock = ExtrasT->Lock;
+	Lock.Lock(); // Block incoming cancellations
+	if (!ExtrasT->IsComplete())
+	{
+		Lock.Unlock();
+		ExtrasT->Event.Trigger(); // Might delete this if the coroutine cleans up
+		// Success is synchronous, cancellation isn't
+		return ExtrasT->bWasSuccessful;
+	}
+	else
+	{
+		Lock.Unlock();
+		return false; // Already complete
+	}
+}

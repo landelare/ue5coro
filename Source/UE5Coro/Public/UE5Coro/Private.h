@@ -89,6 +89,7 @@ class FLatentChainAwaiter;
 class FLatentAnyAwaiter;
 class FLatentAwaiter;
 class FLatentPromise;
+struct FManualCoroutineOverride { };
 class FNewThreadAwaiter;
 struct FPackageLoadAwaiter;
 class FPromise;
@@ -112,6 +113,7 @@ template<bool, typename, typename> struct TDelegateAwaiterFor;
 template<bool, typename, typename, typename...> class TDynamicDelegateAwaiter;
 template<typename> class TFutureAwaiter;
 template<typename> class TGeneratorPromise;
+template<typename> class TManualPromiseExtras;
 template<typename> class TTaskAwaiter;
 
 template<typename>

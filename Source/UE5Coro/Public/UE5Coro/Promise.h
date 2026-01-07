@@ -194,7 +194,7 @@ struct [[nodiscard]] UE5CORO_API FPromiseExtras
 };
 
 template<typename T>
-struct [[nodiscard]] TPromiseExtras final : FPromiseExtras
+struct [[nodiscard]] TPromiseExtras : FPromiseExtras
 {
 #if UE5CORO_DEBUG
 	std::atomic<bool> bMoveUsed = false;
@@ -231,6 +231,7 @@ inline UWorld* GetBestWorld()
 class [[nodiscard]] UE5CORO_API FPromise
 {
 	friend void TCoroutine<>::SetDebugName(FString);
+	template<typename T> friend class TManualPromiseExtras;
 	friend FCoroutineScope;
 	friend Debug::FUE5CoroCategory;
 
@@ -372,11 +373,20 @@ public:
 	}
 
 	void return_value(T Value)
+		requires (!std::same_as<Extras, TManualPromiseExtras<T>>)
 	{
 		auto* ExtrasT = static_cast<Extras*>(this->Extras.get());
 		UE::TUniqueLock Lock(ExtrasT->Lock);
-		check(!ExtrasT->IsComplete()); // Completion is after a value is returned
+		checkf(!ExtrasT->IsComplete(), // Completion happens after this
+		       TEXT("Internal error: Expected incomplete coroutine"));
 		ExtrasT->ReturnValue = std::move(Value);
+	}
+
+	void return_value(FManualCoroutineOverride)
+		requires std::same_as<Extras, TManualPromiseExtras<T>>
+	{
+		checkf(!static_cast<Extras*>(this->Extras.get())->IsComplete(),
+		       TEXT("Internal error: Expected incomplete coroutine"));
 	}
 
 	TCoroutine<T> get_return_object() noexcept

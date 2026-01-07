@@ -8,6 +8,8 @@ UE5Coro::TCoroutine\<\> or another compatible type.
 The term subroutine refers to a function that does not have co_await, co_yield,
 or co_return in its body, regardless of its return type.
 
+## TCoroutine
+
 TCoroutine is copyable and represents an individual coroutine call.
 Calling the same coroutine multiple times with the same parameters (or no
 parameters) will return different values each time.
@@ -25,6 +27,8 @@ it a suitable key for ordered containers.
 GetTypeHash() and std::hash are also supported for unordered containers.
 TCoroutine values remain valid indefinitely, even after their coroutines have
 completed.
+
+### FVoidCoroutine
 
 FVoidCoroutine (in the global namespace, by necessity) is provided as a USTRUCT
 wrapper for TCoroutine\<\> to work around UHT limitations.
@@ -46,6 +50,17 @@ If a function is changed into a coroutine after it has been used in BP, the
 hidden pin(s) might appear on the node graph, but this is harmless and does not
 affect behavior as long as these pins remain disconnected.
 If desired, affected nodes may be recreated to fix their visuals.
+
+More documentation can be found [below](#fvoidcoroutine-1).
+
+### TManualCoroutine
+
+TManualCoroutine cannot be returned from a coroutine.
+It is default constructible, and automatically starts its own coroutine, which
+is then controlled manually by calling SetResult, TrySetResult, or Cancel on the
+handle.
+
+Detailed documentation can be found [below](#tmanualcoroutinet).
 
 ## Result types
 
@@ -665,3 +680,81 @@ UPROPERTY.
 Its only intended use is to be directly passed to a latent coroutine, which
 already provides UObject lifetime management for the coroutine target and world
 through the engine's latent action manager.
+
+# TManualCoroutine\<T\>
+
+See also: [FAwaitableEvent](Threading.md#fawaitableevent), the multithreading
+primitive that provides similar functionality for coroutines.
+TManualCoroutine is a FAwaitableEvent wrapper on steroids.
+
+TManualCoroutine\<T\> can only be returned from subroutines (to `co_return` one,
+which is not commonly useful, the return type would need to be
+`TCoroutine<TManualCoroutine<T>>`).
+It immediately starts a coroutine on the current thread, which will call
+[SetDebugName](#static-void-tcoroutinesetdebugnamefstring-name) with the
+provided name, then suspend and do nothing until it's either canceled, or a
+result is provided externally, acting as if it was implemented like this:
+
+```c++
+TManualCoroutine<T> IllustrationOnly_WillNotCompile()
+{
+    TCoroutine<>::SetDebugName(Debug_name_passed_to_constructor);
+    co_await SetResult_gets_called_externally; // Cancellation might happen here
+    co_return The_argument_passed_to_SetResult;
+}
+```
+
+In the [gameplay debugger](GameplayDebugger.md), these will show up as `Manual`
+coroutines.
+
+TManualCoroutine\<T\> is copyable, and safely object-sliceable to TCoroutine\<T\>
+or TCoroutine\<\> to observe it (which is then copyable once again).
+TCoroutines, however, may not be downcast back into TManualCoroutine.
+Like TCoroutine, all copies refer to the same coroutine execution, and these
+handles are directly awaitable in other (TCoroutine-returning) coroutines.
+
+The last TManualCoroutine to go out of scope or be otherwise destroyed will
+cancel the coroutine to prevent it from lingering forever and causing a memory
+leak.
+If the coroutine was already successful, this cancellation is a no-op.
+
+Example:
+```c++
+// To wrap a legacy, callback-based API with a subroutine:
+TCoroutine<int> ExampleSubroutine()
+{
+    TManualCoroutine<int> Coro(TEXT("Example name"));
+    ExternalDelegate.BindLambda([=](bool bSuccess, int Result)
+    {
+        if (bSuccess)
+            Coro.SetResult(Result);
+        else
+            Coro.Cancel();
+    });
+    return Coro; // Intentional and safe object slicing
+}
+```
+
+### TManualCoroutine\<T\>::TManualCoroutine(FString DebugName = \{\})
+
+Starts a manual coroutine with an optional debug name.
+
+### TManualCoroutine\<T\>::~TManualCoroutine()
+
+If this is the last TManualCoroutine object that refers to the same coroutine
+(TCoroutine\<T\> handles are only observers and **do not count!**), cancels the
+coroutine.
+
+### void TManualCoroutine\<T\>::SetResult(T Result)
+
+If the coroutine is not complete yet due to another call to (Try)SetResult or
+Cancel, causes the coroutine to successfully `co_return` the provided value.
+
+If the coroutine is already complete, its state or result will not change,
+and the call will trigger an `ensure`.
+
+### bool TManualCoroutine\<T\>::TrySetResult(T Result)
+
+Like SetResult, but no `ensure` is triggered.
+Returns `true` if this call successfully completed the coroutine, `false` if the
+coroutine was already complete (successful or canceled).
