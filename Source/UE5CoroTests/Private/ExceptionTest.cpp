@@ -78,8 +78,8 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 		auto Fn = [&]() -> TCoroutine<>
 		{
 			co_await std::suspend_never();
-			Coro = static_cast<TCoroutinePromise<void, FAsyncPromise>&>(
-				FPromise::Current()).get_return_object();
+			Coro = static_cast<TCoroutinePromise<void, FAsyncPromise,
+				FPromiseExtras>&>(FPromise::Current()).get_return_object();
 			throw 456;
 		};
 		Coro = std::nullopt;
@@ -103,8 +103,8 @@ bool FExceptionTest::RunTest(const FString& Parameters)
 		auto Fn = [&](FLatentActionInfo) -> TCoroutine<>
 		{
 			co_await std::suspend_never();
-			Coro = static_cast<TCoroutinePromise<void, FLatentPromise>&>(
-				FPromise::Current()).get_return_object();
+			Coro = static_cast<TCoroutinePromise<void, FLatentPromise,
+				FPromiseExtras>&>(FPromise::Current()).get_return_object();
 			throw 789;
 		};
 		FLatentActionInfo Info(0, 0, nullptr,

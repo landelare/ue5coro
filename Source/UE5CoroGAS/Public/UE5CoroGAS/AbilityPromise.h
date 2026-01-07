@@ -61,7 +61,7 @@ static_assert(sizeof(FAbilityCoroutine) == sizeof(TCoroutine<>));
 namespace UE5Coro::Private
 {
 class [[nodiscard]] UE5COROGAS_API FAbilityPromise
-	: public TCoroutinePromise<void, FLatentPromise>
+	: public TCoroutinePromise<void, FLatentPromise, FPromiseExtras>
 {
 	using Super = TCoroutinePromise;
 

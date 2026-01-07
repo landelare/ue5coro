@@ -106,7 +106,7 @@ template<typename, int> struct TAsyncLoadAwaiter;
 template<typename> struct TAsyncQueryAwaiter;
 template<typename> struct TAsyncQueryAwaiterRV;
 template<typename> class TCancelableAwaiter;
-template<typename, typename> class TCoroutinePromise;
+template<typename, typename, typename> class TCoroutinePromise;
 template<bool, typename, typename, typename...> class TDelegateAwaiter;
 template<bool, typename, typename> struct TDelegateAwaiterFor;
 template<bool, typename, typename, typename...> class TDynamicDelegateAwaiter;

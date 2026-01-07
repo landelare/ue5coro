@@ -51,7 +51,7 @@ class TCoroutine;
 template<>
 class UE5CORO_API TCoroutine<>
 {
-	template<typename, typename>
+	template<typename, typename, typename>
 	friend class Private::TCoroutinePromise;
 	friend std::hash<TCoroutine>;
 

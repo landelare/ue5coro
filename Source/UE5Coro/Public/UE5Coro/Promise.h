@@ -355,17 +355,17 @@ public:
 	}
 };
 
-template<typename T, typename Base>
+template<typename T, typename Base, typename Extras>
 class TCoroutinePromise : public Base
 {
 public:
 	explicit TCoroutinePromise(const auto&... Args)
-		: Base(std::make_shared<TPromiseExtras<T>>(*this), Args...) { }
+		: Base(std::make_shared<Extras>(*this), Args...) { }
 	UE_NONCOPYABLE(TCoroutinePromise);
 
 	~TCoroutinePromise()
 	{
-		auto* ExtrasT = static_cast<TPromiseExtras<T>*>(this->Extras.get());
+		auto* ExtrasT = static_cast<Extras*>(this->Extras.get());
 		ExtrasT->Lock.Lock(); // This will be held until the end of ~FPromise
 		checkf(ExtrasT->Promise, TEXT("Unexpected double promise destruction"));
 		ExtrasT->ReturnValuePtr = &ExtrasT->ReturnValue;
@@ -373,7 +373,7 @@ public:
 
 	void return_value(T Value)
 	{
-		auto* ExtrasT = static_cast<TPromiseExtras<T>*>(this->Extras.get());
+		auto* ExtrasT = static_cast<Extras*>(this->Extras.get());
 		UE::TUniqueLock Lock(ExtrasT->Lock);
 		check(!ExtrasT->IsComplete()); // Completion is after a value is returned
 		ExtrasT->ReturnValue = std::move(Value);
@@ -385,12 +385,12 @@ public:
 	}
 };
 
-template<typename Base>
-class TCoroutinePromise<void, Base> : public Base
+template<typename Base, typename Extras>
+class TCoroutinePromise<void, Base, Extras> : public Base
 {
 public:
 	explicit TCoroutinePromise(const auto&... Args)
-		: Base(std::make_shared<FPromiseExtras>(*this), Args...) { }
+		: Base(std::make_shared<Extras>(*this), Args...) { }
 	UE_NONCOPYABLE(TCoroutinePromise);
 
 	~TCoroutinePromise()
@@ -510,9 +510,12 @@ struct std::coroutine_traits<UE5Coro::TCoroutine<T>, Args...>
 	static constexpr bool bUseLatent = LatentInfoCount || LatentForceCount ||
 	                                   LatentContextCount;
 
+	using FPromiseBase = std::conditional_t<bUseLatent,
+		UE5Coro::Private::FLatentPromise, UE5Coro::Private::FAsyncPromise>;
+	using FPromiseExtras = std::conditional_t<std::is_void_v<T>,
+		UE5Coro::Private::FPromiseExtras, UE5Coro::Private::TPromiseExtras<T>>;
 	using promise_type = UE5Coro::Private::TCoroutinePromise<
-		T, std::conditional_t<bUseLatent, UE5Coro::Private::FLatentPromise,
-		                                  UE5Coro::Private::FAsyncPromise>>;
+		T, FPromiseBase, FPromiseExtras>;
 };
 
 template<typename T, typename... Args>
