@@ -119,7 +119,8 @@ void FAsyncTimeAwaiter::Cancel(void* This, FPromise& Promise)
 		{
 			verifyf(Awaiter->Promise.exchange(nullptr) == &Promise,
 			        TEXT("Internal error: mismatched promise at cancellation"));
-			AsyncTask(Awaiter->Thread, [&Promise] { Promise.Resume(); });
+			TGraphTask<FResumeTask>::CreateTask().ConstructAndDispatchWhenReady(
+				Awaiter->Thread, Promise);
 		}
 		else
 			check(!"Internal error: unexpected race condition");
@@ -130,9 +131,10 @@ void FAsyncTimeAwaiter::Resume()
 {
 	// This is called from the timer thread, coroutine resumption must be async
 	checkf(Promise, TEXT("Internal error: spurious resume without suspension"));
-	if (auto* P = Promise.exchange(nullptr);
-	    P->UnregisterCancelableAwaiter<true>())
-		AsyncTask(Thread, [P] { P->Resume(); });
+	if (auto& P = *Promise.exchange(nullptr);
+	    P.UnregisterCancelableAwaiter<true>())
+		TGraphTask<FResumeTask>::CreateTask().ConstructAndDispatchWhenReady(
+			Thread, P);
 	else
 		check(!"Internal error: unexpected race condition");
 }
