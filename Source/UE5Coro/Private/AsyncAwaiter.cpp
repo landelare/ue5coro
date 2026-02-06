@@ -42,8 +42,15 @@ class FResumeTask final
 	FPromise& Promise;
 
 public:
-	explicit FResumeTask(ENamedThreads::Type Thread, FPromise& Promise)
-		: Thread(Thread), Promise(Promise) { }
+	explicit FResumeTask(ENamedThreads::Type InThread, FPromise& Promise)
+		: Thread(InThread), Promise(Promise)
+	{
+		// Round unnamed worker threads up to AnyThread
+		if (ENamedThreads::GetThreadIndex(Thread) >
+		    ENamedThreads::ActualRenderingThread)
+			Thread = static_cast<ENamedThreads::Type>(Thread | 0xFF);
+		static_assert(ENamedThreads::AnyThread == 0xFF);
+	}
 
 	void DoTask(ENamedThreads::Type, FGraphEvent*) { Promise.Resume(); }
 
