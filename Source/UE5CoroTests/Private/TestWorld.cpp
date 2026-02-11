@@ -110,3 +110,15 @@ int FTestHelper::ReadSemaphore(FAwaitableSemaphore& Semaphore)
 	UE::TUniqueLock Lock(Semaphore.Lock);
 	return Semaphore.Count;
 }
+
+bool FTestHelper::IsEmpty(FAwaitableEvent& Event)
+{
+	UE::TUniqueLock Lock(Event.Lock);
+	return Event.AwaitingPromises.empty();
+}
+
+bool FTestHelper::IsEmpty(FAwaitableSemaphore& Semaphore)
+{
+	UE::TUniqueLock Lock(Semaphore.Lock);
+	return Semaphore.AwaitingPromises.empty();
+}

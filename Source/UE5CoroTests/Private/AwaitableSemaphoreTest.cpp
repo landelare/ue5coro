@@ -107,6 +107,37 @@ void DoTest(FAutomationTestBase& Test)
 		Semaphore.Unlock(100);
 		Test.TestEqual("State 5", State, 19);
 	}
+
+	for (int i = 0; i <= 3; ++i)
+	{
+		FAwaitableSemaphore Semaphore(1, 0);
+		Test.TestTrue("Game thread", IsInGameThread());
+		bool bUnlockOnThread = (i & 1) != 0;
+		bool bAwaitOnThread = (i & 2) != 0;
+		std::atomic<bool> bSynchronous = false;
+		auto Coro = World.Run(CORO
+		{
+			if (bAwaitOnThread)
+				co_await Async::MoveToNewThread();
+			co_await Semaphore;
+			Test.TestTrue("Synchronous", bSynchronous);
+		});
+		FTestHelper::PumpGameThread(World,
+			[&] { return !FTestHelper::IsEmpty(Semaphore); });
+
+		World.Run(CORO
+		{
+			if (bUnlockOnThread)
+				co_await Async::MoveToNewThread();
+			// This is not entirely reliable without synchronization, but race
+			// conditions should cause false passes, not false failures
+			bSynchronous = true;
+			Semaphore.Unlock();
+			bSynchronous = false;
+		});
+		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
+		Test.TestTrue("Successful", Coro.WasSuccessful());
+	}
 }
 }
 

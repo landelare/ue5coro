@@ -102,5 +102,7 @@ public:
 	static void CheckWorld(FAutomationTestBase& Test, UWorld* World);
 	static bool ReadEvent(FAwaitableEvent&);
 	static int ReadSemaphore(FAwaitableSemaphore&);
+	static bool IsEmpty(FAwaitableEvent&);
+	static bool IsEmpty(FAwaitableSemaphore&);
 };
 }

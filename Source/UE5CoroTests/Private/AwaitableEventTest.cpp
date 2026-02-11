@@ -152,6 +152,37 @@ void DoTest(FAutomationTestBase& Test, EEventMode Mode)
 		Test.TestEqual("Trigger 3", State, 4);
 	}
 
+	for (int i = 0; i <= 3; ++i)
+	{
+		FAwaitableEvent Event(Mode, false);
+		Test.TestTrue("Game thread", IsInGameThread());
+		bool bTriggerOnThread = (i & 1) != 0;
+		bool bAwaitOnThread = (i & 2) != 0;
+		std::atomic<bool> bSynchronous = false;
+		auto Coro = World.Run(CORO
+		{
+			if (bAwaitOnThread)
+				co_await Async::MoveToNewThread();
+			co_await Event;
+			Test.TestTrue("Synchronous", bSynchronous);
+		});
+		FTestHelper::PumpGameThread(World,
+			[&] { return !FTestHelper::IsEmpty(Event); });
+
+		World.Run(CORO
+		{
+			if (bTriggerOnThread)
+				co_await Async::MoveToNewThread();
+			// This is not entirely reliable without synchronization, but race
+			// conditions should cause false passes, not false failures
+			bSynchronous = true;
+			Event.Trigger();
+			bSynchronous = false;
+		});
+		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
+		Test.TestTrue("Successful", Coro.WasSuccessful());
+	}
+
 	{
 		int Result = -1;
 		FAwaitableEvent Event(Mode, false);
