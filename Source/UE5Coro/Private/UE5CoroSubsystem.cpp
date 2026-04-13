@@ -66,6 +66,12 @@ FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo()
 	return {INDEX_NONE, NextLinkage++, TEXT("None"), this};
 }
 
+FLatentActionInfo UUE5CoroSubsystem::MakeInvariantLatentInfo()
+{
+	checkf(IsInGameThread(), TEXT("Unexpected latent info off the game thread"));
+	return {INDEX_NONE, INDEX_NONE, TEXT("None"), this};
+}
+
 FLatentActionInfo UUE5CoroSubsystem::MakeLatentInfo(FTwoLives* State)
 {
 	checkf(IsInGameThread(), TEXT("Unexpected latent info off the game thread"));

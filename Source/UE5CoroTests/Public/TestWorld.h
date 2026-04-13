@@ -92,6 +92,17 @@ public:
 		Coro.ContinueWith([=] { delete ExtendedLifeFn; });
 		return Coro;
 	}
+
+	auto RunInvariant(std::invocable<FLatentActionInfo> auto Fn)
+	{
+		auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
+		auto LatentInfo = Sys->MakeInvariantLatentInfo();
+
+		auto* ExtendedLifeFn = new auto(std::move(Fn));
+		auto Coro = (*ExtendedLifeFn)(LatentInfo);
+		Coro.ContinueWith([=] { delete ExtendedLifeFn; });
+		return Coro;
+	}
 };
 
 class UE5COROTESTS_API FTestHelper

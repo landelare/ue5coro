@@ -70,6 +70,7 @@ struct FBoolSetter
 struct FIntSetter
 {
 	int* Ptr;
+	void Increment() const { ++*Ptr; }
 	void Set(int Value) const { *Ptr = Value; }
 };
 
@@ -150,6 +151,48 @@ void DoTestSharedPtr(FTestWorld& World, FAutomationTestBase& Test)
 		Ptr = nullptr;
 		World.Tick();
 		Test.TestEqual("No continuation", State, 0);
+	}
+
+	IF_CORO_LATENT
+	{
+		int Entered = 0, EnteredInvariant = 0;
+		int Continued = 0, ContinuedInvariant = 0;
+		int ContinuedWeak = 0, ContinuedWeakInvariant = 0;
+		S<FIntSetter> Ptr(new FIntSetter{&ContinuedWeak});
+		S<FIntSetter> PtrInvariant(new FIntSetter{&ContinuedWeakInvariant});
+		auto Coro = CORO
+		{
+			++Entered;
+			co_await NextTick();
+		};
+		auto CoroInvariant = CORO
+		{
+			++EnteredInvariant;
+			co_await NextTick();
+		};
+		auto Coro1 = World.Run(Coro);
+		auto Coro2 = World.Run(Coro);
+		auto CoroI1 = World.RunInvariant(CoroInvariant);
+		auto CoroI2 = World.RunInvariant(CoroInvariant);
+		Test.TestEqual("Entered before", Entered, 2);
+		Test.TestEqual("Entered before (invariant)", EnteredInvariant, 1);
+		Coro1.ContinueWith([&] { ++Continued; });
+		Coro2.ContinueWith([&] { ++Continued; });
+		CoroI1.ContinueWith([&] { ++ContinuedInvariant; });
+		CoroI2.ContinueWith([&] { ++ContinuedInvariant; });
+		Coro1.ContinueWithWeak(Ptr, &FIntSetter::Increment);
+		Coro2.ContinueWithWeak(Ptr, &FIntSetter::Increment);
+		CoroI1.ContinueWithWeak(PtrInvariant, &FIntSetter::Increment);
+		CoroI2.ContinueWithWeak(PtrInvariant, &FIntSetter::Increment);
+		auto All = World.Run(
+			CORO { co_await WhenAll(Coro1, Coro2, CoroI1, CoroI2); });
+		FTestHelper::PumpGameThread(World, [&] { return All.IsDone(); });
+		Test.TestEqual("Entered after", Entered, 2);
+		Test.TestEqual("Entered after (invariant)", EnteredInvariant, 1);
+		Test.TestEqual("Continued", Continued, 2);
+		Test.TestEqual("Continued (invariant)", ContinuedInvariant, 2);
+		Test.TestEqual("Continued (weak)", ContinuedWeak, 2);
+		Test.TestEqual("Continued (weak, invariant)", ContinuedWeakInvariant, 2);
 	}
 }
 

@@ -54,6 +54,9 @@ public:
 	/** Creates a unique and valid LatentInfo that does not lead anywhere. */
 	[[nodiscard]] UE5CORO_API FLatentActionInfo MakeLatentInfo();
 
+	/** Creates a LatentInfo that has the same IDs every time and leads nowhere. */
+	[[nodiscard]] UE5CORO_API FLatentActionInfo MakeInvariantLatentInfo();
+
 	/** Creates a valid LatentInfo suitable for the Latent::Chain functions. */
 	[[nodiscard]] FLatentActionInfo MakeLatentInfo(UE5Coro::Private::FTwoLives*);
 
