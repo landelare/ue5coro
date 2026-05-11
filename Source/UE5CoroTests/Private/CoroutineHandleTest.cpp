@@ -42,6 +42,11 @@ using namespace UE5Coro::Latent;
 using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FStaticHandleTest, "UE5Coro.Handle.Static",
+                                 EAutomationTestFlags_ApplicationContextMask |
+                                 EAutomationTestFlags::HighPriority |
+                                 EAutomationTestFlags::ProductFilter)
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHandleTestAsync, "UE5Coro.Handle.Async",
                                  EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
@@ -302,20 +307,16 @@ void DoTest(FAutomationTestBase& Test)
 	}
 
 	{
-		auto Coro = TCoroutine<>::CompletedCoroutine;
-		Test.TestTrue("Completed", Coro.IsDone());
-		Test.TestTrue("Successful", Coro.WasSuccessful());
-
 		auto Ptr = std::make_unique<int>(1); // move-only result type
 		auto Coro1 = TCoroutine<>::FromResult(std::move(Ptr));
 		auto Coro2 = TCoroutine<>::FromResult(2);
 		auto Coro3 = TCoroutine<int>::FromResult(3);
 		Test.TestTrue("Completed 1", Coro1.IsDone());
-		Test.TestTrue("Successful 1", Coro.WasSuccessful());
+		Test.TestTrue("Successful 1", Coro1.WasSuccessful());
 		Test.TestTrue("Completed 2", Coro2.IsDone());
-		Test.TestTrue("Successful 2", Coro.WasSuccessful());
+		Test.TestTrue("Successful 2", Coro2.WasSuccessful());
 		Test.TestTrue("Completed 3", Coro3.IsDone());
-		Test.TestTrue("Successful 3", Coro.WasSuccessful());
+		Test.TestTrue("Successful 3", Coro3.WasSuccessful());
 		Test.TestNull("Moved from", Ptr.get());
 		Test.TestEqual("Moved to", *Coro1.GetResult(), 1);
 		Test.TestEqual("Coro2", Coro2.GetResult(), 2);
@@ -351,6 +352,38 @@ void DoTest(FAutomationTestBase& Test)
 	DoTestSharedPtr<TNotThreadSafeSharedPtr, T...>(World, Test);
 	DoTestSharedPtr<std::shared_ptr, T...>(World, Test);
 }
+}
+
+bool FStaticHandleTest::RunTest(const FString& Parameters)
+{
+	TestTrue("Completed 1", TCoroutine<>::CompletedCoroutine.IsDone());
+	TestTrue("Successful 1", TCoroutine<>::CompletedCoroutine.WasSuccessful());
+	TestTrue("Completed 2", TCoroutine<>::FailedCoroutine.IsDone());
+	TestFalse("Failed 1", TCoroutine<>::FailedCoroutine.WasSuccessful());
+	{
+		auto SuccessfulA = TCoroutine<>::FromResult(123);
+		auto SuccessfulB = TCoroutine<int>::FromResult(123);
+		TestTrue("Completed 3A", SuccessfulA.IsDone());
+		TestTrue("Successful 2A", SuccessfulA.WasSuccessful());
+		TestEqual("Result 1A", SuccessfulA.GetResult(), 123);
+		TestTrue("Completed 3B", SuccessfulB.IsDone());
+		TestTrue("Successful 2B", SuccessfulB.WasSuccessful());
+		TestEqual("Result 1B", SuccessfulB.GetResult(), 123);
+	}
+	{
+		auto FailedA = TCoroutine<>::FromFailure<int>();
+		auto FailedB = TCoroutine<int>::FromFailure();
+		auto FailedC = TCoroutine<>::FromFailure<void>();
+		TestTrue("Completed 4A", FailedA.IsDone());
+		TestFalse("Failed 2A", FailedA.WasSuccessful());
+		TestEqual("Result 2A", FailedA.GetResult(), int{});
+		TestTrue("Completed 4B", FailedB.IsDone());
+		TestFalse("Failed 2B", FailedB.WasSuccessful());
+		TestEqual("Result 2B", FailedB.GetResult(), int{});
+		TestTrue("Completed 4C", FailedC.IsDone());
+		TestFalse("Failed 2C", FailedC.WasSuccessful());
+	}
+	return true;
 }
 
 bool FHandleTestAsync::RunTest(const FString& Parameters)

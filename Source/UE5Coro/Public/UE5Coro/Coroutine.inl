@@ -34,6 +34,8 @@
 #pragma region Private
 namespace UE5Coro
 {
+// FromFailure is implemented in Cancellation.h
+
 // Argument deduction on TCoroutine<>
 template<typename V>
 TCoroutine<std::decay_t<V>> TCoroutine<>::FromResult(V&& Value)

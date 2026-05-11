@@ -65,9 +65,16 @@ public:
 	/** A coroutine that has already completed with no result. */
 	static const TCoroutine CompletedCoroutine;
 
+	/** A coroutine that has already failed with no result. */
+	static const TCoroutine FailedCoroutine;
+
 	/** A coroutine that has already completed with the provided value. */
 	template<typename V>
 	[[nodiscard]] static TCoroutine<std::decay_t<V>> FromResult(V&& Value);
+
+	/** A coroutine that has already failed to provide a result. */
+	template<typename T>
+	[[nodiscard]] static TCoroutine<T> FromFailure();
 
 	/** Request the coroutine to stop executing at the next opportunity.
 	 *  This function returns immediately, with the coroutine still running.
@@ -141,6 +148,9 @@ public:
 
 	/** A coroutine that has already completed with the provided value. */
 	[[nodiscard]] static TCoroutine<T> FromResult(T Value);
+
+	/** A coroutine that has already failed to provide a result. */
+	[[nodiscard]] static TCoroutine<T> FromFailure();
 
 	/** Waits for the coroutine to finish, then gets its result.
 	 *
