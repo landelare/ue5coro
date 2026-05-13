@@ -549,6 +549,14 @@ Cancellation has [its own documentation page](Cancellation.md).
 
 ## Miscellaneous features
 
+### FString TCoroutine\<\>::GetDebugName() const
+
+Returns the same string that a coroutine has set for itself using SetDebugName,
+or an empty string in Shipping builds, unless
+[coroutine tracking](GameplayDebugger.md#setup) is enabled.
+
+Not thread safe with respect to SetDebugName.
+
 ### static void TCoroutine\<\>::SetDebugName(FString Name)
 
 When called from within a coroutine returning TCoroutine, attaches a debug name
@@ -557,6 +565,7 @@ and the UE5Coro [gameplay debugger](GameplayDebugger.md).
 This function does nothing in Shipping builds by default, but it will activate
 if [coroutine tracking](GameplayDebugger.md#setup) is enabled.
 
+It is recommended to call SetDebugName before the first co_await in a coroutine.
 Calling SetDebugName from outside a coroutine is undefined behavior.
 
 Examples:

@@ -69,6 +69,15 @@ bool TCoroutine<>::WasSuccessful() const noexcept
 	return Extras->bWasSuccessful;
 }
 
+FString TCoroutine<>::GetDebugName() const
+{
+#if UE5CORO_DEBUG || UE5CORO_ENABLE_COROUTINE_TRACKING
+	return Extras->DebugName;
+#else
+	return FString();
+#endif
+}
+
 void TCoroutine<>::SetDebugName(FString Name)
 {
 #if UE5CORO_DEBUG || UE5CORO_ENABLE_COROUTINE_TRACKING

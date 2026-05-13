@@ -118,6 +118,11 @@ public:
 	void ContinueWithWeak(Private::TStrongPtr auto Ptr,
 	                      Private::TInvocableWithPtr<decltype(Ptr)> auto Fn);
 
+	/** Returns the coroutine's debug name, or an empty string in build
+	 *  configurations where debug names are not stored.
+	 *  Not thread safe with respect to SetDebugName. */
+	FString GetDebugName() const;
+
 	/** Sets a debug name for the currently-executing coroutine.
 	 *  Only valid to call from within a coroutine returning TCoroutine.
 	 *  Has no effect in release/shipping builds by default, but it's

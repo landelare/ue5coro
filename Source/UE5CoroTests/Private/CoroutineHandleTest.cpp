@@ -207,6 +207,20 @@ void DoTest(FAutomationTestBase& Test)
 	FTestWorld World;
 
 	{
+		constexpr TCHAR DebugName[] = TEXT("TestDebugName");
+		auto Coro = World.Run(CORO
+		{
+			TCoroutine<>::SetDebugName(DebugName);
+			co_return;
+		});
+#if UE5CORO_DEBUG || UE5CORO_ENABLE_COROUTINE_TRACKING
+		Test.TestEqual(TEXT("Debug name"), Coro.GetDebugName(), DebugName);
+#else
+		Test.TestTrue(TEXT("No debug name"), Coro.GetDebugName().IsEmpty());
+#endif
+	}
+
+	{
 		FEventRef StartTest;
 		auto Coro = World.Run(CORO
 		{
