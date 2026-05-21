@@ -48,7 +48,13 @@ template<typename> class TGeneratorIterator;
  *  This object represents ownership of the coroutine, its destruction will
  *  cancel the coroutine. */
 template<typename T>
-struct [[nodiscard]] TGenerator
+struct [[nodiscard]]
+#if __cplusplus >= 202302L && !defined(UE5CORO_DISABLE_GENERATOR_DEPRECATION)
+[[deprecated("UE5Coro::TGenerator is deprecated when targeting C++23 or later. "
+             "Consider std::generator instead. "
+             "Define UE5CORO_DISABLE_GENERATOR_DEPRECATION to suppress this warning.")]]
+#endif
+TGenerator
 {
 	using promise_type = Private::TGeneratorPromise<T>;
 	using iterator = TGeneratorIterator<T>;
@@ -101,6 +107,8 @@ public:
 	iterator begin() noexcept { return iterator(*this); }
 	iterator end() const noexcept { return iterator(nullptr); }
 };
+
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 
 /** Provides an iterator-like interface over TGenerator: operator++ advances
  *  the generator, operator* and operator-> read the current value, etc. */
@@ -203,3 +211,5 @@ public:
 };
 }
 #pragma endregion
+
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
