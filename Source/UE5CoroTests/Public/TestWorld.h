@@ -89,6 +89,17 @@ public:
 		Coro.ContinueWith([=] { delete ExtendedLifeFn; });
 		return Coro;
 	}
+
+	auto RunInvariant(std::invocable<FLatentActionInfo> auto Fn)
+	{
+		auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
+		auto LatentInfo = Sys->MakeInvariantLatentInfo();
+
+		auto* ExtendedLifeFn = new auto(std::move(Fn));
+		auto Coro = (*ExtendedLifeFn)(LatentInfo);
+		Coro.ContinueWith([=] { delete ExtendedLifeFn; });
+		return Coro;
+	}
 };
 
 class UE5COROTESTS_API FTestHelper
@@ -99,5 +110,7 @@ public:
 	static void CheckWorld(FAutomationTestBase& Test, UWorld* World);
 	static bool ReadEvent(FAwaitableEvent&);
 	static int ReadSemaphore(FAwaitableSemaphore&);
+	static bool IsIdle(FAwaitableEvent&);
+	static bool IsIdle(FAwaitableSemaphore&);
 };
 }

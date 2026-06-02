@@ -372,14 +372,45 @@ This field contains a handle to a coroutine with a `void` result that has
 already completed successfully.
 It's useful as a default value of TCoroutine\<\> fields.
 
-### static TCoroutine\<std::decay_t\<V\>\> TCoroutine\<\>::FromResult(V&& Value)
+### static const TCoroutine\<\> TCoroutine\<\>::FailedCoroutine
+
+This field contains a handle to a coroutine with a `void` result that has
+already failed.
+It's useful as a default value of TCoroutine\<\> fields.
+
+### static TCoroutine\<T\> TCoroutine\<T\>::FromResult(T Value)
 
 This function can be used to convert a value to a coroutine handle that acts as
 if a coroutine has immediately and successfully co_returned that value.
+
+The coroutine will be `IsDone()`, `WasSuccessful()`, and its result will be
+moved from `Value`.
+
+### static TCoroutine\<std::decay_t\<V\>\> TCoroutine\<\>::FromResult\<V\>(V&& Value)
+
+This overload can be used to convert a value to a coroutine handle that acts as
+if a coroutine has immediately and successfully co_returned that value, without
+having to explicitly specify the type in code (use `TCoroutine<>::` instead of
+`TCoroutine<T>::`).
+
 Since the function parameter is subject to decay, this method will work even if,
 e.g., V is an lvalue reference.
-An explicit type parameter may be provided to `TCoroutine<T>::FromResult` if
-this is not desired.
+
+The coroutine will be `IsDone()`, `WasSuccessful()`, and its result will be
+forwarded from `Value`.
+
+### static TCoroutine\<\>::FromFailure\<T\>()
+### static TCoroutine\<T\>::FromFailure()
+
+These functions return a coroutine handle that acts as if a coroutine has
+immediately failed to co_return a value of type T.
+They behave identically.
+
+Such a coroutine will be `IsDone()`, **not** `WasSuccessful()`, and its result
+will be a default-constructed `T()`.
+
+`FromFailure<void>()` will return a coroutine similar, but not equal to
+[FailedCoroutine](#static-const-tcoroutine-tcoroutinefailedcoroutine).
 
 ## Async->Sync transitions
 
@@ -518,6 +549,14 @@ Cancellation has [its own documentation page](Cancellation.md).
 
 ## Miscellaneous features
 
+### FString TCoroutine\<\>::GetDebugName() const
+
+Returns the same string that a coroutine has set for itself using SetDebugName,
+or an empty string in Shipping builds, unless
+[coroutine tracking](GameplayDebugger.md#setup) is enabled.
+
+Not thread safe with respect to SetDebugName.
+
 ### static void TCoroutine\<\>::SetDebugName(FString Name)
 
 When called from within a coroutine returning TCoroutine, attaches a debug name
@@ -526,6 +565,7 @@ and the UE5Coro [gameplay debugger](GameplayDebugger.md).
 This function does nothing in Shipping builds by default, but it will activate
 if [coroutine tracking](GameplayDebugger.md#setup) is enabled.
 
+It is recommended to call SetDebugName before the first co_await in a coroutine.
 Calling SetDebugName from outside a coroutine is undefined behavior.
 
 Examples:

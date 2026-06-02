@@ -63,6 +63,22 @@ public:
 	void await_resume();
 };
 
+template<typename T>
+TCoroutine<T> TCoroutine<>::FromFailure()
+{
+	co_await FSelfCancellation();
+	if constexpr (!std::is_void_v<T>)
+		co_return T(); // Unreachable
+}
+
+template<typename T>
+TCoroutine<T> TCoroutine<T>::FromFailure()
+{
+	co_await FSelfCancellation();
+	if constexpr (!std::is_void_v<T>)
+		co_return T(); // Unreachable
+}
+
 /** Guards against user-requested cancellation. For advanced use.
  *  This does NOT affect a latent coroutine destroyed by the latent action
  *  manager.

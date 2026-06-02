@@ -1,5 +1,10 @@
 # Generators
 
+> [!NOTE]
+> TGenerator is deprecated when targeting C++23 or later.<br>
+> std::generator is recommended instead.<br>
+> Define the macro `UE5CORO_DISABLE_GENERATOR_DEPRECATION` to continue using it.
+
 Returning TGenerator\<T\> from a function allows it to yield an arbitrary number
 of values through it (including infinite), with the caller having control over
 when, and how many to fetch.

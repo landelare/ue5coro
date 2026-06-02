@@ -42,6 +42,11 @@ using namespace UE5Coro::Latent;
 using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FStaticHandleTest, "UE5Coro.Handle.Static",
+                                 EAutomationTestFlags_ApplicationContextMask |
+                                 EAutomationTestFlags::HighPriority |
+                                 EAutomationTestFlags::ProductFilter)
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHandleTestAsync, "UE5Coro.Handle.Async",
                                  EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
@@ -70,6 +75,7 @@ struct FBoolSetter
 struct FIntSetter
 {
 	int* Ptr;
+	void Increment() const { ++*Ptr; }
 	void Set(int Value) const { *Ptr = Value; }
 };
 
@@ -151,12 +157,68 @@ void DoTestSharedPtr(FTestWorld& World, FAutomationTestBase& Test)
 		World.Tick();
 		Test.TestEqual("No continuation", State, 0);
 	}
+
+	IF_CORO_LATENT
+	{
+		int Entered = 0, EnteredInvariant = 0;
+		int Continued = 0, ContinuedInvariant = 0;
+		int ContinuedWeak = 0, ContinuedWeakInvariant = 0;
+		S<FIntSetter> Ptr(new FIntSetter{&ContinuedWeak});
+		S<FIntSetter> PtrInvariant(new FIntSetter{&ContinuedWeakInvariant});
+		auto Coro = CORO
+		{
+			++Entered;
+			co_await NextTick();
+		};
+		auto CoroInvariant = CORO
+		{
+			++EnteredInvariant;
+			co_await NextTick();
+		};
+		auto Coro1 = World.Run(Coro);
+		auto Coro2 = World.Run(Coro);
+		auto CoroI1 = World.RunInvariant(CoroInvariant);
+		auto CoroI2 = World.RunInvariant(CoroInvariant);
+		Test.TestEqual("Entered before", Entered, 2);
+		Test.TestEqual("Entered before (invariant)", EnteredInvariant, 1);
+		Coro1.ContinueWith([&] { ++Continued; });
+		Coro2.ContinueWith([&] { ++Continued; });
+		CoroI1.ContinueWith([&] { ++ContinuedInvariant; });
+		CoroI2.ContinueWith([&] { ++ContinuedInvariant; });
+		Coro1.ContinueWithWeak(Ptr, &FIntSetter::Increment);
+		Coro2.ContinueWithWeak(Ptr, &FIntSetter::Increment);
+		CoroI1.ContinueWithWeak(PtrInvariant, &FIntSetter::Increment);
+		CoroI2.ContinueWithWeak(PtrInvariant, &FIntSetter::Increment);
+		auto All = World.Run(
+			CORO { co_await WhenAll(Coro1, Coro2, CoroI1, CoroI2); });
+		FTestHelper::PumpGameThread(World, [&] { return All.IsDone(); });
+		Test.TestEqual("Entered after", Entered, 2);
+		Test.TestEqual("Entered after (invariant)", EnteredInvariant, 1);
+		Test.TestEqual("Continued", Continued, 2);
+		Test.TestEqual("Continued (invariant)", ContinuedInvariant, 2);
+		Test.TestEqual("Continued (weak)", ContinuedWeak, 2);
+		Test.TestEqual("Continued (weak, invariant)", ContinuedWeakInvariant, 2);
+	}
 }
 
 template<typename... T>
 void DoTest(FAutomationTestBase& Test)
 {
 	FTestWorld World;
+
+	{
+		constexpr TCHAR DebugName[] = TEXT("TestDebugName");
+		auto Coro = World.Run(CORO
+		{
+			TCoroutine<>::SetDebugName(DebugName);
+			co_return;
+		});
+#if UE5CORO_DEBUG || UE5CORO_ENABLE_COROUTINE_TRACKING
+		Test.TestEqual(TEXT("Debug name"), Coro.GetDebugName(), DebugName);
+#else
+		Test.TestTrue(TEXT("No debug name"), Coro.GetDebugName().IsEmpty());
+#endif
+	}
 
 	{
 		FEventRef StartTest;
@@ -259,20 +321,16 @@ void DoTest(FAutomationTestBase& Test)
 	}
 
 	{
-		auto Coro = TCoroutine<>::CompletedCoroutine;
-		Test.TestTrue("Completed", Coro.IsDone());
-		Test.TestTrue("Successful", Coro.WasSuccessful());
-
 		auto Ptr = std::make_unique<int>(1); // move-only result type
 		auto Coro1 = TCoroutine<>::FromResult(std::move(Ptr));
 		auto Coro2 = TCoroutine<>::FromResult(2);
 		auto Coro3 = TCoroutine<int>::FromResult(3);
 		Test.TestTrue("Completed 1", Coro1.IsDone());
-		Test.TestTrue("Successful 1", Coro.WasSuccessful());
+		Test.TestTrue("Successful 1", Coro1.WasSuccessful());
 		Test.TestTrue("Completed 2", Coro2.IsDone());
-		Test.TestTrue("Successful 2", Coro.WasSuccessful());
+		Test.TestTrue("Successful 2", Coro2.WasSuccessful());
 		Test.TestTrue("Completed 3", Coro3.IsDone());
-		Test.TestTrue("Successful 3", Coro.WasSuccessful());
+		Test.TestTrue("Successful 3", Coro3.WasSuccessful());
 		Test.TestNull("Moved from", Ptr.get());
 		Test.TestEqual("Moved to", *Coro1.GetResult(), 1);
 		Test.TestEqual("Coro2", Coro2.GetResult(), 2);
@@ -308,6 +366,38 @@ void DoTest(FAutomationTestBase& Test)
 	DoTestSharedPtr<TNotThreadSafeSharedPtr, T...>(World, Test);
 	DoTestSharedPtr<std::shared_ptr, T...>(World, Test);
 }
+}
+
+bool FStaticHandleTest::RunTest(const FString& Parameters)
+{
+	TestTrue("Completed 1", TCoroutine<>::CompletedCoroutine.IsDone());
+	TestTrue("Successful 1", TCoroutine<>::CompletedCoroutine.WasSuccessful());
+	TestTrue("Completed 2", TCoroutine<>::FailedCoroutine.IsDone());
+	TestFalse("Failed 1", TCoroutine<>::FailedCoroutine.WasSuccessful());
+	{
+		auto SuccessfulA = TCoroutine<>::FromResult(123);
+		auto SuccessfulB = TCoroutine<int>::FromResult(123);
+		TestTrue("Completed 3A", SuccessfulA.IsDone());
+		TestTrue("Successful 2A", SuccessfulA.WasSuccessful());
+		TestEqual("Result 1A", SuccessfulA.GetResult(), 123);
+		TestTrue("Completed 3B", SuccessfulB.IsDone());
+		TestTrue("Successful 2B", SuccessfulB.WasSuccessful());
+		TestEqual("Result 1B", SuccessfulB.GetResult(), 123);
+	}
+	{
+		auto FailedA = TCoroutine<>::FromFailure<int>();
+		auto FailedB = TCoroutine<int>::FromFailure();
+		auto FailedC = TCoroutine<>::FromFailure<void>();
+		TestTrue("Completed 4A", FailedA.IsDone());
+		TestFalse("Failed 2A", FailedA.WasSuccessful());
+		TestEqual("Result 2A", FailedA.GetResult(), int{});
+		TestTrue("Completed 4B", FailedB.IsDone());
+		TestFalse("Failed 2B", FailedB.WasSuccessful());
+		TestEqual("Result 2B", FailedB.GetResult(), int{});
+		TestTrue("Completed 4C", FailedC.IsDone());
+		TestFalse("Failed 2C", FailedC.WasSuccessful());
+	}
+	return true;
 }
 
 bool FHandleTestAsync::RunTest(const FString& Parameters)

@@ -110,3 +110,15 @@ int FTestHelper::ReadSemaphore(FAwaitableSemaphore& Semaphore)
 	std::scoped_lock Lock(Semaphore.Lock);
 	return Semaphore.Count;
 }
+
+bool FTestHelper::IsIdle(FAwaitableEvent& Event)
+{
+	std::scoped_lock Lock(Event.Lock);
+	return Event.AwaitingPromises.empty();
+}
+
+bool FTestHelper::IsIdle(FAwaitableSemaphore& Semaphore)
+{
+	std::scoped_lock Lock(Semaphore.Lock);
+	return Semaphore.AwaitingPromises.empty();
+}
