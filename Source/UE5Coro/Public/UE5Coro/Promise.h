@@ -51,6 +51,8 @@ concept TAwaitable = requires
 	                         std::remove_cvref_t<T>>()(std::declval<T>())
 	.await_suspend(std::declval<std::coroutine_handle<Private::FLatentPromise>>());
 };
+template<typename T>
+concept CAwaitable = TAwaitable<T>;
 
 /** Types that get special treatment when awaited from a coroutine (async:
  *  higher overhead, latent: fast path).
@@ -58,6 +60,8 @@ concept TAwaitable = requires
  *  internal, but important implementation detail on the public API. */
 template<typename T>
 concept TLatentAwaiter = std::derived_from<T, Private::FLatentAwaiter>;
+template<typename T>
+concept CLatentAwaiter = TLatentAwaiter<T>;
 
 /** Types that are not TLatentAwaiters, but support expedited cancellation.
  *  This concept is mainly provided for documentation purposes. */
@@ -67,6 +71,8 @@ concept TCancelableAwaiter =
 	requires(T t) { { t.operator co_await() } -> std::derived_from<
 		Private::TCancelableAwaiter<decltype(t.operator co_await())>>; };
 	// TAwaitTransform is not handled by this concept
+template<typename T>
+concept CCancelableAwaiter = TCancelableAwaiter<T>;
 }
 
 #pragma region Private
