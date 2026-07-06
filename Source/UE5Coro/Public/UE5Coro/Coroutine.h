@@ -225,6 +225,7 @@ struct TLatentContext final
 	/** Makes this type useful as a `this` replacement in lambdas. */
 	T* operator->() const noexcept { return Target; }
 	T& operator*() const noexcept { return *Target; }
+	operator T*() const noexcept { return Target; }
 };
 }
 
