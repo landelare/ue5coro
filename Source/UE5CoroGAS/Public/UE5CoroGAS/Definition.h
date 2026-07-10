@@ -31,6 +31,8 @@
 
 #pragma once
 
+class UUE5CoroTaskCallbackTarget;
+
 namespace UE5Coro::Private::GAS
 {
 struct FActivationKey;
