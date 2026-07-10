@@ -61,6 +61,7 @@ void UUE5CoroAnimCallbackTarget::TryResume()
 	{
 		WeakInstance = nullptr; // Stop watching the instance
 		std::exchange(Promise, nullptr)->Resume(); // Resume exactly once
+		// The coroutine could have forced GC, deleting `this`
 	}
 }
 

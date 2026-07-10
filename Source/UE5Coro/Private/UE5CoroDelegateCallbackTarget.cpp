@@ -40,6 +40,7 @@ void UUE5CoroDelegateCallbackTarget::ProcessEvent(UFunction*, void* Parms)
 {
 	// This might also be caused by a multithreaded race condition
 	checkf(Fn, TEXT("Internal error: unexpected early or double callback"));
+	FGCObjectScopeGuard Scope(this); // Guard against the coroutine forcing GC
 	std::exchange(Fn, nullptr)(Parms);
 	MarkAsGarbage(); // Prevent further calls from dynamic delegates
 }
