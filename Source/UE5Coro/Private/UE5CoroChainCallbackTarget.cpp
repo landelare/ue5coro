@@ -84,6 +84,8 @@ void UUE5CoroChainCallbackTarget::Tick(float DeltaTime)
 	// ProcessLatentActions refuses to work on non-BP classes before UE5.5.
 	GetClass()->ClassFlags |= CLASS_CompiledFromBlueprint;
 #endif
+	// This object's Outer is a world subsystem
+	checkf(IsValid(GetWorld()), TEXT("Expected to tick within a world"));
 	GetWorld()->GetLatentActionManager().ProcessLatentActions(this, DeltaTime);
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
 	GetClass()->ClassFlags &= ~CLASS_CompiledFromBlueprint;
