@@ -88,17 +88,6 @@ void FTestHelper::PumpGameThread(FTestWorld& World,
 		World.Tick();
 }
 
-void FTestHelper::CheckWorld(FAutomationTestBase& Test, UWorld* World)
-{
-	auto& Promise = static_cast<FLatentPromise&>(FPromise::Current());
-	// The check is only using the FPromise base class
-	checkf(!FPlatformString::Strcmp(Promise.Extras->DebugPromiseType,
-	                                TEXT("Latent")),
-	       TEXT("Internal error: only latent coroutines have a world context"));
-	// Now that it's known to be latent, check the world
-	Test.TestEqual("World check", Promise.World.Get(), World);
-}
-
 bool FTestHelper::ReadEvent(FAwaitableEvent& Event)
 {
 	UE::TUniqueLock Lock(Event.Lock);

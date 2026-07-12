@@ -164,7 +164,7 @@ UWorld* FPromise::GetWorld() const
 {
 	checkf(IsInGameThread(), TEXT("Internal error: attempted to read coroutine "
 	                              "world from outside the game thread"));
-	return nullptr;
+	return WeakWorld.Get();
 }
 
 bool FPromise::RegisterCancelableAwaiter(void* Awaiter)

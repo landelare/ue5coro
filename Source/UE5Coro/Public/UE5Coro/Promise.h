@@ -245,6 +245,9 @@ class [[nodiscard]] UE5CORO_API FPromise
 	FCancellationTracker CancellationTracker;
 
 protected:
+	// Latent promises always have a home world.
+	// Async promises are sometimes associated with a world.
+	TWeakObjectPtr<UWorld> WeakWorld;
 	void* CancelableAwaiter = nullptr;
 
 	std::shared_ptr<FPromiseExtras> Extras;
@@ -263,7 +266,7 @@ protected:
 public:
 	static FPromise& Current();
 	UE::FMutex& GetLock();
-	virtual UWorld* GetWorld() const; // nullptr if not associated with a world
+	UWorld* GetWorld() const; // nullptr if not associated with a world
 
 	[[nodiscard]] bool RegisterCancelableAwaiter(void*);
 	template<bool bLock> [[nodiscard]] bool UnregisterCancelableAwaiter();
@@ -295,6 +298,8 @@ protected:
 		: FPromise(std::move(InExtras), TEXT("Async")) { }
 
 public:
+	void SetWorld(UWorld* World);
+
 	FInitialSuspend initial_suspend() noexcept
 	{
 		return {FInitialSuspend::Resume};
@@ -314,11 +319,9 @@ class [[nodiscard]] UE5CORO_API FLatentPromise : public FPromise
 {
 	friend FLatentFinalSuspend;
 	friend Debug::FUE5CoroCategory;
-	friend Test::FTestHelper;
 
 	static int UUID;
 
-	TWeakObjectPtr<UWorld> World;
 	void* LatentAction = nullptr; // Use Extras->Lock for destruction
 	enum ELatentFlags : int
 	{
@@ -339,7 +342,6 @@ protected:
 	virtual void ThreadSafeDestroy() final override;
 
 public:
-	virtual UWorld* GetWorld() const override;
 	virtual void Resume() override;
 	void LatentActionDestroyed();
 	void CancelFromWithin();
@@ -473,14 +475,14 @@ FLatentPromise::FLatentPromise(std::shared_ptr<FPromiseExtras> InExtras,
 			{
 				checkf(IsValid(Context.CallbackTarget),
 			           TEXT("FLatentActionInfo callback target not valid"));
-				World = Context.CallbackTarget->GetWorld();
+				WeakWorld = Context.CallbackTarget->GetWorld();
 				CreateLatentAction(Context);
 			}
 			else if constexpr (bIsLatentContext<std::decay_t<T>>)
 			{
 				checkf(IsValid(Context.Target) && IsValid(Context.World),
 				       TEXT("Invalid override used for latent coroutine"));
-				World = Context.World;
+				WeakWorld = Context.World;
 				CreateLatentAction(Context.Target);
 			}
 		}(Args), ...);
@@ -496,17 +498,17 @@ FLatentPromise::FLatentPromise(std::shared_ptr<FPromiseExtras> InExtras,
 		{
 			if constexpr (std::is_pointer_v<T>)
 			{
-				World = WorldContext->GetWorld();
+				WeakWorld = WorldContext->GetWorld();
 				CreateLatentAction(WorldContext);
 			}
 			else
 			{
-				World = WorldContext.GetWorld();
+				WeakWorld = WorldContext.GetWorld();
 				CreateLatentAction(&WorldContext);
 			}
 		}(Args...);
 	}
-	checkf(World.IsValid(),
+	checkf(WeakWorld.IsValid(), // Latent coroutines must have a home world
 	       TEXT("Could not determine world for latent coroutine"));
 }
 }

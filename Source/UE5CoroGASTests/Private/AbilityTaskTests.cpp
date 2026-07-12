@@ -35,6 +35,7 @@
 #include "UE5CoroGASTestAbilityTask.h"
 #include "UE5CoroGASTestGameplayAbility.h"
 
+using namespace UE5Coro::Private;
 using namespace UE5Coro::Private::Test;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAbilityTaskTest, "UE5Coro.GAS.AbilityTask",
@@ -68,7 +69,11 @@ bool FAbilityTaskTest::RunTest(const FString& Parameters)
 #endif
 
 	// This is called from within an executing coroutine for FPromise::Current
-	auto CheckWorld = [&] { FTestHelper::CheckWorld(*this, World); };
+	auto CheckWorld = [&]
+	{
+		auto& Promise = FPromise::Current();
+		TestEqual("World test", Promise.GetWorld(), static_cast<UWorld*>(World));
+	};
 
 	{
 		TStrongObjectPtr Ptr(UUE5CoroGASTestAbilityTask::Run(Ability));
