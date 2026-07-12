@@ -39,6 +39,7 @@
 #include "CoreMinimal.h"
 #include "UE5Coro/Definitions.h"
 #include <functional>
+#include <vector>
 #define UE5CORO_PRIVATE_SUPPRESS_COROUTINE_INL
 #include "UE5Coro/Coroutine.h"
 #include "UE5Coro/Private.h"
@@ -206,7 +207,7 @@ class [[nodiscard]] UE5CORO_API FPromise
 
 protected:
 	std::shared_ptr<FPromiseExtras> Extras;
-	TArray<std::function<void(void*)>> OnCompleted;
+	std::vector<std::function<void(void*)>> OnCompleted;
 #if !PLATFORM_EXCEPTIONS_DISABLED
 	std::atomic<bool> bUnhandledException = false;
 #endif

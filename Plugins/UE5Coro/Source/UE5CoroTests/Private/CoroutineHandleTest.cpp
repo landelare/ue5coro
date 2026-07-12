@@ -146,6 +146,20 @@ void DoTestSharedPtr(FTestWorld& World, FAutomationTestBase& Test)
 		World.Tick();
 		Test.TestEqual(TEXT("No continuation"), State, 0);
 	}
+
+	{
+		int State = 0;
+		auto Coro = World.Run(CORO { co_await Latent::NextTick(); });
+		for (int i = 0; i < 100; ++i)
+			Coro.ContinueWith([&] { ++State; });
+		Test.TestEqual("Not completed yet 1", State, 0);
+		Test.TestFalse("Not completed yet 2", Coro.IsDone());
+		Test.TestFalse("Not completed yet 3", Coro.WasSuccessful());
+		FTestHelper::PumpGameThread(World, [&] { return Coro.IsDone(); });
+		Test.TestEqual("Completed 1", State, 100);
+		Test.TestTrue("Completed 2", Coro.IsDone());
+		Test.TestTrue("Completed 3", Coro.WasSuccessful());
+	}
 }
 
 template<typename... T>

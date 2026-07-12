@@ -37,6 +37,8 @@
 #include "UE5CoroGAS/AbilityPromises.h"
 #include "UE5CoroGameplayAbility.generated.h"
 
+class UUE5CoroTaskCallbackTarget;
+
 /**
  * Usage summary:
  * - Override ExecuteAbility instead of ActivateAbility
@@ -48,7 +50,7 @@ UCLASS(Abstract, NotBlueprintable)
 class UE5COROGAS_API UUE5CoroGameplayAbility : public UGameplayAbility
 {
 	GENERATED_BODY()
-	friend class UUE5CoroTaskCallbackTarget;
+	friend UUE5CoroTaskCallbackTarget;
 	friend UE5Coro::Private::TAbilityPromise<ThisClass>;
 
 	// One shared per class to support every instancing policy including derived

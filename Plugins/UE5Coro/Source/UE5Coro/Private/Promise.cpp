@@ -97,10 +97,11 @@ FPromise::~FPromise()
 
 	// The coroutine is considered completed NOW
 	auto* ReturnValuePtr = std::exchange(Extras->ReturnValuePtr, nullptr);
-	Extras->Completed->Trigger();
+	Extras->Completed->Trigger(); // This prevents new continuations
+	auto Completions = std::move(OnCompleted);
 	Extras->Lock.unlock();
 
-	for (auto& Fn : OnCompleted)
+	for (auto& Fn : Completions)
 		Fn(ReturnValuePtr);
 }
 
@@ -176,7 +177,7 @@ void FPromise::AddContinuation(std::function<void(void*)> Fn)
 	checkf(!Extras->Lock.try_lock(), TEXT("Internal error: lock not held"));
 	checkf(Fn, TEXT("Internal error: adding empty function as continuation"));
 
-	OnCompleted.Add(std::move(Fn));
+	OnCompleted.push_back(std::move(Fn));
 }
 
 void FPromise::unhandled_exception()
