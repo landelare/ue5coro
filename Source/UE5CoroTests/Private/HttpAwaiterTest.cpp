@@ -63,7 +63,7 @@ void DoTest(FAutomationTestBase& Test)
 		auto Request = FHttpModule::Get().CreateRequest();
 		// We're not testing HTTP, just the awaiter
 		Request->SetURL(TEXT(".invalid"));
-		Request->SetTimeout(0.01);
+		Request->SetTimeout(0.01f);
 		auto Awaiter = ProcessAsync(Request);
 		auto AwaiterCopy = Awaiter;
 		auto [Response, bSuccess] = co_await AwaiterCopy;
@@ -86,7 +86,7 @@ void DoTest(FAutomationTestBase& Test)
 		auto Request = FHttpModule::Get().CreateRequest();
 		// We're not testing HTTP, just the awaiter
 		Request->SetURL(TEXT(".invalid"));
-		Request->SetTimeout(0.01);
+		Request->SetTimeout(0.01f);
 		auto [Response, bSuccess] = co_await ProcessAsync(Request);
 		// In UE4, this always ends in the game thread
 		Test.TestTrue("In game thread", IsInGameThread());
@@ -103,7 +103,7 @@ void DoTest(FAutomationTestBase& Test)
 		auto Request = FHttpModule::Get().CreateRequest();
 		// We're not testing HTTP, just the awaiter
 		Request->SetURL(TEXT(".invalid"));
-		Request->SetTimeout(0.01);
+		Request->SetTimeout(0.01f);
 		[[maybe_unused]] auto Unused = ProcessAsync(Request);
 		co_await Latent::NextTick(); // FTestWorld::Run() wants an async finish
 	});

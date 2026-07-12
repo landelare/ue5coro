@@ -107,7 +107,6 @@ class UE5COROTESTS_API FTestHelper
 public:
 	static void PumpGameThread(FTestWorld& World,
 	                           std::function<bool()> ExitCondition);
-	static void CheckWorld(FAutomationTestBase& Test, UWorld* World);
 	static bool ReadEvent(FAwaitableEvent&);
 	static int ReadSemaphore(FAwaitableSemaphore&);
 	static bool IsIdle(FAwaitableEvent&);

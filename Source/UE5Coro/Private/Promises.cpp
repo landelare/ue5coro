@@ -97,6 +97,10 @@ public:
 			return;
 		}
 
+		// Display the promise's home world to the awaiter
+		checkf(IsValid(LatentPromise->GetWorld()),
+		       TEXT("Internal error: latent coroutine's home world was lost"));
+		FWorldScope WorldScope(LatentPromise->GetWorld());
 		if (CurrentAwaiter.IsValid() && CurrentAwaiter.ShouldResume())
 		{
 			CurrentAwaiter.Clear();
@@ -172,6 +176,27 @@ bool FAsyncPromise::IsEarlyDestroy() const
 	return ShouldCancel(false);
 }
 
+#if UE5CORO_DEBUG
+void FAsyncPromise::Resume()
+{
+	checkf(WeakWorld.IsExplicitlyNull(),
+	       TEXT("Internal error: resuming async coroutine with uncleared world"));
+	FPromise::Resume();
+}
+#endif
+
+void FAsyncPromise::SetWorld(UWorld* World)
+{
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: changing coroutine world off the game thread"));
+	checkfSlow(static_cast<bool>(World) == IsValid(World),
+	           TEXT("Internal error: associating coroutine with invalid world"));
+	// Can't go from one world to another directly
+	checkf(WeakWorld.IsExplicitlyNull() || !World,
+	       TEXT("Internal error: invalid coroutine world transition"));
+	WeakWorld = World;
+}
+
 int FLatentPromise::UUID = 0;
 
 void FLatentPromise::CreateLatentAction(const UObject* Owner)
@@ -180,7 +205,7 @@ void FLatentPromise::CreateLatentAction(const UObject* Owner)
 	       TEXT("Latent coroutines may only be started on the game thread"));
 	checkf(IsValid(Owner),
 	       TEXT("Attempted to start latent coroutine with invalid owner"));
-	checkf(World.IsValid(),
+	checkf(WeakWorld.IsValid(),
 	       TEXT("Could not determine world for latent coroutine"));
 
 	CreateLatentAction(
@@ -240,12 +265,6 @@ void FLatentPromise::ThreadSafeDestroy()
 	FPromise::ThreadSafeDestroy(); // Counts as delete this;
 	checkf(GLatentExitReason == ELatentExitReason::Normal,
 	       TEXT("Internal error: latent exit reason not restored"));
-}
-
-UWorld* FLatentPromise::GetWorld() const
-{
-	std::ignore = FPromise::GetWorld(); // Run debug checks
-	return World.Get();
 }
 
 void FLatentPromise::Resume()
@@ -363,7 +382,8 @@ FInitialSuspend FLatentPromise::initial_suspend()
 {
 	checkf(IsInGameThread(),
 	       TEXT("Latent coroutines may only be started on the game thread"));
-	checkf(World.IsValid(),
+	auto* World = GetWorld();
+	checkf(IsValid(World),
 	       TEXT("Internal error: latent coroutine starts in invalid/stale world"));
 
 	auto* Pending = static_cast<FPendingLatentCoroutine*>(LatentAction);
@@ -371,7 +391,7 @@ FInitialSuspend FLatentPromise::initial_suspend()
 	auto* Target = LatentInfo.CallbackTarget;
 	// Expecting the same world that was determined in the constructor
 	checkf(IsValid(Target) &&
-	       (Target->IsTemplate() || Target->GetWorld() == World.Get()),
+	       (Target->IsTemplate() || Target->GetWorld() == World),
 	       TEXT("Internal error: coroutine suspending in invalid state"));
 	auto& LAM = World->GetLatentActionManager();
 

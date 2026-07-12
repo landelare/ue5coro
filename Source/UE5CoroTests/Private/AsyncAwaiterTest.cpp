@@ -162,11 +162,11 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		Test.TestEqual("Initial state", State, 0);
 		auto Start = FPlatformTime::Seconds();
-		FPlatformProcess::Sleep(0.07);
+		FPlatformProcess::Sleep(0.07f);
 		Test.TestTrue("Sleep is reliable 1",
 		              FPlatformTime::Seconds() >= Start + 0.05);
 		Test.TestTrue("State has increased", State >= 1);
-		FPlatformProcess::Sleep(0.05);
+		FPlatformProcess::Sleep(0.05f);
 		Test.TestTrue("Sleep is reliable 2",
 		              FPlatformTime::Seconds() >= Start + 0.1);
 		Test.TestEqual("Final state", State, 2);
@@ -229,7 +229,7 @@ bool FAsyncStressTest::RunTest(const FString& Parameters)
 	});
 	while (Count < 2000)
 		FPlatformProcess::Yield();
-	FPlatformProcess::Sleep(0.01);
+	FPlatformProcess::Sleep(0.01f);
 	TestEqual("Final count", Count, 2000);
 
 	return true;
