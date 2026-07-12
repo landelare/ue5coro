@@ -84,6 +84,10 @@ public:
 	{
 		checkf(Promise, TEXT("Internal error: update on null promise"));
 
+		// Display the promise's temporary world to the awaiter
+		checkf(IsValid(Promise->GetWorld()),
+		       TEXT("Internal error: async coroutine's temp world was lost"));
+		FWorldScope WorldScope(Promise->GetWorld());
 		// React to cancellations and the awaiter completing
 		if (Promise->ShouldCancel(false) || Awaiter.ShouldResume())
 		{

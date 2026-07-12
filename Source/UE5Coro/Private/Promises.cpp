@@ -97,6 +97,10 @@ public:
 			return;
 		}
 
+		// Display the promise's home world to the awaiter
+		checkf(IsValid(LatentPromise->GetWorld()),
+		       TEXT("Internal error: latent coroutine's home world was lost"));
+		FWorldScope WorldScope(LatentPromise->GetWorld());
 		if (CurrentAwaiter.IsValid() && CurrentAwaiter.ShouldResume())
 		{
 			CurrentAwaiter.Clear();
@@ -187,7 +191,8 @@ void FAsyncPromise::SetWorld(UWorld* World)
 	       TEXT("Internal error: changing coroutine world off the game thread"));
 	checkfSlow(static_cast<bool>(World) == IsValid(World),
 	           TEXT("Internal error: associating coroutine with invalid world"));
-	checkf(!(GetWorld() && World), // Can't go from one world to another directly
+	// Can't go from one world to another directly
+	checkf(WeakWorld.IsExplicitlyNull() || !World,
 	       TEXT("Internal error: invalid coroutine world transition"));
 	WeakWorld = World;
 }
