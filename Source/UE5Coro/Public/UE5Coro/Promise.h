@@ -113,13 +113,19 @@ public:
 	}
 };
 
-struct UE5CORO_API FCoroutineScope final
+struct FWorldScope
+{
+	UWorld* World;
+	UWorld* PreviousWorld;
+
+	explicit FWorldScope(UWorld*);
+	~FWorldScope();
+};
+
+struct UE5CORO_API FCoroutineScope final : FWorldScope
 {
 	FPromise* Promise;
 	FPromise* PreviousPromise;
-	bool bHasWorld = false;
-	UWorld* World;
-	UWorld* PreviousWorld;
 
 	explicit FCoroutineScope(FPromise*);
 	~FCoroutineScope();

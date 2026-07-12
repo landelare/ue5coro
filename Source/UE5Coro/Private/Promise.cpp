@@ -38,30 +38,36 @@ thread_local FPromise* UE5Coro::Private::GCurrentPromise = nullptr;
 UWorldProxy UE5Coro::Private::GCurrentCoroWorld;
 thread_local bool UE5Coro::Private::GDestroyedEarly = false;
 
-FCoroutineScope::FCoroutineScope(FPromise* Promise)
-	: Promise(Promise),
-	  PreviousPromise(std::exchange(GCurrentPromise, Promise))
+FWorldScope::FWorldScope(UWorld* World)
+	: World(World),
+	  PreviousWorld(World ? std::exchange(GCurrentCoroWorld, World) : nullptr)
 {
-	if (IsInGameThread())
-		if (auto* PromiseWorld = Promise->GetWorld())
-		{
-			bHasWorld = true;
-			World = PromiseWorld;
-			PreviousWorld = std::exchange(GCurrentCoroWorld, World);
-		}
+	checkf(!World || IsInGameThread(),
+	       TEXT("Internal error: world scope off the game thread"));
+	checkf(!World || IsValid(World),
+	       TEXT("Internal error: invalid world scope"));
+}
+
+FWorldScope::~FWorldScope()
+{
+	if (!World)
+		return;
+	checkf(IsInGameThread(),
+	       TEXT("Internal error: unexpected cross-thread world scope"));
+	verifyf(std::exchange(GCurrentCoroWorld, PreviousWorld) == World,
+	        TEXT("Internal error: world tracking derailed"));
+}
+
+FCoroutineScope::FCoroutineScope(FPromise* Promise)
+	: FWorldScope(IsInGameThread() ? Promise->GetWorld() : nullptr),
+	  Promise(Promise), PreviousPromise(std::exchange(GCurrentPromise, Promise))
+{
 }
 
 FCoroutineScope::~FCoroutineScope()
 {
 	verifyf(std::exchange(GCurrentPromise, PreviousPromise) == Promise,
 	        TEXT("Internal error: coroutine tracking derailed"));
-	if (bHasWorld)
-	{
-		checkf(IsInGameThread(),
-		       TEXT("Internal error: unexpected cross-thread world scope"));
-		verifyf(std::exchange(GCurrentCoroWorld, PreviousWorld) == World,
-		        TEXT("Internal error: world tracking derailed"));
-	}
 }
 
 bool FPromiseExtras::IsComplete() const
