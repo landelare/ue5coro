@@ -172,6 +172,15 @@ bool FAsyncPromise::IsEarlyDestroy() const
 	return ShouldCancel(false);
 }
 
+#if UE5CORO_DEBUG
+void FAsyncPromise::Resume()
+{
+	checkf(WeakWorld.IsExplicitlyNull(),
+	       TEXT("Internal error: resuming async coroutine with uncleared world"));
+	FPromise::Resume();
+}
+#endif
+
 void FAsyncPromise::SetWorld(UWorld* World)
 {
 	checkf(IsInGameThread(),

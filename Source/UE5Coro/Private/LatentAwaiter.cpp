@@ -45,10 +45,16 @@ class [[nodiscard]] FPendingAsyncCoroutine final : public FPendingLatentAction
 	FLatentAwaiter Awaiter;
 
 public:
-	FPendingAsyncCoroutine(FAsyncPromise& Promise,
+	/** Temporarily associates the coroutine with a world */
+	FPendingAsyncCoroutine(UWorld* World, FAsyncPromise& Promise,
 	                       const FLatentAwaiter& InAwaiter)
 		: Promise(&Promise), Awaiter(InAwaiter)
 	{
+		checkf(!Promise.GetWorld(),
+		       TEXT("Internal error: expected worldless promise"));
+		checkf(IsValid(World),
+		       TEXT("Internal error: expected valid world for latent action"));
+		Promise.SetWorld(World);
 #if UE5CORO_ENABLE_COROUTINE_TRACKING
 		Debug::TrackTickingAsyncPromise(&Promise);
 #endif
@@ -70,6 +76,7 @@ public:
 #if UE5CORO_ENABLE_COROUTINE_TRACKING
 		Debug::ForgetTickingAsyncPromise(Promise);
 #endif
+		Promise->SetWorld(nullptr);
 		Promise->Resume(); // The latent action ended, which is a kind of result
 	}
 
@@ -82,10 +89,11 @@ public:
 		{
 			Response.DoneIf(true);
 
-			// Ownership moves back to the coroutine itself
 #if UE5CORO_ENABLE_COROUTINE_TRACKING
 			Debug::ForgetTickingAsyncPromise(Promise);
 #endif
+			// Remove the world association, and disarm our destructor
+			Promise->SetWorld(nullptr);
 			std::exchange(Promise, nullptr)->Resume();
 		}
 	}
@@ -160,7 +168,7 @@ void FLatentAwaiter::Suspend(FAsyncPromise& Promise)
 	auto* Sys = World->GetSubsystem<UUE5CoroSubsystem>();
 	checkf(::IsValid(Sys), TEXT("Latent awaiters may not be used when the "
 	                            "world is not fully initialized"));
-	auto* Latent = new FPendingAsyncCoroutine(Promise, *this);
+	auto* Latent = new FPendingAsyncCoroutine(World, Promise, *this);
 	auto LatentInfo = Sys->MakeLatentInfo();
 	World->GetLatentActionManager().AddNewAction(LatentInfo.CallbackTarget,
 	                                             LatentInfo.UUID, Latent);

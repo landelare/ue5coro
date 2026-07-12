@@ -298,6 +298,9 @@ protected:
 		: FPromise(std::move(InExtras), TEXT("Async")) { }
 
 public:
+#if UE5CORO_DEBUG
+	virtual void Resume() override;
+#endif
 	void SetWorld(UWorld* World);
 
 	FInitialSuspend initial_suspend() noexcept
