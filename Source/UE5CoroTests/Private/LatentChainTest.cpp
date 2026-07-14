@@ -117,7 +117,7 @@ void DoTest(FAutomationTestBase& Test)
 		World.Tick(0.5);
 		Test.TestEqual("Half state", State, 1);
 		DoubleTick(2, 1);
-		DoubleTick(3, 1.01);
+		DoubleTick(3, 1.01f);
 	}
 
 	{

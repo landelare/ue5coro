@@ -63,7 +63,7 @@ void DoTest(FAutomationTestBase& Test)
 		auto Request = FHttpModule::Get().CreateRequest();
 		// We're not testing HTTP, just the awaiter
 		Request->SetURL(TEXT(".invalid"));
-		Request->SetTimeout(0.01);
+		Request->SetTimeout(0.01f);
 		auto Awaiter = ProcessAsync(Request);
 		auto AwaiterCopy = Awaiter;
 		auto [Response, bSuccess] = co_await AwaiterCopy;
@@ -86,7 +86,7 @@ void DoTest(FAutomationTestBase& Test)
 		auto Request = FHttpModule::Get().CreateRequest();
 		// We're not testing HTTP, just the awaiter
 		Request->SetURL(TEXT(".invalid"));
-		Request->SetTimeout(0.01);
+		Request->SetTimeout(0.01f);
 		auto [Response, bSuccess] = co_await ProcessAsync(Request);
 		Test.TestFalse("Not in game thread 2", IsInGameThread());
 		Test.TestFalse("Success", bSuccess);
@@ -102,7 +102,7 @@ void DoTest(FAutomationTestBase& Test)
 		auto Request = FHttpModule::Get().CreateRequest();
 		// We're not testing HTTP, just the awaiter
 		Request->SetURL(TEXT(".invalid"));
-		Request->SetTimeout(0.01);
+		Request->SetTimeout(0.01f);
 		[[maybe_unused]] auto Unused = ProcessAsync(Request);
 		co_return;
 	});
@@ -117,7 +117,7 @@ void DoTest(FAutomationTestBase& Test)
 		Request->SetDelegateThreadPolicy(
 			EHttpRequestDelegateThreadPolicy::CompleteOnHttpThread);
 		Request->SetURL(TEXT(".invalid"));
-		Request->SetTimeout(0.01);
+		Request->SetTimeout(0.01f);
 		co_await Http::ProcessAsync(Request);
 		FPlatformMisc::MemoryBarrier();
 		Test.TestFalse("Not GT", IsInGameThread());

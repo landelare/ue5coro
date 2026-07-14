@@ -45,7 +45,7 @@ FTestWorld::FTestWorld()
 	GWorld = World;
 	World->InitializeActorsForPlay(FURL());
 	auto* Settings = World->GetWorldSettings();
-	Settings->MinUndilatedFrameTime = 0.0001;
+	Settings->MinUndilatedFrameTime = 0.0001f;
 	Settings->MaxUndilatedFrameTime = 10;
 	World->BeginPlay();
 }

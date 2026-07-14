@@ -115,13 +115,13 @@ void DoTest(FAutomationTestBase& Test)
 			RealState = 2;
 		});
 		World.EndTick();
-		UGameplayStatics::SetGlobalTimeDilation(World, 0.1);
+		UGameplayStatics::SetGlobalTimeDilation(World, 0.1f);
 		Test.TestEqual("Seconds 1-1", State, 1);
 		Test.TestEqual("RealSeconds 1-1", RealState, 1);
-		World.Tick(0.95);
+		World.Tick(0.95f);
 		Test.TestEqual("Seconds 1-2", State, 1);
 		Test.TestEqual("RealSeconds 1-2", RealState, 1);
-		World.Tick(0.1); // Crossing 1.0s here
+		World.Tick(0.1f); // Crossing 1.0s here
 		World->bDebugPauseExecution = false;
 		Test.TestEqual("Seconds 1-3", State, 1);
 		Test.TestEqual("RealSeconds 2", RealState, 2);
@@ -148,13 +148,13 @@ void DoTest(FAutomationTestBase& Test)
 			RealState = 2;
 		});
 		World.EndTick();
-		UGameplayStatics::SetGlobalTimeDilation(World, 0.1);
+		UGameplayStatics::SetGlobalTimeDilation(World, 0.1f);
 		Test.TestEqual("UntilTime 1-1", State, 1);
 		Test.TestEqual("UntilRealTime 1-1", RealState, 1);
-		World.Tick(0.95);
+		World.Tick(0.95f);
 		Test.TestEqual("UntilTime 1-2", State, 1);
 		Test.TestEqual("UntilRealTime 1-2", RealState, 1);
-		World.Tick(0.1); // Crossing 1.0s here
+		World.Tick(0.1f); // Crossing 1.0s here
 		World->bDebugPauseExecution = false;
 		Test.TestEqual("UntilTime 1-3", State, 1);
 		Test.TestEqual("UntilRealTime 2", RealState, 2);
@@ -176,14 +176,14 @@ void DoTest(FAutomationTestBase& Test)
 		});
 		World.EndTick();
 		UGameplayStatics::SetGlobalTimeDilation(World, 2);
-		World.Tick(0.4); // 0.8
+		World.Tick(0.4f); // 0.8
 		Test.TestEqual("SecondsForActor 1-1", State, 0);
-		World.Tick(0.2); // 1.2
+		World.Tick(0.2f); // 1.2
 		Test.TestEqual("SecondsForActor 1-2", State, 1);
 		Actor->CustomTimeDilation = 2;
-		World.Tick(0.1); // 1.6
+		World.Tick(0.1f); // 1.6
 		Test.TestEqual("SecondsForActor 2-1", State, 1);
-		World.Tick(0.2); // 2.4
+		World.Tick(0.2f); // 2.4
 		Test.TestEqual("SecondsForActor 2-2", State, 2);
 		UGameplayStatics::SetGlobalTimeDilation(World, 1);
 		Actor->Destroy();
@@ -198,10 +198,10 @@ void DoTest(FAutomationTestBase& Test)
 			++State;
 		});
 		World.EndTick();
-		World.Tick(0.1);
+		World.Tick(0.1f);
 		Test.TestEqual("SecondsForActor 1", State, 0);
 		Actor->Destroy();
-		World.Tick(0.1);
+		World.Tick(0.1f);
 		Test.TestEqual("SecondsForActor 2", State, 1);
 	}
 }

@@ -62,7 +62,7 @@ void DoTest(FAutomationTestBase& Test)
 		World.Run(CORO
 		{
 			auto Budget = FTickTimeBudget::Milliseconds(1);
-			FPlatformProcess::Sleep(0.002);
+			FPlatformProcess::Sleep(0.002f);
 			co_await Budget;
 			State = 1;
 		});
