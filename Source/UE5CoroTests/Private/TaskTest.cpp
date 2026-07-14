@@ -146,17 +146,22 @@ void DoConsumeTest(FAutomationTestBase& Test)
 				return 3;
 			});
 			Test.TestTrue("Still in game thread", IsInGameThread());
-			decltype(auto) Value1 = co_await Task;
+			auto Value1 = co_await Task;
 			Test.TestFalse("Moved out of game thread 1", IsInGameThread());
-			decltype(auto) Value2 = co_await std::move(Task);
+			auto Value2 = co_await std::move(Task);
 			Test.TestFalse("Moved out of game thread 2", IsInGameThread());
-			// TTask<T>::GetResult() returns T&
-			static_assert(std::is_lvalue_reference_v<decltype(Value1)>);
-			static_assert(std::is_lvalue_reference_v<decltype(Value2)>);
 			Test.TestEqual("Values", Value1, Value2);
 			Retval = Value1;
 			++State;
 			CoroToTest->Trigger();
+			if (State == -123) [[unlikely]] // Expected to never run
+			{
+				Test.AddError("Bad state");
+				[[maybe_unused]] decltype(auto) Type1 = co_await Task;
+				[[maybe_unused]] decltype(auto) Type2 = co_await std::move(Task);
+				static_assert(std::is_lvalue_reference_v<decltype(Type1)>);
+				static_assert(std::is_lvalue_reference_v<decltype(Type2)>);
+			}
 		});
 		TestToCoro->Trigger();
 		CoroToTest->Wait();
