@@ -5,6 +5,14 @@ UE5Coro implements C++20
 Unreal Engine 5 with a focus on gameplay logic, convenience, and providing
 seamless integration with the engine.
 
+> [!NOTE]
+> UE5Coro is complete, with no known bugs at the time of archival.
+> Unreal Engine 5 has reached the end of its lifecycle, and this plugin with it.
+>
+> Thank you to everyone who submitted bug reports and feature requests over the
+> years.
+> UE5Coro wouldn't be as good as it is without your input. ❤️
+
 There's built-in support for easy authoring of latent UFUNCTIONs.
 Change the return type of a latent UFUNCTION to make it a coroutine, and you get
 all the FPendingLatentAction boilerplate for free, with BP-safe multithreading
@@ -102,7 +110,7 @@ you only need O(1) storage instead of O(N) for N items, what's not to like?
 # List of features
 
 The following links will get you to the relevant pages of the documentation.
-Bookmark this section if you prefer to read the latest documentation in your
+Bookmark this section if you prefer to read the final documentation in your
 browser, or read it straight from your IDE.
 Every API function is documented in the C++ headers, and the releases contain
 the Markdown source of the documentation that you're reading right now.
@@ -140,9 +148,10 @@ coroutines.
 > [!NOTE]
 > Most of these functions return undocumented internal types from the
 > `UE5Coro::Private` namespace.
-> Client code should not refer to anything from this namespace directly, as
-> everything within is subject to change in future versions, **without** prior
-> deprecation.
+> Using these directly is highly advanced, and not as convenient as the public
+> API.
+> It is strongly recommended to never refer to anything from this namespace
+> by name.
 >
 > Most often, this is not an issue: for example, the unnamed temporary object in
 > `co_await Something()` does not appear in source code.
@@ -214,8 +223,8 @@ default.
 
 # Updates
 
-To update, delete UE5Coro from your project's Plugins folder, and install the
-new version using the instructions above.
+To update (or downgrade), delete UE5Coro from your project's Plugins folder, and
+install the desired version using its instructions from its README.md.
 
 # Packaging
 
